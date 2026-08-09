@@ -13,25 +13,29 @@ import { Label } from '../components/ui/label';
 // yang belum dimigrasi. Semua logic auth (login, redirect, error handling)
 // PERSIS SAMA kayak sebelumnya - cuma markup/styling yang diganti.
 //
-// TIDAK ada "Keep me signed in" atau "Forgot Password?" di sini walaupun
-// lazim ada di template login - backend belum punya fitur itu (session
-// selalu sama durasinya, gak ada endpoint reset password). Nambahin kontrol
-// UI yang gak beneran ngapa-ngapain itu bohong ke user, jadi sengaja dilewatin.
+// TIDAK ada "Keep me signed in" di sini - itu toggle yang kalau dipasang
+// harus BENERAN ngubah durasi sesi, bukan sekadar checkbox kosong.
+//
+// "Forgot Password?" TETAP ada (link ke /forgot-password) walaupun backend
+// belum punya endpoint reset password - kebijakan reskin: elemen dari
+// referensi Mantis gak di-skip diam-diam, tetap ditampilkan, tapi karena
+// route-nya sengaja gak didefinisikan di App.jsx, klik bakal kena catch-all
+// NotFoundPage (404) alih-alih diem-diem gak ngapa-ngapain atau nge-lie
+// pura-pura sukses kirim email.
+// Background decoration pake foto asli (frontend/public/auth-bg.jpg),
+// full-cover di tengah layar (bukan bulatan kecil di pojok lagi) terus
+// diblur berat + overlay gelap tipis biar card & teks tetep gampang dibaca.
+// Kalau file belum ditaruh, browser cuma nampilin broken-image kecil
+// (gak break layout/build).
 function BackgroundDecoration() {
   return (
     <div className="pointer-events-none fixed inset-0 overflow-hidden">
-      <div
-        className="absolute -left-32 bottom-0 h-[420px] w-[420px] rounded-full opacity-30 blur-3xl"
-        style={{ background: 'var(--accent)' }}
+      <img
+        src="/auth-bg.jpg"
+        alt=""
+        className="absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl"
       />
-      <div
-        className="absolute -left-10 bottom-20 h-[280px] w-[280px] rounded-full opacity-20 blur-3xl"
-        style={{ background: 'var(--ok)' }}
-      />
-      <div
-        className="absolute left-40 -bottom-20 h-[260px] w-[260px] rounded-full opacity-10 blur-3xl"
-        style={{ background: 'var(--danger)' }}
-      />
+      <div className="absolute inset-0 bg-background/70" />
     </div>
   );
 }
@@ -71,11 +75,12 @@ function LoginPage() {
     <div className="relative flex min-h-screen items-center justify-center bg-background p-4">
       <BackgroundDecoration />
 
-      {/* Logo di pojok kiri atas halaman - bukan di atas card */}
+      {/* Logo di pojok kiri atas halaman - bukan di atas card.
+          Gambar asli, bukan placeholder huruf - lihat frontend/public/logo.svg.
+          Kalau file belum ditaruh, browser cuma nampilin broken-image icon
+          di sini (gak break build). */}
       <div className="fixed left-6 top-6 flex items-center gap-2.5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-          H
-        </div>
+        <img src="/logo.svg" alt="PM Monitor" className="h-8 w-auto" />
         <span className="[font-family:var(--font-display)] text-base font-semibold text-foreground">
           PM Monitor
         </span>
@@ -104,7 +109,12 @@ function LoginPage() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Link to="/forgot-password" className="text-xs text-primary hover:underline">
+                Lupa Password?
+              </Link>
+            </div>
             <div className="relative">
               <Input
                 id="password"
@@ -118,7 +128,7 @@ function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground"
+                className="absolute inset-y-0 right-0 flex w-10 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-muted-foreground [appearance:none] hover:text-foreground"
                 tabIndex={-1}
                 aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
               >

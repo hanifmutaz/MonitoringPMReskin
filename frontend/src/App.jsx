@@ -18,6 +18,7 @@ import InventoryPage from './pages/InventoryPage';
 import InventoryHistoryPage from './pages/InventoryHistoryPage';
 import SettingsPage from './pages/SettingsPage';
 import UserManagementPage from './pages/UserManagementPage';
+import NotFoundPage from './pages/NotFoundPage';
 
 function App() {
   return (
@@ -49,6 +50,12 @@ function App() {
           </Route>
         </Route>
       </Route>
+
+      {/* Catch-all - juga nangkep link ke fitur yang belum ada implementasinya
+          beneran (misal "Lupa Password?" di LoginPage), daripada disembunyiin
+          total dari UI. Sengaja di luar ProtectedRoute biar kena baik lagi
+          login maupun udah, dan gak butuh backend endpoint apa pun. */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

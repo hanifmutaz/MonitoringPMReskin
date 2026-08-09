@@ -12,31 +12,29 @@ const emptyForm = { username: '', full_name: '', email: '', password: '', confir
 // Sama gaya kayak LoginPage.jsx (logo pojok, blob dekoratif, card header
 // title+link sejajar) - ditulis independen, bukan shared component, karena
 // cuma dipakai di 2 tempat ini. Semua logic validasi/submit gak berubah.
+// Sama gaya kayak LoginPage.jsx (logo pojok, foto blur dekoratif, card header
+// title+link sejajar) - ditulis independen, bukan shared component, karena
+// cuma dipakai di 2 tempat ini. Semua logic validasi/submit gak berubah.
+// Foto asli di frontend/public/auth-bg.jpg, full-cover + blur + overlay
+// gelap (bukan bulatan kecil di pojok).
 function BackgroundDecoration() {
   return (
     <div className="pointer-events-none fixed inset-0 overflow-hidden">
-      <div
-        className="absolute -left-32 bottom-0 h-[420px] w-[420px] rounded-full opacity-30 blur-3xl"
-        style={{ background: 'var(--accent)' }}
+      <img
+        src="/auth-bg.jpg"
+        alt=""
+        className="absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl"
       />
-      <div
-        className="absolute -left-10 bottom-20 h-[280px] w-[280px] rounded-full opacity-20 blur-3xl"
-        style={{ background: 'var(--ok)' }}
-      />
-      <div
-        className="absolute left-40 -bottom-20 h-[260px] w-[260px] rounded-full opacity-10 blur-3xl"
-        style={{ background: 'var(--danger)' }}
-      />
+      <div className="absolute inset-0 bg-background/70" />
     </div>
   );
 }
 
+// Gambar asli, bukan placeholder huruf - lihat frontend/public/logo.svg.
 function Logo() {
   return (
     <div className="fixed left-6 top-6 flex items-center gap-2.5">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-        H
-      </div>
+      <img src="/logo.svg" alt="PM Monitor" className="h-8 w-auto" />
       <span className="[font-family:var(--font-display)] text-base font-semibold text-foreground">PM Monitor</span>
     </div>
   );
@@ -171,7 +169,7 @@ function RegisterPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground"
+                className="absolute inset-y-0 right-0 flex w-10 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-muted-foreground [appearance:none] hover:text-foreground"
                 tabIndex={-1}
                 aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
               >
