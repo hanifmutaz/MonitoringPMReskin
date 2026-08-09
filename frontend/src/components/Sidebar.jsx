@@ -1,49 +1,98 @@
 // src/components/Sidebar.jsx
-import { NavLink } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
-  Gauge,
-  CalendarClock,
   Wrench,
-  History,
   ClipboardList,
   Database,
-  Package,
-  PackageSearch,
-  Settings as SettingsIcon,
-  Users,
+  ShieldCheck,
+  ChevronDown,
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboardSummary } from '../hooks/useDashboardSummary';
 
-// Reskin (RESKIN-PLAN.md §8 langkah 1): markup/className diganti Tailwind
-// murni, LOGIC (routing, badgeCount, logout, isAdmin gating) PERSIS SAMA
-// kayak sebelumnya - gak ada perubahan data/behavior. Class lama
-// (.sidebar/.nav-item/.brand-mark/dst dari components.css & global.css)
-// dilepas TOTAL dari elemen ini, bukan digabung dengan Tailwind - unlayered
-// CSS lama itu akan selalu menang atas Tailwind utility kalau digabung
-// (lihat §7.3 RESKIN-PLAN.md), jadi override gak akan kepake kalau class
-// lama masih nempel.
+// Reskin lanjutan (revisi setelah feedback via chat):
+// 1. FIX BUG: nav item ke-underline - kelewatan pas reskin pertama, elemen
+//    <a>/NavLink browser default punya text-decoration:underline, CSS lama
+//    yang nutupin ini (.nav-item{text-decoration:none}) udah dilepas waktu
+//    reskin pertama tapi lupa ganti sama util Tailwind `no-underline`.
+// 2. Grup nav diganti dari flat list + label statis, jadi PARENT (ikon +
+//    label + chevron) yang bisa di-collapse/expand + SUB-ITEM di dalamnya -
+//    pola diambil dari referensi mockup (grup "Invoice" di Mantis, lihat
+//    screenshot yang dikasih user). Grup yang otomatis kebuka: grup yang
+//    berisi route aktif saat ini. User bisa expand/collapse grup lain manual
+//    (bukan accordion ketat - lebih dari satu grup boleh kebuka bareng).
+// 3. `--sidebar-width` dinaikin ke 280px (dari 230px, di tokens.css) +
+//    label item TIDAK di-truncate lagi (dulu `truncate` bikin "...") -
+//    sekarang boleh wrap ke baris kedua kalau memang masih kurang lebar,
+//    tapi dengan lebar baru harusnya muat 1 baris.
 //
-// Struktur nav TETAP flat 5 grup / 12 item (BUKAN collapsible) - sesuai
-// rekomendasi §5.1: mockup referensi (`dashboard-mockup.html`) punya
-// puluhan item makanya butuh collapse per-grup, kita cuma 12 item jadi
-// gak perlu.
+// Data/logic (routing, badgeCount dari useDashboardSummary, logout,
+// isAdmin gating) TETAP SAMA - cuma markup/struktur nav yang berubah.
 //
-// TODO(logo/foto): brand mark masih placeholder huruf "H" dalam kotak
-// (pola yang sama kayak yang sudah dipakai di LoginPage.jsx/RegisterPage.jsx
-// - lihat catatan TODO yang sama di sana). Begitu file logo asli (SVG/PNG)
-// Hirose/PM Monitor tersedia, ganti div placeholder ini jadi <img>. JANGAN
-// pakai icon-font untuk ini.
+// TODO(logo): brand mark masih placeholder huruf "H" - ganti ke <img>
+// begitu file logo asli tersedia (JANGAN icon-font, sesuai instruksi user).
 
-function NavItem({ to, icon: Icon, children, badgeCount }) {
+const NAV_GROUPS = [
+  {
+    key: 'dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    items: [
+      { to: '/', label: 'Dashboard Management' },
+      { to: '/dashboard/pm-part', label: 'Dashboard PM Part' },
+      { to: '/dashboard/pm-line', label: 'Dashboard PM Monthly and Weekly' },
+    ],
+  },
+  {
+    key: 'pm-part',
+    label: 'PM Part',
+    icon: Wrench,
+    items: [
+      { to: '/pm-part', label: 'Monitoring PM Part', badgeKey: 'status_danger' },
+      { to: '/pm-part/history', label: 'History PM Part' },
+    ],
+  },
+  {
+    key: 'pm-line',
+    label: 'PM Monthly and Weekly',
+    icon: ClipboardList,
+    items: [
+      { to: '/pm-line', label: 'Monitoring PM Monthly and Weekly', badgeKey: 'lines_critical' },
+      { to: '/pm-line/history', label: 'History PM Monthly and Weekly' },
+    ],
+  },
+  {
+    key: 'data',
+    label: 'Data',
+    icon: Database,
+    items: [
+      { to: '/master-data', label: 'Master Data Part' },
+      { to: '/inventory', label: 'Inventory' },
+      { to: '/inventory/history', label: 'History Inventory' },
+    ],
+  },
+  {
+    key: 'admin',
+    label: 'Administrasi',
+    icon: ShieldCheck,
+    adminOnly: true,
+    items: [
+      { to: '/settings', label: 'Settings' },
+      { to: '/users', label: 'User Management' },
+    ],
+  },
+];
+
+function SubNavItem({ to, children, badgeCount }) {
   return (
     <NavLink
       to={to}
       end
       className={({ isActive }) =>
-        `group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] transition-colors ${
+        `group relative flex items-center gap-2 rounded-lg py-2 pl-5 pr-3 text-[13px] no-underline transition-colors ${
           isActive
             ? 'bg-[var(--accent-dim)] font-medium text-primary'
             : 'text-muted-foreground hover:bg-accent hover:text-foreground'
@@ -53,8 +102,7 @@ function NavItem({ to, icon: Icon, children, badgeCount }) {
       {({ isActive }) => (
         <>
           {isActive && <span className="absolute inset-y-1 left-0 w-[3px] rounded-r-full bg-primary" />}
-          <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.8} />
-          <span className="flex-1 truncate">{children}</span>
+          <span className="flex-1">{children}</span>
           {badgeCount > 0 && (
             <span className="rounded-full bg-danger px-[7px] py-px font-[var(--font-mono)] text-[10px] font-bold text-white">
               {badgeCount}
@@ -66,14 +114,44 @@ function NavItem({ to, icon: Icon, children, badgeCount }) {
   );
 }
 
-function NavGroupLabel({ children, first }) {
+function NavGroup({ group, isOpen, onToggle, isGroupActive, summary }) {
+  const Icon = group.icon;
+
   return (
-    <div
-      className={`px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.6px] text-[var(--text-faint)] ${
-        first ? 'mt-1' : 'mt-4'
-      }`}
-    >
-      {children}
+    <div className="mb-0.5">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] no-underline transition-colors ${
+          isGroupActive
+            ? 'font-medium text-primary'
+            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+        }`}
+      >
+        <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.8} />
+        <span className="flex-1 text-left">{group.label}</span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-[var(--text-faint)] transition-transform duration-200 ${
+            isOpen ? 'rotate-180' : ''
+          }`}
+          strokeWidth={1.8}
+        />
+      </button>
+
+      <div
+        className={`grid overflow-hidden transition-[grid-template-rows] duration-200 ease-in-out ${
+          isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        }`}
+      >
+        <div className="min-h-0 space-y-0.5 pt-0.5">
+          {group.items.map((item) => (
+            <SubNavItem key={item.to} to={item.to} badgeCount={item.badgeKey ? summary?.[item.badgeKey] : undefined}>
+              {item.label}
+            </SubNavItem>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -81,6 +159,26 @@ function NavGroupLabel({ children, first }) {
 function Sidebar() {
   const { user, logout, isAdmin } = useAuth();
   const { data: summary } = useDashboardSummary();
+  const location = useLocation();
+
+  const activeGroupKey = useMemo(() => {
+    const found = NAV_GROUPS.find((g) => g.items.some((item) => item.to === location.pathname));
+    return found?.key;
+  }, [location.pathname]);
+
+  const [openGroups, setOpenGroups] = useState(() => new Set(activeGroupKey ? [activeGroupKey] : []));
+
+  function toggleGroup(key) {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
 
   const initials = (user?.full_name || '?')
     .trim()
@@ -103,55 +201,16 @@ function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-3">
-        <NavGroupLabel first>Dashboard</NavGroupLabel>
-        <NavItem to="/" icon={LayoutDashboard}>
-          Dashboard Management
-        </NavItem>
-        <NavItem to="/dashboard/pm-part" icon={Gauge}>
-          Dashboard PM Part
-        </NavItem>
-        <NavItem to="/dashboard/pm-line" icon={CalendarClock}>
-          Dashboard PM Monthly and Weekly
-        </NavItem>
-
-        <NavGroupLabel>PM Part</NavGroupLabel>
-        <NavItem to="/pm-part" icon={Wrench} badgeCount={summary?.status_danger}>
-          Monitoring PM Part
-        </NavItem>
-        <NavItem to="/pm-part/history" icon={History}>
-          History PM Part
-        </NavItem>
-
-        <NavGroupLabel>PM Monthly and Weekly</NavGroupLabel>
-        <NavItem to="/pm-line" icon={ClipboardList} badgeCount={summary?.lines_critical}>
-          Monitoring PM Monthly and Weekly
-        </NavItem>
-        <NavItem to="/pm-line/history" icon={History}>
-          History PM Monthly and Weekly
-        </NavItem>
-
-        <NavGroupLabel>Data</NavGroupLabel>
-        <NavItem to="/master-data" icon={Database}>
-          Master Data Part
-        </NavItem>
-        <NavItem to="/inventory" icon={Package}>
-          Inventory
-        </NavItem>
-        <NavItem to="/inventory/history" icon={PackageSearch}>
-          History Inventory
-        </NavItem>
-
-        {isAdmin && (
-          <>
-            <NavGroupLabel>Administrasi</NavGroupLabel>
-            <NavItem to="/settings" icon={SettingsIcon}>
-              Settings
-            </NavItem>
-            <NavItem to="/users" icon={Users}>
-              User Management
-            </NavItem>
-          </>
-        )}
+        {NAV_GROUPS.filter((g) => !g.adminOnly || isAdmin).map((group) => (
+          <NavGroup
+            key={group.key}
+            group={group}
+            isOpen={openGroups.has(group.key)}
+            onToggle={() => toggleGroup(group.key)}
+            isGroupActive={group.key === activeGroupKey}
+            summary={summary}
+          />
+        ))}
       </nav>
 
       <div className="flex items-center gap-2.5 border-t border-border px-4 py-3.5">
