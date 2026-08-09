@@ -1,0 +1,50 @@
+/* src/styles/tokens.css
+ *
+ * Design tokens diambil PERSIS dari 05_UI_UX_SPECIFICATION.md Bagian 2.
+ * Ini kontrak tampilan - JANGAN ubah nilai di sini tanpa persetujuan
+ * eksplisit (lihat §9 "Yang TIDAK boleh dilakukan AI/developer frontend").
+ */
+
+:root {
+  /* 2.1 Warna */
+  --bg: #0d1117;
+  --panel: #151b23;
+  --panel-2: #1b222c;
+  --panel-3: #212a36;
+  --border: #252e3a;
+  --border-soft: #1c232d;
+
+  --text: #e7ebf0;
+  --text-dim: #8d97a6;
+  --text-faint: #5c6675;
+
+  --accent: #4c8dff;
+  --accent-dim: rgba(76, 141, 255, 0.14);
+
+  --ok: #34c77b;
+  --ok-dim: rgba(52, 199, 123, 0.14);
+  --warn: #f5a623;
+  --warn-dim: rgba(245, 166, 35, 0.14);
+  --danger: #f5484b;
+  --danger-dim: rgba(245, 72, 75, 0.14);
+
+  /* 2.2 Tipografi */
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  /* 2.3 Radius & Spacing */
+  --radius: 12px;
+  --radius-sm: 8px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-3-5: 14px;
+  --space-4: 16px;
+  --space-4-5: 18px;
+  --space-5: 22px;
+
+  --sidebar-width: 230px;
+  --content-max-width: 1400px;
+}

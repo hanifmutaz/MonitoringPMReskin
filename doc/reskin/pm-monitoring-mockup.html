@@ -1,0 +1,972 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PM Monitoring — Reskin Mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0A0D12;
+  --surface:#12161D;
+  --surface-2:#1A1F29;
+  --border:#232A36;
+  --text:#E7EAF0;
+  --muted:#8A93A6;
+  --accent:#2F80ED;
+  --accent-dim:#16233D;
+  --warn:#F5A623;
+  --info:#38BDF8;
+  --ok:#2DD4BF;
+  --danger:#FB4B4B;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--text);font-family:'Public Sans',sans-serif;}
+h1,h2,h3,h4,.font-display{font-family:'Public Sans',sans-serif;}
+.font-mono{font-family:'JetBrains Mono',monospace;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;}
+.surface-2{background:var(--surface-2);}
+.border-token{border-color:var(--border);}
+.text-muted{color:var(--muted);}
+.text-accent{color:var(--accent);}
+.bg-accent{background:var(--accent);}
+.input-token{background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:10px;}
+.input-token::placeholder{color:#5B6577;}
+.input-token:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim);}
+.btn-primary{background:var(--accent);color:#ffffff;font-weight:600;border-radius:10px;transition:.15s;}
+.btn-primary:hover{background:#4a93f5;}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text);border-radius:10px;}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;display:inline-flex;align-items:center;gap:5px;}
+.badge-ok{background:rgba(45,212,191,.12);color:var(--ok);}
+.badge-warn{background:rgba(245,166,35,.12);color:var(--warn);}
+.badge-danger{background:rgba(251,75,75,.12);color:var(--danger);}
+.badge-info{background:rgba(56,189,248,.12);color:var(--info);}
+.sidebar-item{border-left:3px solid transparent;color:var(--muted);}
+.sidebar-item:hover{color:var(--text);background:var(--surface-2);}
+.sidebar-item.active{border-left-color:var(--accent);color:var(--text);background:var(--surface-2);}
+.gauge{position:relative;width:40px;height:40px;border-radius:50%;}
+.gauge svg{transform:rotate(-90deg);}
+.gauge-track{stroke:var(--border);}
+.gauge-value{stroke-linecap:round;}
+.auth-glow{position:absolute;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,var(--accent-dim) 0%, transparent 70%);filter:blur(20px);pointer-events:none;}
+table{border-collapse:collapse;width:100%;}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;text-align:left;padding:10px 16px;border-bottom:1px solid var(--border);}
+td{padding:12px 16px;border-bottom:1px solid var(--border);font-size:13.5px;}
+tr:last-child td{border-bottom:none;}
+.progress-track{background:var(--surface-2);border-radius:999px;height:6px;overflow:hidden;}
+.progress-fill{background:var(--accent);height:100%;border-radius:999px;}
+.view{display:none;}
+.view.active{display:block;}
+.view.full-view.active{display:flex;}
+#shell-dashboard.sidebar-collapsed .sidebar-aside{width:76px;}
+#shell-dashboard.sidebar-collapsed .nav-label{display:none;}
+#shell-dashboard.sidebar-collapsed .group-header{justify-content:center;}
+#shell-dashboard.sidebar-collapsed .group-children{display:none;}
+.mockup-nav-btn{font-size:12px;color:var(--muted);padding:6px 10px;border-radius:8px;cursor:pointer;white-space:nowrap;}
+.mockup-nav-btn:hover{background:var(--surface-2);color:var(--text);}
+.mockup-nav-btn.active{background:var(--accent);color:#ffffff;font-weight:600;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+</style>
+</head>
+<body>
+
+<!-- ===================== MOCKUP PREVIEW SWITCHER (bukan bagian dari UI final) ===================== -->
+<div id="mockupNav" class="fixed top-0 left-0 right-0 z-[999] bg-[#0A0D12] border-b border-token px-3 py-2 flex items-center gap-1 overflow-x-auto">
+  <span class="font-display font-bold text-accent text-sm mr-2 shrink-0">PM · Mockup</span>
+</div>
+<div style="height:44px"></div>
+
+<div id="app"></div>
+
+<!-- ============================================================ -->
+<!-- DASHBOARD SHELL (dipakai semua halaman bertabel/chart/plugin) -->
+<!-- ============================================================ -->
+<div id="shell-dashboard" class="view">
+  <div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <aside class="sidebar-aside w-64 shrink-0 border-r border-token flex flex-col transition-all" style="background:var(--surface)">
+      <div class="h-16 flex items-center gap-2 px-5 border-b border-token overflow-hidden">
+        <div class="w-8 h-8 shrink-0 rounded-lg bg-accent flex items-center justify-center font-display font-bold text-[#12161D]">P</div>
+        <div class="nav-label">
+          <div class="font-display font-bold text-sm leading-none">PM Monitoring</div>
+          <div class="text-[10px] text-muted mt-0.5">Hirose Electric Indonesia</div>
+        </div>
+      </div>
+      <nav class="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-0.5 text-sm" id="sidebarNav">
+        <!-- diisi oleh JS -->
+      </nav>
+      <div class="p-3 border-t border-token flex items-center gap-2 overflow-hidden">
+        <div class="w-8 h-8 shrink-0 rounded-full bg-accent/20 flex items-center justify-center text-accent font-mono text-xs font-bold">HM</div>
+        <div class="text-xs nav-label">
+          <div class="font-medium leading-none">Mu'taz</div>
+          <div class="text-muted mt-0.5">Kaizen · Admin</div>
+        </div>
+      </div>
+    </aside>
+    <!-- Main -->
+    <div class="flex-1 flex flex-col min-w-0">
+      <header class="h-16 border-b border-token flex items-center justify-between px-6 shrink-0" style="background:var(--surface)">
+        <div class="flex items-center gap-3">
+          <button class="btn-ghost w-9 h-9 flex items-center justify-center" onclick="toggleSidebarCollapse()">☰</button>
+          <div class="input-token flex items-center gap-2 px-3 py-2 text-sm text-muted w-72">
+            <span>⌕</span><span>Cari part, line, CL no...</span><span class="ml-auto font-mono text-[10px] surface-2 px-1.5 py-0.5 rounded border border-token">⌘K</span>
+
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="badge badge-danger">3 Part DANGER</span>
+          <button class="btn-ghost w-9 h-9 flex items-center justify-center relative">🔔<span class="absolute -top-1 -right-1 bg-danger text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center">2</span></button>
+          <button class="btn-ghost w-9 h-9 flex items-center justify-center">⚙</button>
+        </div>
+      </header>
+      <main class="flex-1 overflow-y-auto p-6" id="dashboard-content" style="background:var(--bg)">
+      </main>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- TEMPLATES: TABLE PATTERNS                                    -->
+<!-- ============================================================ -->
+
+<template id="tpl-table-sorting">
+<div class="mb-5">
+  <div class="text-xs text-muted mb-1">Home / PM Part / <span class="text-text">Sorting</span></div>
+  <h1 class="font-display font-bold text-2xl">PM Part — Sorting</h1>
+</div>
+<div class="card overflow-hidden">
+  <div class="flex items-center justify-between px-5 py-4 border-b border-token">
+    <div class="font-semibold text-sm">Part Tracking Table</div>
+    <select class="input-token text-xs px-3 py-1.5">
+      <option>Urutkan berdasarkan (Sisa Umur)</option>
+      <option>Urutkan berdasarkan (Status)</option>
+    </select>
+  </div>
+  <div class="overflow-x-auto">
+  <table>
+    <thead><tr>
+      <th>Drawing No <span class="text-muted">⇅</span></th><th>Part Name</th><th>Line <span class="text-muted">⇅</span></th>
+      <th>Counter <span class="text-muted">⇅</span></th><th>Limit</th><th>Status <span class="text-muted">⇅</span></th><th>Est. PM</th>
+    </tr></thead>
+    <tbody id="sortRows"></tbody>
+  </table>
+  </div>
+</div>
+</template>
+
+<template id="tpl-table-filtering">
+<div class="mb-5">
+  <div class="text-xs text-muted mb-1">Home / PM Part / <span class="text-text">Filtering</span></div>
+  <h1 class="font-display font-bold text-2xl">PM Part — Filtering</h1>
+</div>
+<div class="card overflow-hidden">
+  <div class="px-5 py-4 border-b border-token grid grid-cols-4 gap-3">
+    <input class="input-token px-3 py-2 text-sm" placeholder="Cari Drawing No / Part">
+    <select class="input-token px-3 py-2 text-sm"><option>Semua Line</option><option>Line 01</option><option>Line 02</option></select>
+    <select class="input-token px-3 py-2 text-sm"><option>Semua Status</option><option>OK</option><option>WARNING</option><option>DANGER</option></select>
+    <div class="flex items-center gap-2 text-xs text-muted"><span>Counter</span><input type="range" class="w-full accent-[#F5A623]"></div>
+  </div>
+  <div class="overflow-x-auto">
+  <table>
+    <thead><tr><th>Drawing No</th><th>Part Name</th><th>Line</th><th>Counter</th><th>Limit</th><th>Status</th><th>Est. PM</th></tr></thead>
+    <tbody id="filterRows"></tbody>
+  </table>
+  </div>
+</div>
+</template>
+
+<template id="tpl-table-grouping">
+<div class="mb-5">
+  <div class="text-xs text-muted mb-1">Home / PM Line / <span class="text-text">Grouping</span></div>
+  <h1 class="font-display font-bold text-2xl">PM Line — Grouping per Status</h1>
+</div>
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+  <table>
+    <thead><tr><th>▾ Status</th><th>Jumlah Line</th><th>Total Poin Bulan Ini</th><th>Rata-rata Progress</th></tr></thead>
+    <tbody id="groupRows"></tbody>
+  </table>
+  </div>
+</div>
+</template>
+
+<template id="tpl-table-pagination">
+<div class="mb-5">
+  <div class="text-xs text-muted mb-1">Home / PM Part / <span class="text-text">Pagination</span></div>
+  <h1 class="font-display font-bold text-2xl">PM Part — Pagination</h1>
+</div>
+<div class="card overflow-hidden">
+  <div class="flex items-center justify-between px-5 py-3 border-b border-token text-xs text-muted">
+    <div class="flex items-center gap-2">Baris per halaman
+      <select class="input-token px-2 py-1"><option>10</option><option>25</option><option>50</option></select>
+    </div>
+    <div class="flex items-center gap-1" id="pagBtns"></div>
+  </div>
+  <div class="overflow-x-auto">
+  <table>
+    <thead><tr><th>Drawing No</th><th>Part Name</th><th>Line</th><th>Status</th><th>Est. PM</th></tr></thead>
+    <tbody id="pagRows"></tbody>
+  </table>
+  </div>
+</div>
+</template>
+
+<template id="tpl-table-selection">
+<div class="mb-5">
+  <div class="text-xs text-muted mb-1">Home / PM Part / <span class="text-text">Row Selection</span></div>
+  <h1 class="font-display font-bold text-2xl">PM Part — Row Selection</h1>
+  <p class="text-sm text-muted mt-1">Untuk aksi massal: reset counter, export, atau ubah Line sekaligus.</p>
+</div>
+<div class="card overflow-hidden">
+  <div class="flex items-center justify-between px-5 py-3 border-b border-token">
+    <span class="text-xs text-muted">2 baris dipilih</span>
+    <div class="flex gap-2"><button class="btn-ghost text-xs px-3 py-1.5">Export</button><button class="btn-primary text-xs px-3 py-1.5">Reset Counter</button></div>
+  </div>
+  <div class="overflow-x-auto">
+  <table>
+    <thead><tr><th class="w-8"><input type="checkbox"></th><th>Drawing No</th><th>Part Name</th><th>Line</th><th>Status</th></tr></thead>
+    <tbody id="selectRows"></tbody>
+  </table>
+  </div>
+</div>
+</template>
+
+<template id="tpl-table-expanding">
+<div class="mb-5">
+  <div class="text-xs text-muted mb-1">Home / PM Line / <span class="text-text">Expanding</span></div>
+  <h1 class="font-display font-bold text-2xl">PM Line — Expanding Detail</h1>
+</div>
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+  <table>
+    <thead><tr><th class="w-8"></th><th>Line</th><th>Tipe</th><th>Poin</th><th>Status</th><th>Progress</th></tr></thead>
+    <tbody>
+      <tr class="cursor-pointer" style="background:var(--surface-2)">
+        <td class="text-accent">▾</td><td class="font-mono">LINE-07</td><td>Monthly</td><td class="font-mono">24 / 30</td><td><span class="badge badge-warn">WARNING</span></td>
+        <td><div class="progress-track w-32"><div class="progress-fill" style="width:80%"></div></div></td>
+      </tr>
+      <tr><td colspan="6" class="p-0">
+        <div class="px-8 py-4" style="background:var(--bg)">
+          <div class="text-xs text-muted mb-2">Riwayat CL Line-07 (7 hari terakhir)</div>
+          <table><thead><tr><th>Tanggal</th><th>CL No</th><th>Poin</th><th>Operator</th></tr></thead>
+          <tbody>
+            <tr><td class="font-mono text-xs">08 Agu 2026</td><td class="font-mono text-xs">CL-1182</td><td class="font-mono text-xs">+1.0</td><td>Andi</td></tr>
+            <tr><td class="font-mono text-xs">07 Agu 2026</td><td class="font-mono text-xs">CL-1179</td><td class="font-mono text-xs">+0.5</td><td>Sari</td></tr>
+          </tbody></table>
+        </div>
+      </td></tr>
+      <tr><td class="text-muted">▸</td><td class="font-mono">LINE-12</td><td>Weekly</td><td class="font-mono">4 / 8</td><td><span class="badge badge-ok">OK</span></td>
+        <td><div class="progress-track w-32"><div class="progress-fill" style="width:50%"></div></div></td></tr>
+      <tr><td class="text-muted">▸</td><td class="font-mono">LINE-03</td><td>Monthly</td><td class="font-mono">29 / 30</td><td><span class="badge badge-danger">DANGER</span></td>
+        <td><div class="progress-track w-32"><div class="progress-fill" style="width:97%"></div></div></td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+</template>
+
+<template id="tpl-table-editable">
+<div class="mb-5">
+  <div class="text-xs text-muted mb-1">Home / Settings / <span class="text-text">Editable Threshold</span></div>
+  <h1 class="font-display font-bold text-2xl">Settings — Editable Threshold</h1>
+</div>
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+  <table>
+    <thead><tr><th>Part</th><th>Limit Counter</th><th>Warning %</th><th>Danger %</th><th></th></tr></thead>
+    <tbody>
+      <tr><td class="font-mono">DWG-4471</td>
+        <td><input class="input-token font-mono text-xs px-2 py-1 w-24" value="50000"></td>
+        <td><input class="input-token font-mono text-xs px-2 py-1 w-16" value="80"></td>
+        <td><input class="input-token font-mono text-xs px-2 py-1 w-16" value="95"></td>
+        <td><button class="text-accent text-xs">✎ Simpan</button></td></tr>
+      <tr><td class="font-mono">DWG-4488</td>
+        <td class="text-muted font-mono text-xs">40000</td><td class="text-muted font-mono text-xs">80</td><td class="text-muted font-mono text-xs">95</td>
+        <td><button class="text-muted text-xs">✎ Edit</button></td></tr>
+      <tr><td class="font-mono">DWG-4502</td>
+        <td class="text-muted font-mono text-xs">65000</td><td class="text-muted font-mono text-xs">75</td><td class="text-muted font-mono text-xs">90</td>
+        <td><button class="text-muted text-xs">✎ Edit</button></td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+</template>
+
+<!-- ============================================================ -->
+<!-- TEMPLATES: CHARTS / DROPZONE / MASK / WIZARD                 -->
+<!-- ============================================================ -->
+
+<template id="tpl-charts">
+<div class="mb-5">
+  <div class="text-xs text-muted mb-1">Home / Charts / <span class="text-text">Apexchart</span></div>
+  <h1 class="font-display font-bold text-2xl">Apexchart</h1>
+</div>
+<div class="grid grid-cols-2 gap-4 mb-5">
+  <div class="card p-5">
+    <div class="font-semibold text-sm mb-4">Column Chart</div>
+    <svg viewBox="0 0 400 160" class="w-full h-40">
+      <line x1="0" y1="140" x2="400" y2="140" stroke="#232A36"/>
+      <line x1="0" y1="90" x2="400" y2="90" stroke="#232A36" stroke-dasharray="2 3"/>
+      <line x1="0" y1="40" x2="400" y2="40" stroke="#232A36" stroke-dasharray="2 3"/>
+      <!-- grouped bars: PM Short / PM Line per bulan -->
+      <g fill="#2F80ED"><rect x="10" y="70" width="14" height="70"/><rect x="60" y="55" width="14" height="85"/><rect x="110" y="90" width="14" height="50"/><rect x="160" y="45" width="14" height="95"/><rect x="210" y="60" width="14" height="80"/><rect x="260" y="30" width="14" height="110"/><rect x="310" y="65" width="14" height="75"/><rect x="360" y="35" width="14" height="105"/></g>
+      <g fill="#2DD4BF"><rect x="26" y="105" width="14" height="35"/><rect x="76" y="95" width="14" height="45"/><rect x="126" y="115" width="14" height="25"/><rect x="176" y="100" width="14" height="40"/><rect x="226" y="90" width="14" height="50"/><rect x="276" y="80" width="14" height="60"/><rect x="326" y="70" width="14" height="70"/><rect x="376" y="85" width="14" height="55"/></g>
+    </svg>
+    <div class="flex justify-between text-[10px] text-muted mt-1 px-1"><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span></div>
+    <div class="flex gap-4 text-xs text-muted mt-3"><span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-accent"></span>PM Short</span><span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-ok"></span>PM Line</span></div>
+  </div>
+  <div class="card p-5">
+    <div class="font-semibold text-sm mb-4">Bar Chart — Shot Count per Line</div>
+    <div class="space-y-2.5">
+      <div class="flex items-center gap-3 text-xs"><span class="w-16 text-muted font-mono">L-07</span><div class="flex-1 progress-track h-3"><div class="progress-fill" style="width:38%"></div></div></div>
+      <div class="flex items-center gap-3 text-xs"><span class="w-16 text-muted font-mono">L-06</span><div class="flex-1 progress-track h-3"><div class="progress-fill" style="width:48%"></div></div></div>
+      <div class="flex items-center gap-3 text-xs"><span class="w-16 text-muted font-mono">L-05</span><div class="flex-1 progress-track h-3"><div class="progress-fill" style="width:55%"></div></div></div>
+      <div class="flex items-center gap-3 text-xs"><span class="w-16 text-muted font-mono">L-04</span><div class="flex-1 progress-track h-3"><div class="progress-fill" style="width:63%"></div></div></div>
+      <div class="flex items-center gap-3 text-xs"><span class="w-16 text-muted font-mono">L-03</span><div class="flex-1 progress-track h-3"><div class="progress-fill" style="width:72%"></div></div></div>
+      <div class="flex items-center gap-3 text-xs"><span class="w-16 text-muted font-mono">L-02</span><div class="flex-1 progress-track h-3"><div class="progress-fill" style="width:85%"></div></div></div>
+      <div class="flex items-center gap-3 text-xs"><span class="w-16 text-muted font-mono">L-01</span><div class="flex-1 progress-track h-3"><div class="progress-fill" style="width:95%"></div></div></div>
+    </div>
+  </div>
+</div>
+<div class="grid grid-cols-3 gap-4 mb-5">
+  <div class="card p-5">
+    <div class="font-semibold text-sm mb-4">Line Chart — Tren PM Selesai</div>
+    <svg viewBox="0 0 300 140" class="w-full h-36">
+      <polyline points="0,120 40,100 80,105 120,80 160,85 200,45 240,60 280,15" fill="none" stroke="#2F80ED" stroke-width="2.5"/>
+    </svg>
+    <div class="flex justify-between text-[10px] text-muted mt-1"><span>Jan</span><span>Mar</span><span>May</span><span>Jul</span><span>Sep</span></div>
+  </div>
+  <div class="card p-5">
+    <div class="font-semibold text-sm mb-4">Area Chart — Shot / Jam</div>
+    <svg viewBox="0 0 300 140" class="w-full h-36">
+      <polygon points="0,90 40,70 80,85 120,55 160,65 200,20 240,45 280,25 280,140 0,140" fill="#2F80ED" opacity="0.18"/>
+      <polyline points="0,90 40,70 80,85 120,55 160,65 200,20 240,45 280,25" fill="none" stroke="#2F80ED" stroke-width="2.5"/>
+    </svg>
+    <div class="flex justify-between text-[10px] text-muted mt-1"><span>00:00</span><span>02:00</span><span>04:00</span><span>06:00</span></div>
+  </div>
+  <div class="card p-5">
+    <div class="font-semibold text-sm mb-4">Distribusi Status Part</div>
+    <div class="flex items-center justify-center">
+      <svg width="120" height="120" viewBox="0 0 36 36">
+        <circle cx="18" cy="18" r="15.9" fill="none" stroke="#1A1F29" stroke-width="4"></circle>
+        <circle cx="18" cy="18" r="15.9" fill="none" stroke="#2DD4BF" stroke-width="4" stroke-dasharray="70 100" stroke-dashoffset="25"></circle>
+        <circle cx="18" cy="18" r="15.9" fill="none" stroke="#F5A623" stroke-width="4" stroke-dasharray="20 100" stroke-dashoffset="-45"></circle>
+        <circle cx="18" cy="18" r="15.9" fill="none" stroke="#FB4B4B" stroke-width="4" stroke-dasharray="10 100" stroke-dashoffset="-65"></circle>
+      </svg>
+    </div>
+    <div class="flex justify-center gap-2 text-[11px] text-muted mt-2 flex-wrap">
+      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-ok"></span>OK 70%</span>
+      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:var(--warn)"></span>Warn 20%</span>
+      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-danger"></span>Danger 10%</span>
+    </div>
+  </div>
+</div>
+<div class="card p-5">
+  <div class="font-semibold text-sm mb-4">Mixed Chart — Poin Bulanan vs Target</div>
+  <svg viewBox="0 0 400 140" class="w-full h-40">
+    <g fill="#2F80ED" opacity="0.85"><rect x="15" y="95" width="16" height="45"/><rect x="65" y="85" width="16" height="55"/><rect x="115" y="100" width="16" height="40"/><rect x="165" y="70" width="16" height="70"/><rect x="215" y="60" width="16" height="80"/><rect x="265" y="45" width="16" height="95"/><rect x="315" y="30" width="16" height="110"/><rect x="365" y="20" width="16" height="120"/></g>
+    <polyline points="23,80 73,75 123,82 173,60 223,50 273,40 323,25 373,15" fill="none" stroke="#2DD4BF" stroke-width="2.5"/>
+  </svg>
+  <div class="flex gap-4 text-xs text-muted mt-2">
+    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-accent"></span>Poin Aktual</span>
+    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-ok"></span>Target Kumulatif</span>
+  </div>
+</div>
+</template>
+
+<template id="tpl-dropzone">
+<div class="mb-5">
+  <div class="text-xs text-muted mb-1">Home / Master Data / <span class="text-text">Import</span></div>
+  <h1 class="font-display font-bold text-2xl">Master Data — Import</h1>
+</div>
+<div class="card p-8 border-dashed" style="border-style:dashed">
+  <div class="flex flex-col items-center text-center py-10">
+    <div class="w-16 h-16 rounded-full bg-accent/15 flex items-center justify-center text-2xl text-accent mb-4">⇪</div>
+    <div class="font-semibold mb-1">Tarik file .xlsx ke sini atau <span class="text-accent">pilih file</span></div>
+    <div class="text-xs text-muted">Format: template Master Part / Master Line (.xlsx) — maks 10MB</div>
+  </div>
+</div>
+<div class="card mt-4 overflow-hidden">
+  <div class="px-5 py-3 border-b border-token text-sm font-semibold">File Diunggah</div>
+  <div class="divide-y divide-[var(--border)]">
+    <div class="flex items-center justify-between px-5 py-3 text-sm">
+      <div class="flex items-center gap-3"><span class="text-accent">▤</span><span>master_part_juli2026.xlsx</span></div>
+      <span class="badge badge-ok">Berhasil · 113 baris</span>
+    </div>
+    <div class="flex items-center justify-between px-5 py-3 text-sm">
+      <div class="flex items-center gap-3"><span class="text-danger">▤</span><span>master_line_v2.xlsx</span></div>
+      <span class="badge badge-danger">Gagal · 2 baris duplikat</span>
+    </div>
+  </div>
+</div>
+</template>
+
+<template id="tpl-mask">
+<div class="mb-5">
+  <div class="text-xs text-muted mb-1">Home / PM Part / <span class="text-text">Tambah Part</span></div>
+  <h1 class="font-display font-bold text-2xl">Tambah Part Baru</h1>
+</div>
+<div class="grid grid-cols-2 gap-4">
+  <div class="card p-5">
+    <div class="text-sm font-semibold mb-4">Jadwal & Estimasi</div>
+    <label class="text-xs text-muted">Tanggal PM Terakhir</label>
+    <input class="input-token w-full px-3 py-2 mt-1 mb-4 font-mono text-sm" placeholder="DD-MM-YYYY">
+    <label class="text-xs text-muted">Waktu Input</label>
+    <input class="input-token w-full px-3 py-2 mt-1 font-mono text-sm" placeholder="HH:MM">
+  </div>
+  <div class="card p-5">
+    <div class="text-sm font-semibold mb-4">CL Mapping</div>
+    <label class="text-xs text-muted">Drawing No</label>
+    <input class="input-token w-full px-3 py-2 mt-1 mb-4 font-mono text-sm" placeholder="DWG-####">
+    <label class="text-xs text-muted">PIC Kontak</label>
+    <input class="input-token w-full px-3 py-2 mt-1 font-mono text-sm" placeholder="+62 8__-____-____">
+  </div>
+</div>
+</template>
+
+<template id="tpl-wizard">
+<div class="mb-5">
+  <div class="text-xs text-muted mb-1">Home / PM Line / <span class="text-text">Tambah Line</span></div>
+  <h1 class="font-display font-bold text-2xl">Tambah Line — Wizard</h1>
+</div>
+<div class="card p-6 max-w-2xl">
+  <div class="flex items-center gap-3 mb-8 text-xs">
+    <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-accent text-[#12161D] flex items-center justify-center font-bold">1</span><span>Info Line</span></div>
+    <div class="flex-1 h-px bg-[var(--border)]"></div>
+    <div class="flex items-center gap-2 text-muted"><span class="w-6 h-6 rounded-full surface-2 border border-token flex items-center justify-center">2</span><span>Threshold PM</span></div>
+    <div class="flex-1 h-px bg-[var(--border)]"></div>
+    <div class="flex items-center gap-2 text-muted"><span class="w-6 h-6 rounded-full surface-2 border border-token flex items-center justify-center">3</span><span>Review</span></div>
+  </div>
+  <div class="grid grid-cols-2 gap-4">
+    <div><label class="text-xs text-muted">Nama Line</label><input class="input-token w-full px-3 py-2 mt-1" placeholder="LINE-13"></div>
+    <div><label class="text-xs text-muted">Tipe PM</label><select class="input-token w-full px-3 py-2 mt-1"><option>Weekly</option><option>Monthly</option></select></div>
+    <div class="col-span-2"><label class="text-xs text-muted">Nama di ConMas (harus sama persis)</label><input class="input-token w-full px-3 py-2 mt-1 font-mono text-sm" placeholder="LINE_13_ASSY"></div>
+  </div>
+  <div class="flex justify-end mt-8"><button class="btn-primary px-5 py-2.5 text-sm">Lanjut →</button></div>
+</div>
+</template>
+
+<template id="tpl-reorder-list">
+<div class="mb-5">
+  <div class="text-xs text-muted mb-1">Home / Inventory / <span class="text-text">Reorder List</span></div>
+  <h1 class="font-display font-bold text-2xl">Reorder List</h1>
+</div>
+<div class="grid grid-cols-4 gap-4 mb-5">
+  <div class="card p-4">
+    <div class="flex items-center justify-between"><span class="text-sm font-medium">Received</span><span class="text-[11px] text-ok flex items-center gap-0.5">▲ 70.5%</span></div>
+    <div class="font-display font-bold text-2xl font-mono mt-2">42</div>
+    <div class="text-xs text-muted">PO diterima</div>
+    <svg viewBox="0 0 100 30" class="w-full h-8 mt-2"><polyline points="0,20 15,10 30,18 45,6 60,14 75,4 90,10 100,2" fill="none" stroke="#2DD4BF" stroke-width="2"/></svg>
+  </div>
+  <div class="card p-4">
+    <div class="flex items-center justify-between"><span class="text-sm font-medium">Ordered</span><span class="text-[11px]" style="color:var(--warn)">▼ 27.4%</span></div>
+    <div class="font-display font-bold text-2xl font-mono mt-2">9</div>
+    <div class="text-xs text-muted">Menunggu vendor</div>
+    <svg viewBox="0 0 100 30" class="w-full h-8 mt-2"><polyline points="0,10 15,18 30,8 45,20 60,12 75,22 90,14 100,18" fill="none" stroke="#F5A623" stroke-width="2"/></svg>
+  </div>
+  <div class="card p-4">
+    <div class="flex items-center justify-between"><span class="text-sm font-medium">Overdue</span><span class="text-[11px] text-danger flex items-center gap-0.5">▼ 27.4%</span></div>
+    <div class="font-display font-bold text-2xl font-mono mt-2">3</div>
+    <div class="text-xs text-muted">Lewat lead time</div>
+    <svg viewBox="0 0 100 30" class="w-full h-8 mt-2"><polyline points="0,6 15,20 30,10 45,22 60,8 75,18 90,4 100,16" fill="none" stroke="#FB4B4B" stroke-width="2"/></svg>
+  </div>
+  <div class="rounded-2xl p-4" style="background:linear-gradient(135deg,var(--accent),#1c56b0)">
+    <div class="flex items-center gap-2 text-white text-sm"><span class="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center">▤</span>Total Nilai Order</div>
+    <div class="flex items-end justify-between mt-3">
+      <div><div class="text-white/70 text-[11px]">Berjalan</div><div class="text-white font-mono font-semibold">Rp84,2jt</div></div>
+      <div class="text-right"><div class="text-white/70 text-[11px]">Overdue</div><div class="text-white font-mono font-semibold">Rp6,1jt</div></div>
+    </div>
+    <div class="text-white font-display font-bold text-2xl font-mono mt-2">Rp90,3jt</div>
+  </div>
+</div>
+<div class="card overflow-hidden">
+  <div class="flex items-center gap-5 px-5 pt-4 text-sm border-b border-token">
+    <span class="pb-3 border-b-2 text-accent" style="border-color:var(--accent)">Semua <span class="ml-1 badge badge-info">54</span></span>
+    <span class="pb-3 text-muted">Diterima <span class="ml-1 badge badge-ok">42</span></span>
+    <span class="pb-3 text-muted">Dipesan <span class="ml-1 badge badge-warn">9</span></span>
+    <span class="pb-3 text-muted">Overdue <span class="ml-1 badge badge-danger">3</span></span>
+  </div>
+  <div class="flex items-center justify-between px-5 py-4 gap-3">
+    <input class="input-token px-3 py-2 text-sm w-72" placeholder="Cari 54 order...">
+    <div class="flex items-center gap-2">
+      <select class="input-token text-xs px-3 py-2"><option>Urutkan (Tgl Order)</option></select>
+      <button class="btn-primary text-xs px-4 py-2">+ Buat Order</button>
+    </div>
+  </div>
+  <div class="overflow-x-auto">
+  <table>
+    <thead><tr><th class="w-8"><input type="checkbox"></th><th>PO ID</th><th>Part / Vendor</th><th>Tgl Order</th><th>ETA</th><th>Qty</th><th>Status</th><th>Aksi</th></tr></thead>
+    <tbody>
+      <tr><td><input type="checkbox"></td><td class="font-mono text-xs">PO-0102</td>
+        <td class="flex items-center gap-2 py-3"><span class="w-7 h-7 rounded-full bg-accent/20 text-accent flex items-center justify-center text-[10px] font-bold">CV</span><div><div>Guide Bushing</div><div class="text-[11px] text-muted">CV Presisi Jaya</div></div></td>
+        <td class="font-mono text-xs text-muted">15/07/2026</td><td class="font-mono text-xs text-muted">22/07/2026</td><td class="font-mono text-xs">500</td>
+        <td><span class="badge badge-warn">Dipesan</span></td><td class="flex gap-2 text-muted">👁 ✎ 🗑</td></tr>
+      <tr><td><input type="checkbox"></td><td class="font-mono text-xs">PO-0099</td>
+        <td class="flex items-center gap-2 py-3"><span class="w-7 h-7 rounded-full bg-ok/20 text-ok flex items-center justify-center text-[10px] font-bold">PT</span><div><div>Ejector Pin Set</div><div class="text-[11px] text-muted">PT Logam Sentosa</div></div></td>
+        <td class="font-mono text-xs text-muted">05/07/2026</td><td class="font-mono text-xs text-muted">11/07/2026</td><td class="font-mono text-xs">1200</td>
+        <td><span class="badge badge-ok">Diterima</span></td><td class="flex gap-2 text-muted">👁 ✎ 🗑</td></tr>
+      <tr><td><input type="checkbox"></td><td class="font-mono text-xs">PO-0087</td>
+        <td class="flex items-center gap-2 py-3"><span class="w-7 h-7 rounded-full bg-danger/20 text-danger flex items-center justify-center text-[10px] font-bold">SB</span><div><div>Sprue Bushing</div><div class="text-[11px] text-muted">Sinar Baja</div></div></td>
+        <td class="font-mono text-xs text-muted">28/06/2026</td><td class="font-mono text-xs text-muted">05/07/2026</td><td class="font-mono text-xs">300</td>
+        <td><span class="badge badge-danger">Overdue</span></td><td class="flex gap-2 text-muted">👁 ✎ 🗑</td></tr>
+      <tr><td><input type="checkbox"></td><td class="font-mono text-xs">PO-0080</td>
+        <td class="flex items-center gap-2 py-3"><span class="w-7 h-7 rounded-full bg-ok/20 text-ok flex items-center justify-center text-[10px] font-bold">CV</span><div><div>Cavity Insert D</div><div class="text-[11px] text-muted">CV Presisi Jaya</div></div></td>
+        <td class="font-mono text-xs text-muted">20/06/2026</td><td class="font-mono text-xs text-muted">27/06/2026</td><td class="font-mono text-xs">150</td>
+        <td><span class="badge badge-ok">Diterima</span></td><td class="flex gap-2 text-muted">👁 ✎ 🗑</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="flex items-center justify-between px-5 py-3 border-t border-token text-xs text-muted">
+    <span>Baris per halaman <select class="input-token px-2 py-1 ml-1"><option>10</option></select></span>
+    <div class="flex gap-1"><button class="mockup-nav-btn active" style="padding:4px 9px">1</button><button class="mockup-nav-btn" style="padding:4px 9px">2</button><button class="mockup-nav-btn" style="padding:4px 9px">»</button></div>
+  </div>
+</div>
+</template>
+
+<template id="tpl-widget-data">
+<div class="mb-5">
+  <div class="text-xs text-muted mb-1">Home / Widgets / <span class="text-text">Data</span></div>
+  <h1 class="font-display font-bold text-2xl">Widget — Data</h1>
+</div>
+<div class="grid grid-cols-3 gap-4 mb-4">
+  <div class="card p-5">
+    <div class="font-semibold text-sm mb-3">Tugas Hari Ini</div>
+    <div class="space-y-2.5 text-sm">
+      <label class="flex items-center gap-2 text-muted line-through"><input type="checkbox" checked>Cek email approval Line 07</label>
+      <label class="flex items-center gap-2 text-muted line-through"><input type="checkbox" checked>Update CL harian Line 02</label>
+      <label class="flex items-center gap-2 text-muted line-through"><input type="checkbox" checked>Input shot count L-04</label>
+      <label class="flex items-center gap-2"><input type="checkbox">Review Part DANGER (3)</label>
+      <label class="flex items-center gap-2"><input type="checkbox">Approve akun operator baru</label>
+      <label class="flex items-center gap-2"><input type="checkbox">Export laporan mingguan</label>
+    </div>
+  </div>
+  <div class="card p-5">
+    <div class="font-semibold text-sm mb-1">Status Sync ConMas</div>
+    <div class="text-xs text-muted mb-3">Line makin banyak yang ke-sync, terus jalan!</div>
+    <div class="space-y-3 text-xs">
+      <div><div class="flex justify-between mb-1"><span class="text-muted">Line Terkoneksi</span><span class="font-mono">88%</span></div><div class="progress-track"><div class="progress-fill" style="width:88%"></div></div></div>
+      <div><div class="flex justify-between mb-1"><span class="text-muted">Job Cron Sukses</span><span class="font-mono">96%</span></div><div class="progress-track"><div class="progress-fill" style="width:96%;background:var(--ok)"></div></div></div>
+      <div><div class="flex justify-between mb-1"><span class="text-muted">Line Belum Match Nama</span><span class="font-mono">12%</span></div><div class="progress-track"><div class="progress-fill" style="width:12%;background:var(--warn)"></div></div></div>
+    </div>
+  </div>
+  <div class="card p-5">
+    <div class="flex items-center justify-between mb-3"><span class="font-semibold text-sm">Operator Aktif</span><a class="text-xs text-accent">Lihat semua</a></div>
+    <div class="space-y-3 text-sm">
+      <div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold">AN</span><div><div>Andi Nugraha</div><div class="text-[11px] text-muted">Line 01–03</div></div></div><span class="text-[11px] text-muted">5 mnt lalu</span></div>
+      <div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-8 h-8 rounded-full bg-ok/20 text-ok flex items-center justify-center text-xs font-bold">SR</span><div><div>Sari Rahayu</div><div class="text-[11px] text-muted">Line 04–06</div></div></div><span class="text-[11px] text-muted">1 jam lalu</span></div>
+      <div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-8 h-8 rounded-full bg-danger/20 text-danger flex items-center justify-center text-xs font-bold">DP</span><div><div>Dedi Purnomo</div><div class="text-[11px] text-muted">Line 07</div></div></div><span class="text-[11px] text-muted">Kemarin</span></div>
+    </div>
+  </div>
+</div>
+<div class="grid grid-cols-2 gap-4 mb-4">
+  <div class="card p-5">
+    <div class="flex items-center justify-between mb-3"><span class="font-semibold text-sm">Aktivitas Terbaru</span><a class="text-xs text-accent">Lihat semua</a></div>
+    <div class="space-y-3 text-sm">
+      <div><div class="text-muted text-[11px] mb-0.5">2 jam lalu</div><div>Part <span class="font-mono">DWG-4541</span> masuk status <span class="text-danger">DANGER</span></div></div>
+      <div><div class="text-muted text-[11px] mb-0.5">4 jam lalu</div><div>Sync ConMas selesai — 60 line diperbarui</div></div>
+      <div><div class="text-muted text-[11px] mb-0.5">1 hari lalu</div><div>PO-0102 dibuat untuk Guide Bushing</div></div>
+      <div><div class="text-muted text-[11px] mb-0.5">2 hari lalu</div><div>User baru <span class="text-accent">wulan.k</span> menunggu approval</div></div>
+    </div>
+  </div>
+  <div class="card overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-4"><span class="font-semibold text-sm">PM Line Mendatang</span><a class="text-xs text-accent">Lihat semua</a></div>
+    <table>
+      <thead><tr><th>Line</th><th>Tipe</th><th>Est. PM</th><th>Prioritas</th></tr></thead>
+      <tbody>
+        <tr><td class="font-mono text-xs">LINE-07</td><td class="text-xs">Monthly</td><td class="font-mono text-xs">12 Agu</td><td><span class="badge badge-danger">Tinggi</span></td></tr>
+        <tr><td class="font-mono text-xs">LINE-02</td><td class="text-xs">Weekly</td><td class="font-mono text-xs">14 Agu</td><td><span class="badge badge-warn">Sedang</span></td></tr>
+        <tr><td class="font-mono text-xs">LINE-11</td><td class="text-xs">Monthly</td><td class="font-mono text-xs">02 Sep</td><td><span class="badge badge-ok">Rendah</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="card overflow-hidden">
+  <div class="flex items-center justify-between px-5 py-4"><span class="font-semibold text-sm">Log Input CL Terakhir</span><a class="text-xs text-accent">Lihat semua</a></div>
+  <table>
+    <thead><tr><th>Waktu</th><th>Line</th><th>CL No</th><th>Poin</th><th>Operator</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td class="font-mono text-xs text-muted">09:12</td><td class="font-mono text-xs">LINE-01</td><td class="font-mono text-xs">CL-1183</td><td class="font-mono text-xs">+1.0</td><td class="text-xs">Andi</td><td><span class="badge badge-ok">Tersimpan</span></td></tr>
+      <tr><td class="font-mono text-xs text-muted">08:47</td><td class="font-mono text-xs">LINE-04</td><td class="font-mono text-xs">CL-1180</td><td class="font-mono text-xs">+0.5</td><td class="text-xs">Sari</td><td><span class="badge badge-ok">Tersimpan</span></td></tr>
+      <tr><td class="font-mono text-xs text-muted">08:15</td><td class="font-mono text-xs">LINE-07</td><td class="font-mono text-xs">CL-1179</td><td class="font-mono text-xs">—</td><td class="text-xs">Dedi</td><td><span class="badge badge-danger">Gagal</span></td></tr>
+    </tbody>
+  </table>
+</div>
+</template>
+
+<template id="tpl-widget-statistics">
+<div class="mb-5">
+  <div class="text-xs text-muted mb-1">Home / Widgets / <span class="text-text">Statistics</span></div>
+  <h1 class="font-display font-bold text-2xl">Widget — Statistics</h1>
+</div>
+<div class="grid grid-cols-4 gap-4 mb-4">
+  <div class="card p-5 flex items-center justify-between"><div><div class="font-display font-bold text-2xl font-mono">113</div><div class="text-xs text-muted">Total Part</div></div><span class="text-xl text-accent">▤</span></div>
+  <div class="card p-5 flex items-center justify-between"><div><div class="font-display font-bold text-2xl font-mono">60</div><div class="text-xs text-muted">Total Line</div></div><span class="text-xl text-ok">⛭</span></div>
+  <div class="card p-5 flex items-center justify-between"><div><div class="font-display font-bold text-2xl font-mono">1.482</div><div class="text-xs text-muted">CL Bulan Ini</div></div><span class="text-xl" style="color:var(--warn)">▦</span></div>
+  <div class="card p-5 flex items-center justify-between"><div><div class="font-display font-bold text-2xl font-mono">96%</div><div class="text-xs text-muted">Sync Sukses</div></div><span class="text-xl text-info">⇅</span></div>
+</div>
+<div class="grid grid-cols-3 gap-4 mb-4">
+  <div class="rounded-2xl p-5 text-white" style="background:linear-gradient(135deg,var(--accent),#1c56b0)">
+    <div class="text-sm opacity-90">Part OK</div>
+    <div class="font-display font-bold text-3xl font-mono mt-1">79</div>
+    <div class="text-xs opacity-75 mt-1">70% dari total part aktif</div>
+  </div>
+  <div class="rounded-2xl p-5 text-white" style="background:linear-gradient(135deg,#F5A623,#c97e0f)">
+    <div class="text-sm opacity-90">Part WARNING</div>
+    <div class="font-display font-bold text-3xl font-mono mt-1">22</div>
+    <div class="text-xs opacity-75 mt-1">Perlu dijadwalkan minggu ini</div>
+  </div>
+  <div class="rounded-2xl p-5 text-white" style="background:linear-gradient(135deg,#FB4B4B,#a12626)">
+    <div class="text-sm opacity-90">Part DANGER</div>
+    <div class="font-display font-bold text-3xl font-mono mt-1">3</div>
+    <div class="text-xs opacity-75 mt-1">Butuh tindakan segera</div>
+  </div>
+</div>
+<div class="grid grid-cols-3 gap-4 mb-4">
+  <div class="card p-4"><div class="text-sm text-muted">Shot Bulan Ini</div><div class="font-display font-bold text-xl font-mono mt-1">842.190</div><div class="text-[11px] text-ok mt-1">▲ naik 8,900 dari bulan lalu</div></div>
+  <div class="card p-4"><div class="text-sm text-muted">Total Operator</div><div class="font-display font-bold text-xl font-mono mt-1">24</div><div class="text-[11px] badge badge-ok mt-1 inline-flex">▲ 3 baru</div></div>
+  <div class="card p-4"><div class="text-sm text-muted">Rata-rata Downtime</div><div class="font-display font-bold text-xl font-mono mt-1">1.8 jam</div><div class="text-[11px] badge badge-danger mt-1 inline-flex">▼ 12%</div></div>
+</div>
+<div class="grid grid-cols-3 gap-4">
+  <div class="card p-4 col-span-2">
+    <div class="font-semibold text-sm mb-3">Progress Rollout Fitur</div>
+    <div class="space-y-3 text-xs">
+      <div><div class="flex justify-between mb-1"><span>Fase 1 & 2 — Core</span><span class="font-mono">100%</span></div><div class="progress-track"><div class="progress-fill" style="width:100%;background:var(--ok)"></div></div></div>
+      <div><div class="flex justify-between mb-1"><span>Fase 3 — Sync ConMas</span><span class="font-mono">100%</span></div><div class="progress-track"><div class="progress-fill" style="width:100%;background:var(--ok)"></div></div></div>
+      <div><div class="flex justify-between mb-1"><span>Reskin UI (Mantis)</span><span class="font-mono">40%</span></div><div class="progress-track"><div class="progress-fill" style="width:40%"></div></div></div>
+      <div><div class="flex justify-between mb-1"><span>Inventory & ROP</span><span class="font-mono">15%</span></div><div class="progress-track"><div class="progress-fill" style="width:15%;background:var(--warn)"></div></div></div>
+    </div>
+  </div>
+  <div class="card p-5" style="background:linear-gradient(135deg,var(--surface-2),var(--surface))">
+    <div class="font-semibold text-sm mb-1">Checklist Go-Live ConMas</div>
+    <div class="text-xs text-muted mb-3">3 syarat operasional per PROJECT_SCOPE</div>
+    <div class="space-y-2 text-xs">
+      <label class="flex items-center gap-2"><input type="checkbox" checked>Kredensial CONMAS_DB_* terisi</label>
+      <label class="flex items-center gap-2"><input type="checkbox" checked>Akun DB read-only terkonfirmasi</label>
+      <label class="flex items-center gap-2"><input type="checkbox">Nama Line ConMas ↔ Master Data cocok</label>
+    </div>
+  </div>
+</div>
+</template>
+
+<!-- LOGIN -->
+<div class="view full-view min-h-screen relative overflow-hidden flex items-center justify-center px-4" data-view="auth-login" style="background:var(--bg)">
+  <div class="auth-glow" style="top:-160px;left:-160px"></div>
+  <div class="absolute top-6 left-6 flex items-center gap-2">
+    <div class="w-8 h-8 rounded-lg bg-accent flex items-center justify-center font-display font-bold text-[#12161D]">P</div>
+    <span class="font-display font-bold">PM Monitoring</span>
+  </div>
+  <div class="card w-full max-w-md p-8 relative z-10">
+    <div class="flex items-start justify-between mb-6">
+      <h1 class="font-display font-bold text-2xl">Masuk</h1>
+      <span class="text-xs text-muted">Belum punya akun? <a class="text-accent">Daftar</a></span>
+    </div>
+    <label class="text-xs text-muted">Username / Email</label>
+    <input class="input-token w-full px-3 py-2.5 mt-1 mb-4 text-sm" placeholder="nama.pengguna">
+    <label class="text-xs text-muted">Kata Sandi</label>
+    <input type="password" class="input-token w-full px-3 py-2.5 mt-1 text-sm" value="••••••••">
+    <div class="flex items-center justify-between mt-3 mb-6 text-xs">
+      <label class="flex items-center gap-2 text-muted"><input type="checkbox">Ingat saya</label>
+      <a class="text-accent" data-goto="auth-forgot">Lupa kata sandi?</a>
+    </div>
+    <button class="btn-primary w-full py-2.5 text-sm">Masuk</button>
+    <div class="text-center text-[11px] text-muted mt-6">Akses internal Hirose Electric Indonesia · Kaizen Dept</div>
+  </div>
+</div>
+
+<!-- REGISTER -->
+<div class="view full-view min-h-screen relative overflow-hidden flex items-center justify-center px-4 py-10" data-view="auth-register" style="background:var(--bg)">
+  <div class="auth-glow" style="bottom:-160px;right:-160px"></div>
+  <div class="card w-full max-w-md p-8 relative z-10">
+    <div class="flex items-start justify-between mb-6">
+      <h1 class="font-display font-bold text-2xl">Daftar Akun</h1>
+      <span class="text-xs text-muted">Sudah punya akun? <a class="text-accent" data-goto="auth-login">Masuk</a></span>
+    </div>
+    <div class="grid grid-cols-2 gap-3 mb-4">
+      <div><label class="text-xs text-muted">Nama Depan</label><input class="input-token w-full px-3 py-2.5 mt-1 text-sm" placeholder="Hanif"></div>
+      <div><label class="text-xs text-muted">Nama Belakang</label><input class="input-token w-full px-3 py-2.5 mt-1 text-sm" placeholder="Mu'taz"></div>
+    </div>
+    <label class="text-xs text-muted">Departemen</label>
+    <input class="input-token w-full px-3 py-2.5 mt-1 mb-4 text-sm" placeholder="Kaizen">
+    <label class="text-xs text-muted">Email Kantor</label>
+    <input class="input-token w-full px-3 py-2.5 mt-1 mb-4 text-sm" placeholder="nama@hirose-electric.co.id">
+    <label class="text-xs text-muted">Kata Sandi</label>
+    <input class="input-token w-full px-3 py-2.5 mt-1 text-sm" placeholder="Minimal 8 karakter">
+    <div class="progress-track mt-2 mb-1"><div class="progress-fill" style="width:30%;background:var(--danger)"></div></div>
+    <div class="text-[11px] text-danger mb-4">Lemah</div>
+    <div class="text-[11px] text-muted mb-5">Dengan mendaftar, akun Anda menunggu <span class="text-text">persetujuan Admin</span> sebelum bisa digunakan.</div>
+    <button class="btn-primary w-full py-2.5 text-sm">Buat Akun</button>
+  </div>
+</div>
+
+<!-- FORGOT PASSWORD -->
+<div class="view full-view min-h-screen relative overflow-hidden flex items-center justify-center px-4" data-view="auth-forgot" style="background:var(--bg)">
+  <div class="auth-glow" style="top:-160px;left:-160px"></div>
+  <div class="card w-full max-w-md p-8 relative z-10">
+    <div class="flex items-start justify-between mb-6">
+      <h1 class="font-display font-bold text-2xl">Lupa Kata Sandi</h1>
+      <a class="text-xs text-accent" data-goto="auth-login">← Kembali</a>
+    </div>
+    <label class="text-xs text-muted">Email Terdaftar</label>
+    <input class="input-token w-full px-3 py-2.5 mt-1 mb-2 text-sm" placeholder="nama@hirose-electric.co.id">
+    <div class="text-[11px] text-muted mb-5">Cek folder spam kalau email tidak muncul dalam beberapa menit.</div>
+    <button class="btn-primary w-full py-2.5 text-sm" data-goto="auth-check-mail">Kirim Link Reset</button>
+  </div>
+</div>
+
+<!-- RESET PASSWORD -->
+<div class="view full-view min-h-screen relative overflow-hidden flex items-center justify-center px-4" data-view="auth-reset" style="background:var(--bg)">
+  <div class="auth-glow" style="bottom:-160px;left:-160px"></div>
+  <div class="card w-full max-w-md p-8 relative z-10">
+    <h1 class="font-display font-bold text-2xl mb-1">Reset Kata Sandi</h1>
+    <p class="text-xs text-muted mb-6">Buat kata sandi baru untuk akunmu.</p>
+    <label class="text-xs text-muted">Kata Sandi Baru</label>
+    <input class="input-token w-full px-3 py-2.5 mt-1 text-sm" placeholder="Kata sandi baru">
+    <div class="progress-track mt-2 mb-1"><div class="progress-fill" style="width:30%;background:var(--danger)"></div></div>
+    <div class="text-[11px] text-danger mb-4">Lemah</div>
+    <label class="text-xs text-muted">Konfirmasi Kata Sandi</label>
+    <input class="input-token w-full px-3 py-2.5 mt-1 mb-6 text-sm" placeholder="Ulangi kata sandi">
+    <button class="btn-primary w-full py-2.5 text-sm">Reset Kata Sandi</button>
+  </div>
+</div>
+
+<!-- EMAIL VERIFICATION -->
+<div class="view full-view min-h-screen relative overflow-hidden flex items-center justify-center px-4" data-view="auth-verify" style="background:var(--bg)">
+  <div class="auth-glow" style="top:-160px;right:-160px"></div>
+  <div class="card w-full max-w-md p-8 relative z-10">
+    <h1 class="font-display font-bold text-2xl mb-1">Masukkan Kode Verifikasi</h1>
+    <p class="text-xs text-muted mb-1">Kami kirim kode ke email kamu.</p>
+    <p class="text-xs text-muted mb-6">han****@hirose-electric.co.id</p>
+    <div class="flex gap-3 mb-6">
+      <input class="input-token w-14 h-14 text-center text-lg font-mono" maxlength="1">
+      <input class="input-token w-14 h-14 text-center text-lg font-mono" maxlength="1">
+      <input class="input-token w-14 h-14 text-center text-lg font-mono" maxlength="1">
+      <input class="input-token w-14 h-14 text-center text-lg font-mono" maxlength="1">
+    </div>
+    <button class="btn-primary w-full py-2.5 text-sm">Lanjutkan</button>
+    <div class="text-center text-xs text-muted mt-5">Tidak terima kode? <a class="text-accent">Kirim ulang</a></div>
+  </div>
+</div>
+
+<!-- CHECK MAIL -->
+<div class="view full-view min-h-screen relative overflow-hidden flex items-center justify-center px-4" data-view="auth-check-mail" style="background:var(--bg)">
+  <div class="auth-glow" style="bottom:-160px;right:-160px"></div>
+  <div class="card w-full max-w-md p-8 relative z-10 text-center">
+    <div class="w-14 h-14 rounded-full bg-accent/15 text-accent text-2xl flex items-center justify-center mx-auto mb-4">✉</div>
+    <h1 class="font-display font-bold text-2xl mb-2">Cek Email Kamu</h1>
+    <p class="text-sm text-muted mb-6">Kami sudah kirim instruksi reset kata sandi ke email terdaftar.</p>
+    <button class="btn-primary w-full py-2.5 text-sm" data-goto="auth-login">Kembali ke Login</button>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- FULL-PAGE VIEWS: ERROR & COMING SOON                          -->
+<!-- ============================================================ -->
+
+<!-- 404 -->
+<div class="view full-view min-h-screen flex flex-col items-center justify-center px-4 text-center" data-view="error-404" style="background:var(--bg)">
+  <div class="font-display font-extrabold text-8xl mb-2" style="color:var(--surface-2); -webkit-text-stroke:2px var(--border)">404</div>
+  <div class="w-16 h-1 bg-accent rounded-full mb-6"></div>
+  <h1 class="font-display font-bold text-2xl mb-2">Halaman Tidak Ditemukan</h1>
+  <p class="text-sm text-muted mb-6 max-w-sm">Halaman yang kamu cari sudah dipindah, dihapus, atau memang belum pernah ada.</p>
+  <button class="btn-primary px-5 py-2.5 text-sm">← Kembali ke Dashboard</button>
+</div>
+
+<!-- 500 -->
+<div class="view full-view min-h-screen flex flex-col items-center justify-center px-4 text-center" data-view="error-500" style="background:var(--bg)">
+  <div class="gauge mb-6" style="width:120px;height:120px">
+    <svg viewBox="0 0 120 120" width="120" height="120">
+      <circle cx="60" cy="60" r="52" class="gauge-track" fill="none" stroke-width="8"/>
+      <circle cx="60" cy="60" r="52" fill="none" stroke="#FB4B4B" stroke-width="8" stroke-dasharray="326" stroke-dashoffset="90" class="gauge-value"/>
+    </svg>
+  </div>
+  <h1 class="font-display font-bold text-2xl mb-2">Server Bermasalah</h1>
+  <p class="text-sm text-muted mb-6 max-w-sm">Error 500 — sistem sedang memperbaiki masalah. Sync ConMas otomatis dilanjutkan setelah pulih.</p>
+  <button class="btn-primary px-5 py-2.5 text-sm">← Kembali ke Dashboard</button>
+</div>
+
+<!-- COMING SOON -->
+<div class="view full-view min-h-screen flex flex-col items-center justify-center px-4 text-center" data-view="coming-soon" style="background:var(--bg)">
+  <div class="w-16 h-16 rounded-2xl bg-accent/15 text-accent text-3xl flex items-center justify-center mb-6">⚙</div>
+  <h1 class="font-display font-bold text-3xl mb-2">Segera Hadir</h1>
+  <p class="text-sm text-muted mb-8 max-w-sm">Modul Inventory & ROP sedang dalam pengembangan.</p>
+  <div class="flex gap-3 mb-8">
+    <div class="card w-16 py-3"><div class="font-mono font-bold text-xl text-accent">03</div><div class="text-[10px] text-muted">hari</div></div>
+    <div class="card w-16 py-3"><div class="font-mono font-bold text-xl text-accent">14</div><div class="text-[10px] text-muted">jam</div></div>
+    <div class="card w-16 py-3"><div class="font-mono font-bold text-xl text-accent">52</div><div class="text-[10px] text-muted">menit</div></div>
+  </div>
+  <div class="flex gap-2 w-full max-w-sm">
+    <input class="input-token flex-1 px-3 py-2.5 text-sm" placeholder="Email untuk notifikasi">
+    <button class="btn-primary px-5 py-2.5 text-sm">Ingatkan Saya</button>
+  </div>
+</div>
+
+<script>
+// ---------- data dummy ----------
+const parts = [
+  {dwg:'DWG-4471',name:'Mold Cavity A',line:'LINE-01',counter:48200,limit:50000,status:'DANGER',est:'12 Agu 2026'},
+  {dwg:'DWG-4488',name:'Ejector Pin Set',line:'LINE-02',counter:31200,limit:40000,status:'WARNING',est:'20 Agu 2026'},
+  {dwg:'DWG-4502',name:'Guide Bushing',line:'LINE-03',counter:12500,limit:65000,status:'OK',est:'02 Okt 2026'},
+  {dwg:'DWG-4519',name:'Core Pin B',line:'LINE-01',counter:44000,limit:50000,status:'WARNING',est:'15 Agu 2026'},
+  {dwg:'DWG-4530',name:'Sprue Bushing',line:'LINE-04',counter:8900,limit:45000,status:'OK',est:'25 Nov 2026'},
+  {dwg:'DWG-4541',name:'Locating Ring',line:'LINE-02',counter:39750,limit:40000,status:'DANGER',est:'10 Agu 2026'},
+  {dwg:'DWG-4555',name:'Slide Block C',line:'LINE-05',counter:21000,limit:55000,status:'OK',est:'14 Sep 2026'},
+  {dwg:'DWG-4568',name:'Cavity Insert D',line:'LINE-03',counter:33000,limit:65000,status:'OK',est:'01 Okt 2026'},
+];
+const statusBadge = s => s==='OK' ? '<span class="badge badge-ok">OK</span>' : s==='WARNING' ? '<span class="badge badge-warn">WARNING</span>' : '<span class="badge badge-danger">DANGER</span>';
+
+function rowHTML(p, extraFirstCell){
+  return `<tr>${extraFirstCell||''}<td class="font-mono text-xs">${p.dwg}</td><td>${p.name}</td><td class="font-mono text-xs">${p.line}</td>
+    <td class="font-mono text-xs">${p.counter.toLocaleString('id')}</td><td class="font-mono text-xs text-muted">${p.limit.toLocaleString('id')}</td>
+    <td>${statusBadge(p.status)}</td><td class="font-mono text-xs text-muted">${p.est}</td></tr>`;
+}
+function rowHTMLSimple(p, extraFirstCell){
+  return `<tr>${extraFirstCell||''}<td class="font-mono text-xs">${p.dwg}</td><td>${p.name}</td><td class="font-mono text-xs">${p.line}</td>
+    <td>${statusBadge(p.status)}</td><td class="font-mono text-xs text-muted">${p.est}</td></tr>`;
+}
+
+function fillDashboardExtras(key){
+  if(key==='table-sorting'){
+    document.getElementById('sortRows').innerHTML = parts.map(p=>rowHTML(p)).join('');
+  }
+  if(key==='table-filtering'){
+    document.getElementById('filterRows').innerHTML = parts.slice(0,6).map(p=>rowHTML(p)).join('');
+  }
+  if(key==='table-grouping'){
+    document.getElementById('groupRows').innerHTML = `
+      <tr><td class="font-mono">▾ DANGER</td><td class="font-mono">2</td><td class="font-mono">58</td><td><div class="progress-track w-32"><div class="progress-fill" style="width:92%;background:var(--danger)"></div></div></td></tr>
+      <tr><td class="font-mono">▸ WARNING</td><td class="font-mono">2</td><td class="font-mono">44</td><td><div class="progress-track w-32"><div class="progress-fill" style="width:70%"></div></div></td></tr>
+      <tr><td class="font-mono">▸ OK</td><td class="font-mono">4</td><td class="font-mono">18</td><td><div class="progress-track w-32"><div class="progress-fill" style="width:30%;background:var(--ok)"></div></div></td></tr>`;
+  }
+  if(key==='table-pagination'){
+    document.getElementById('pagRows').innerHTML = parts.slice(0,5).map(p=>rowHTMLSimple(p)).join('');
+    let btns = ['«','1','2','3','4','5','...','10','»'];
+    document.getElementById('pagBtns').innerHTML = btns.map(b=>`<button class="mockup-nav-btn ${b==='1'?'active':''}" style="padding:4px 9px">${b}</button>`).join('');
+  }
+  if(key==='table-selection'){
+    document.getElementById('selectRows').innerHTML = parts.slice(0,6).map((p,i)=>rowHTMLSimple(p,`<td><input type="checkbox" ${i===1||i===4?'checked':''}></td>`)).join('');
+  }
+}
+
+// ---------- nav config ----------
+const navGroups = [
+  {label:'Autentikasi', items:[
+    {key:'auth-login', label:'Login'},
+    {key:'auth-register', label:'Register'},
+    {key:'auth-forgot', label:'Lupa Password'},
+    {key:'auth-reset', label:'Reset Password'},
+    {key:'auth-verify', label:'Verifikasi Email'},
+    {key:'auth-check-mail', label:'Check Email'},
+  ]},
+  {label:'Status Page', items:[
+    {key:'error-404', label:'404'},
+    {key:'error-500', label:'500'},
+    {key:'coming-soon', label:'Coming Soon'},
+  ]},
+  {label:'PM Part / Line', icon:'▤', items:[
+    {key:'table-sorting', label:'Sorting'},
+    {key:'table-filtering', label:'Filtering'},
+    {key:'table-grouping', label:'Grouping'},
+    {key:'table-pagination', label:'Pagination'},
+    {key:'table-selection', label:'Row Selection'},
+    {key:'table-expanding', label:'Expanding'},
+    {key:'table-editable', label:'Editable'},
+  ]},
+  {label:'Widgets', icon:'▦', items:[
+    {key:'widget-data', label:'Data'},
+    {key:'widget-statistics', label:'Statistics'},
+  ]},
+  {label:'Inventory', icon:'⛭', items:[
+    {key:'reorder-list', label:'Reorder List'},
+  ]},
+  {label:'Dashboard & Plugin', icon:'⚙', items:[
+    {key:'charts', label:'Charts'},
+    {key:'dropzone', label:'Import (Dropzone)'},
+    {key:'mask', label:'Input Mask'},
+    {key:'wizard', label:'Form Wizard'},
+  ]},
+];
+const dashboardKeys = new Set(['table-sorting','table-filtering','table-grouping','table-pagination','table-selection','table-expanding','table-editable','charts','dropzone','mask','wizard','widget-data','widget-statistics','reorder-list']);
+const fullKeys = new Set(['auth-login','auth-register','auth-forgot','auth-reset','auth-verify','auth-check-mail','error-404','error-500','coming-soon']);
+const groupIcon = {'PM Part / Line':'▤','Widgets':'▦','Inventory':'⛭','Dashboard & Plugin':'⚙'};
+const groupOpen = {}; // persist expand/collapse state per group across renders
+
+// top switcher nav
+const mockupNav = document.getElementById('mockupNav');
+navGroups.forEach(g=>{
+  g.items.forEach(it=>{
+    const b = document.createElement('button');
+    b.className = 'mockup-nav-btn';
+    b.textContent = it.label;
+    b.dataset.key = it.key;
+    b.onclick = ()=>goto(it.key);
+    mockupNav.appendChild(b);
+  });
+});
+
+// sidebar nav (dashboard shell) — collapsible groups, like "Invoice" submenu in Mantis
+const sidebarNav = document.getElementById('sidebarNav');
+function renderSidebar(activeKey){
+  const dashboardGroups = navGroups.filter(g=>g.items.some(i=>dashboardKeys.has(i.key)));
+  sidebarNav.innerHTML = dashboardGroups.map(g=>{
+    const items = g.items.filter(i=>dashboardKeys.has(i.key));
+    const hasActive = items.some(i=>i.key===activeKey);
+    if(!(g.label in groupOpen)) groupOpen[g.label] = true;
+    if(hasActive) groupOpen[g.label] = true; // auto-expand group containing active page
+    const open = groupOpen[g.label];
+    return `
+    <div class="group-block">
+      <div class="sidebar-item group-header flex items-center justify-between px-3 py-2 rounded-r-lg cursor-pointer ${hasActive?'active':''}" data-group="${g.label}">
+        <span class="flex items-center gap-2"><span class="nav-icon w-4 text-center">${groupIcon[g.label]||'▪'}</span><span class="nav-label">${g.label}</span></span>
+        <span class="nav-label text-[10px] transition-transform" style="transform:rotate(${open?90:0}deg)">›</span>
+      </div>
+      <div class="group-children ${open?'':'hidden'} nav-label">
+        ${items.map(i=>`<div class="sidebar-item ${i.key===activeKey?'active':''} pl-9 pr-3 py-1.5 text-[13px] rounded-r-lg cursor-pointer" data-key="${i.key}">${i.label}</div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  sidebarNav.querySelectorAll('[data-key]').forEach(el=>el.onclick=()=>goto(el.dataset.key));
+  sidebarNav.querySelectorAll('[data-group]').forEach(el=>el.onclick=()=>{
+    const label = el.dataset.group;
+    groupOpen[label] = !groupOpen[label];
+    renderSidebar(activeKey);
+  });
+}
+
+// sidebar collapse (icon-only) toggle — hamburger button in topbar
+function toggleSidebarCollapse(){
+  document.getElementById('shell-dashboard').classList.toggle('sidebar-collapsed');
+}
+
+function goto(key){
+  // top nav active state
+  mockupNav.querySelectorAll('.mockup-nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.key===key));
+
+  if(dashboardKeys.has(key)){
+    document.querySelectorAll('.full-view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('shell-dashboard').classList.add('active');
+    const tpl = document.getElementById('tpl-'+key);
+    document.getElementById('dashboard-content').innerHTML = tpl.innerHTML;
+    renderSidebar(key);
+    fillDashboardExtras(key);
+    window.scrollTo(0,0);
+  } else if(fullKeys.has(key)){
+    document.getElementById('shell-dashboard').classList.remove('active');
+    document.querySelectorAll('.full-view').forEach(v=>v.classList.toggle('active', v.dataset.view===key));
+    window.scrollTo(0,0);
+  }
+}
+
+// links inside auth cards (goto lain)
+document.addEventListener('click', e=>{
+  const el = e.target.closest('[data-goto]');
+  if(el){ goto(el.dataset.goto); }
+});
+
+goto('auth-login');
+</script>
+</body>
+</html>

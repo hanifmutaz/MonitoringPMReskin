@@ -1,0 +1,78 @@
+/* src/styles/tailwind.css
+ *
+ * SENGAJA cuma import theme + utilities (BUKAN "@import 'tailwindcss';" yang
+ * penuh) - itu bakal nyertain Preflight (CSS reset Tailwind) yang bentrok
+ * sama reset manual di global.css (yang udah dipakai di SEMUA halaman lama).
+ * Kita gak mau ngerubah tampilan halaman yang BELUM dimigrasi ke Tailwind.
+ *
+ * Semua warna di bawah REFERENSI ke tokens.css (bukan nilai baru) - tokens.css
+ * TETAP jadi satu-satunya sumber kebenaran warna, sesuai catatan di file itu
+ * ("JANGAN ubah nilai di sini tanpa persetujuan eksplisit"). File ini cuma
+ * nge-expose token yang sama ke Tailwind lewat namespace warna/radius
+ * Tailwind sendiri (bg-primary, text-muted-foreground, dst).
+ */
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@import 'tw-animate-css';
+
+@theme inline {
+  /* Dipetakan ke konvensi shadcn/ui (background/foreground, card, popover,
+     primary, secondary, muted, accent, destructive) - ini standar penamaan
+     shadcn, BUKAN token baru. Nilainya semua nunjuk ke tokens.css. */
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+
+  --color-card: var(--panel);
+  --color-card-foreground: var(--text);
+
+  --color-popover: var(--panel-2);
+  --color-popover-foreground: var(--text);
+
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--bg);
+
+  --color-secondary: var(--panel-2);
+  --color-secondary-foreground: var(--text);
+
+  --color-muted: var(--panel-2);
+  --color-muted-foreground: var(--text-dim);
+
+  /* Perhatian: "accent" di konvensi shadcn beda arti sama var(--accent) di
+     tokens.css! Di shadcn, "accent" = warna highlight/hover netral (bukan
+     warna brand). Warna brand biru (var(--accent)) sudah dipetakan ke
+     "primary" di atas. Sengaja dibedain biar gak salah pakai. */
+  --color-accent: var(--panel-3);
+  --color-accent-foreground: var(--text);
+
+  --color-destructive: var(--danger);
+  --color-destructive-foreground: var(--text);
+
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--accent);
+
+  /* Token status - dipakai langsung (bg-ok, text-warn, border-danger, dst),
+     nama & makna PERSIS sama kayak yang udah dipakai di StatusBadge.jsx dkk. */
+  --color-ok: var(--ok);
+  --color-ok-dim: var(--ok-dim);
+  --color-warn: var(--warn);
+  --color-warn-dim: var(--warn-dim);
+  --color-danger: var(--danger);
+  --color-danger-dim: var(--danger-dim);
+
+  /* Cuma --font-sans yang di-expose ke Tailwind (buat komponen shadcn yang
+     butuh font-sans sebagai default). --font-display/--font-mono SENGAJA
+     TIDAK dipetakan ke sini - namanya bakal collision/self-reference sama
+     var(--font-display)/var(--font-mono) yang udah ada di tokens.css
+     (keduanya persis sama nama). Kalau butuh font itu di className
+     Tailwind, pakai arbitrary value: className="font-[var(--font-display)]" */
+  --font-sans: var(--font-body);
+
+  /* shadcn konvensi: --radius jadi basis, sm/md/lg/xl turunan dari situ.
+     Base value = var(--radius) dari tokens.css (12px) - PERSIS sama kayak
+     radius yang dipakai .panel/.kpi-card yang lama. */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}

@@ -1,0 +1,344 @@
+diff --git a/frontend/src/components/CriticalAlertsPanel.jsx b/frontend/src/components/CriticalAlertsPanel.jsx
+index 649e49c..b7ab8ae 100644
+--- a/frontend/src/components/CriticalAlertsPanel.jsx
++++ b/frontend/src/components/CriticalAlertsPanel.jsx
+@@ -1,32 +1,30 @@
+ // src/components/CriticalAlertsPanel.jsx
++// Reskin: props (items) & output visual PERSIS sama - cuma inline style
++// diganti utility Tailwind. Kondisi danger vs warning (2 warna berbeda)
++// ditulis sebagai 2 branch class statis, bukan interpolasi, biar ke-detect
++// Tailwind JIT.
+ import { AlertTriangle } from 'lucide-react';
+ 
+ function AlertCard({ item }) {
+   const isDanger = item.status === 'DANGER';
++
+   return (
+     <div
+-      style={{
+-        display: 'flex',
+-        justifyContent: 'space-between',
+-        alignItems: 'center',
+-        padding: '12px 14px',
+-        borderRadius: 8,
+-        marginBottom: 8,
+-        background: isDanger ? 'var(--danger-dim)' : 'var(--panel-2)',
+-        border: `1px solid ${isDanger ? 'var(--danger)' : 'var(--border)'}`,
+-      }}
++      className={
++        isDanger
++          ? 'mb-2 flex items-center justify-between rounded-sm border border-danger bg-danger-dim p-3.5'
++          : 'mb-2 flex items-center justify-between rounded-sm border border-border bg-[var(--panel-2)] p-3.5'
++      }
+     >
+       <div>
+-        <div className="mono" style={{ fontWeight: 600, fontSize: 13 }}>
+-          {item.line_name}
+-        </div>
+-        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{item.part_name}</div>
++        <div className="font-[var(--font-mono)] text-[13px] font-semibold">{item.line_name}</div>
++        <div className="text-xs text-muted-foreground">{item.part_name}</div>
+       </div>
+-      <div style={{ textAlign: 'right' }}>
+-        <div className="mono" style={{ fontSize: 13, color: isDanger ? 'var(--danger)' : 'var(--warn)' }}>
++      <div className="text-right">
++        <div className={`font-[var(--font-mono)] text-[13px] ${isDanger ? 'text-danger' : 'text-warn'}`}>
+           sisa {item.remaining_shot.toLocaleString('id-ID')} shot
+         </div>
+-        <div className="caption">{item.wear_percentage}% terpakai</div>
++        <div className="text-[11px] text-[var(--text-faint)]">{item.wear_percentage}% terpakai</div>
+       </div>
+     </div>
+   );
+@@ -34,15 +32,17 @@ function AlertCard({ item }) {
+ 
+ function CriticalAlertsPanel({ items = [] }) {
+   return (
+-    <div className="panel">
+-      <div className="panel-header">
+-        <h2 className="panel-title">
++    <div className="rounded-lg border border-border bg-card p-4.5">
++      <div className="mb-4 flex items-center justify-between">
++        <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">
+           <AlertTriangle size={16} style={{ verticalAlign: -3, marginRight: 6 }} />
+           Critical Alerts
+         </h2>
+       </div>
+       {items.length === 0 ? (
+-        <div className="empty-state">Gak ada part yang butuh perhatian saat ini.</div>
++        <div className="py-5.5 px-4 text-center text-[var(--text-faint)]">
++          Gak ada part yang butuh perhatian saat ini.
++        </div>
+       ) : (
+         items.map((item) => <AlertCard key={item.part_id} item={item} />)
+       )}
+diff --git a/frontend/src/components/GanttUpcomingPanel.jsx b/frontend/src/components/GanttUpcomingPanel.jsx
+index 0bf9f7c..424a406 100644
+--- a/frontend/src/components/GanttUpcomingPanel.jsx
++++ b/frontend/src/components/GanttUpcomingPanel.jsx
+@@ -1,4 +1,8 @@
+ // src/components/GanttUpcomingPanel.jsx
++// Reskin: props (items) & output visual PERSIS sama - inline style diganti
++// utility Tailwind. Grid-template-columns tetap inline style karena jumlah
++// kolom dihitung dinamis (DAYS_AHEAD + 1), bukan angka tetap yang bisa jadi
++// utility class statis.
+ import dayjs from 'dayjs';
+ import 'dayjs/locale/id';
+ 
+@@ -22,26 +26,36 @@ function groupByLine(items) {
+   return Array.from(map.entries());
+ }
+ 
+-const STATUS_COLOR = { OK: 'var(--ok)', WARNING: 'var(--warn)', DANGER: 'var(--danger)' };
++const STATUS_CLASS = { OK: 'bg-ok', WARNING: 'bg-warn', DANGER: 'bg-danger' };
+ 
+ function GanttUpcomingPanel({ items = [] }) {
+   const columns = buildColumns();
+   const rows = groupByLine(items);
+ 
+   return (
+-    <div className="panel">
+-      <div className="panel-header">
+-        <h2 className="panel-title">Upcoming PM (7 Hari ke Depan)</h2>
++    <div className="rounded-lg border border-border bg-card p-4.5">
++      <div className="mb-4 flex items-center justify-between">
++        <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">
++          Upcoming PM (7 Hari ke Depan)
++        </h2>
+       </div>
+ 
+       {rows.length === 0 ? (
+-        <div className="empty-state">Gak ada jadwal PM dalam 7 hari ke depan.</div>
++        <div className="py-5.5 px-4 text-center text-[var(--text-faint)]">
++          Gak ada jadwal PM dalam 7 hari ke depan.
++        </div>
+       ) : (
+-        <div style={{ overflowX: 'auto' }}>
+-          <div style={{ display: 'grid', gridTemplateColumns: `150px repeat(${columns.length}, 1fr)`, gap: 4 }}>
++        <div className="overflow-x-auto">
++          <div
++            className="grid gap-1"
++            style={{ gridTemplateColumns: `150px repeat(${columns.length}, 1fr)` }}
++          >
+             <div />
+             {columns.map((col) => (
+-              <div key={col.key} className="table-header-text" style={{ textAlign: 'center', padding: '4px 0' }}>
++              <div
++                key={col.key}
++                className="py-1 text-center font-[var(--font-mono)] text-[11px] font-medium uppercase tracking-[0.5px] text-[var(--text-faint)]"
++              >
+                 {col.label}
+               </div>
+             ))}
+@@ -59,33 +73,19 @@ function GanttUpcomingPanel({ items = [] }) {
+ function RowContent({ lineName, lineItems, columns }) {
+   return (
+     <>
+-      <div className="mono" style={{ fontSize: 12, padding: '10px 0', color: 'var(--text-dim)' }}>
+-        {lineName}
+-      </div>
++      <div className="py-2.5 font-[var(--font-mono)] text-xs text-muted-foreground">{lineName}</div>
+       {columns.map((col) => {
+         const dayItems = lineItems.filter((it) => it.estimated_date === col.key);
+         return (
+           <div
+             key={col.key}
+-            style={{
+-              padding: '8px 0',
+-              display: 'flex',
+-              justifyContent: 'center',
+-              alignItems: 'center',
+-              gap: 4,
+-              borderLeft: '1px solid var(--border-soft)',
+-            }}
++            className="flex items-center justify-center gap-1 border-l border-[var(--border-soft)] py-2"
+           >
+             {dayItems.map((it, idx) => (
+               <span
+                 key={idx}
+                 title={`${it.label} (${it.status})`}
+-                style={{
+-                  width: 8,
+-                  height: 8,
+-                  borderRadius: '50%',
+-                  background: STATUS_COLOR[it.status] || 'var(--text-faint)',
+-                }}
++                className={`h-2 w-2 rounded-full ${STATUS_CLASS[it.status] || 'bg-[var(--text-faint)]'}`}
+               />
+             ))}
+           </div>
+diff --git a/frontend/src/components/KpiCard.jsx b/frontend/src/components/KpiCard.jsx
+index f3200d3..dd2a902 100644
+--- a/frontend/src/components/KpiCard.jsx
++++ b/frontend/src/components/KpiCard.jsx
+@@ -1,23 +1,36 @@
+ // src/components/KpiCard.jsx
++// Reskin: props (icon, label, value, caption, status) & output visual PERSIS
++// sama - cuma .kpi-card/.kpi-icon/dst diganti utility Tailwind. .kpi-grid
++// & .kpi-card (dipakai buat loading skeleton di DashboardPage.jsx) dibiarkan
++// di components.css apa adanya, belum dimigrasi.
++// Class HARUS ditulis lengkap & statis di sini (bukan di-interpolate lewat
++// template string) - Tailwind JIT nyari candidate class lewat regex di teks
++// mentah file, jadi `bg-[var(--${status}-dim)]` gak bakal ke-detect dan
++// hasilnya class kosong tanpa CSS. 'muted' dipakai buat state "belum ada
++// data" - sengaja BUKAN salah satu dari accent/warn/danger (yang berarti
++// baik/waspada/kritis), jadi dibedain manual pakai token netral yang sudah
++// ada (panel-3/text-faint), bukan token baru.
++const ICON_CLASS = {
++  accent: 'bg-[var(--accent-dim)] text-[var(--accent)]',
++  ok: 'bg-ok-dim text-ok',
++  warn: 'bg-warn-dim text-warn',
++  danger: 'bg-danger-dim text-danger',
++  muted: 'bg-[var(--panel-3)] text-[var(--text-faint)]',
++};
++
+ function KpiCard({ icon, label, value, caption, status = 'accent' }) {
+-  // 'muted' dipakai buat state "belum ada data" - sengaja BUKAN salah satu
+-  // dari accent/warn/danger (yang berarti baik/waspada/kritis), jadi gak
+-  // dipetakan ke var(--{status}-dim) seperti biasa. Dibedain manual pakai
+-  // token netral yang sudah ada (panel-3/text-faint) - tidak menambah token
+-  // baru ke tokens.css.
+-  const isMuted = status === 'muted';
+-  const iconStyle = isMuted
+-    ? { background: 'var(--panel-3)', color: 'var(--text-faint)' }
+-    : { background: `var(--${status}-dim)`, color: `var(--${status})` };
++  const iconClass = ICON_CLASS[status] || ICON_CLASS.accent;
+ 
+   return (
+-    <div className="kpi-card">
+-      <div className="kpi-icon" style={iconStyle}>
++    <div className="rounded-lg border border-border bg-card p-4.5">
++      <div className={`mb-3 flex h-[34px] w-[34px] items-center justify-center rounded-sm ${iconClass}`}>
+         {icon}
+       </div>
+-      <div className="kpi-label">{label}</div>
+-      <div className="kpi-value">{value}</div>
+-      {caption && <div className="kpi-caption">{caption}</div>}
++      <div className="mb-1 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
++        {label}
++      </div>
++      <div className="font-[var(--font-display)] text-[30px] font-semibold">{value}</div>
++      {caption && <div className="mt-1 text-xs text-muted-foreground">{caption}</div>}
+     </div>
+   );
+ }
+diff --git a/frontend/src/components/LineStatusDonut.jsx b/frontend/src/components/LineStatusDonut.jsx
+index a59c4bd..eb962c5 100644
+--- a/frontend/src/components/LineStatusDonut.jsx
++++ b/frontend/src/components/LineStatusDonut.jsx
+@@ -1,4 +1,9 @@
+ // src/components/LineStatusDonut.jsx
++// Reskin: props & output visual PERSIS sama - cuma layout/warna statis
++// diganti utility Tailwind. Conic-gradient donut TETAP inline style (nilainya
++// dihitung dari props saat render, gak bisa jadi utility class statis).
++const DOT_CLASS = { ok: 'bg-ok', warn: 'bg-warn', danger: 'bg-danger' };
++
+ function LineStatusDonut({ healthy = 0, warning = 0, critical = 0, totalLabel = 'Total Line' }) {
+   const total = healthy + warning + critical;
+   const pct = (n) => (total > 0 ? (n / total) * 100 : 0);
+@@ -14,37 +19,18 @@ function LineStatusDonut({ healthy = 0, warning = 0, critical = 0, totalLabel =
+   )`;
+ 
+   return (
+-    <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
++    <div className="flex items-center gap-6">
+       <div
+-        style={{
+-          width: 180,
+-          height: 180,
+-          borderRadius: '50%',
+-          background: total > 0 ? gradient : 'var(--panel-3)',
+-          display: 'flex',
+-          alignItems: 'center',
+-          justifyContent: 'center',
+-          flexShrink: 0,
+-        }}
++        className="flex h-[180px] w-[180px] shrink-0 items-center justify-center rounded-full"
++        style={{ background: total > 0 ? gradient : 'var(--panel-3)' }}
+       >
+-        <div
+-          style={{
+-            width: 120,
+-            height: 120,
+-            borderRadius: '50%',
+-            background: 'var(--panel)',
+-            display: 'flex',
+-            flexDirection: 'column',
+-            alignItems: 'center',
+-            justifyContent: 'center',
+-          }}
+-        >
+-          <div className="kpi-value">{total}</div>
+-          <div className="caption">{totalLabel}</div>
++        <div className="flex h-[120px] w-[120px] flex-col items-center justify-center rounded-full bg-card">
++          <div className="font-[var(--font-display)] text-[30px] font-semibold">{total}</div>
++          <div className="text-[11px] text-[var(--text-faint)]">{totalLabel}</div>
+         </div>
+       </div>
+ 
+-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
++      <div className="flex flex-col gap-2.5">
+         <StatusRow color="ok" label="Sehat" value={healthy} />
+         <StatusRow color="warn" label="Perlu Perhatian" value={warning} />
+         <StatusRow color="danger" label="Kritis" value={critical} />
+@@ -55,14 +41,12 @@ function LineStatusDonut({ healthy = 0, warning = 0, critical = 0, totalLabel =
+ 
+ function StatusRow({ color, label, value }) {
+   return (
+-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+-      <span style={{ width: 8, height: 8, borderRadius: '50%', background: `var(--${color})` }} />
+-      <span style={{ fontSize: 13, color: 'var(--text-dim)', minWidth: 110 }}>{label}</span>
+-      <span className="mono" style={{ fontWeight: 600 }}>
+-        {value}
+-      </span>
++    <div className="flex items-center gap-2">
++      <span className={`h-2 w-2 rounded-full ${DOT_CLASS[color]}`} />
++      <span className="min-w-[110px] text-[13px] text-muted-foreground">{label}</span>
++      <span className="font-[var(--font-mono)] font-semibold">{value}</span>
+     </div>
+   );
+ }
+ 
+-export default LineStatusDonut;
+\ No newline at end of file
++export default LineStatusDonut;
+diff --git a/frontend/src/components/StatusBadge.jsx b/frontend/src/components/StatusBadge.jsx
+index 59aebda..b034eed 100644
+--- a/frontend/src/components/StatusBadge.jsx
++++ b/frontend/src/components/StatusBadge.jsx
+@@ -1,13 +1,30 @@
+ // src/components/StatusBadge.jsx
+-const LABELS = { OK: 'OK', WARNING: 'Warning', DANGER: 'Danger' };
++// Reskin: markup sama, class CSS lama (.badge/.badge-ok/dst) diganti utility
++// Tailwind yang ngerujuk PERSIS ke token yang sama (lihat tailwind.css buat
++// --color-ok/-warn/-danger, dan var(--...) langsung buat token yang belum
++// di-expose ke Tailwind seperti --panel-3/--text-faint/--font-mono).
++// Props (status) & output visual TIDAK berubah - .badge-* di components.css
++// dibiarkan apa adanya karena masih dipakai langsung (bukan lewat komponen
++// ini) di DashboardPage.jsx (badgeClassFor) dan tempat lain yang belum
++// dimigrasi.
++const CONFIG = {
++  OK: { label: 'OK', bg: 'bg-ok-dim', text: 'text-ok', dot: 'bg-ok' },
++  WARNING: { label: 'Warning', bg: 'bg-warn-dim', text: 'text-warn', dot: 'bg-warn' },
++  DANGER: { label: 'Danger', bg: 'bg-danger-dim', text: 'text-danger', dot: 'bg-danger' },
++};
++const FALLBACK = { bg: 'bg-[var(--panel-3)]', text: 'text-[var(--text-faint)]', dot: 'bg-[var(--text-faint)]' };
+ 
+ function StatusBadge({ status }) {
+   const normalized = (status || '').toUpperCase();
+-  const className = `badge badge-${normalized.toLowerCase()}`;
++  const cfg = CONFIG[normalized] || FALLBACK;
++  const label = cfg.label || status;
++
+   return (
+-    <span className={className}>
+-      <span className="dot" />
+-      {LABELS[normalized] || status}
++    <span
++      className={`inline-flex items-center gap-1 rounded-full px-[10px] py-[3px] text-xs font-[var(--font-mono)] ${cfg.bg} ${cfg.text}`}
++    >
++      <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
++      {label}
+     </span>
+   );
+ }
