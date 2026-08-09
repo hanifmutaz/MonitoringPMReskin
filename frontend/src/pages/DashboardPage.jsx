@@ -1,6 +1,6 @@
 // src/pages/DashboardPage.jsx
 import { useState } from 'react';
-import { Package, Factory, AlertTriangle, ShieldAlert, Target, TrendingDown } from 'lucide-react';
+import { Package, Factory, AlertTriangle, ShieldAlert, Target, TrendingDown, Activity, Timer } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboardSummary } from '../hooks/useDashboardSummary';
@@ -15,6 +15,42 @@ import LineStatusDonut from '../components/LineStatusDonut';
 import CriticalAlertsPanel from '../components/CriticalAlertsPanel';
 import GanttUpcomingPanel from '../components/GanttUpcomingPanel';
 import SiteSwitcher from '../components/SiteSwitcher';
+
+// Reskin layout (checklist §3 item 3): `.panel`/`.kpi-grid` lama dilepas
+// TOTAL (bukan digabung - lihat aturan §7.3 RESKIN-PLAN.md), diganti
+// Tailwind murni. Style panel/tabel di sini NGIKUTIN pola yang udah dipakai
+// di CriticalAlertsPanel.jsx/GanttUpcomingPanel.jsx (rounded-lg border-border
+// bg-card p-4.5, judul text-[15px] font-semibold) - bukan pola baru, biar
+// satu halaman konsisten.
+//
+// Konten & urutan section diadaptasi dari referensi
+// `doc/reskin/mockup-management-dashboard.html` (keputusan Mutaz - checklist
+// §5: "ambil isinya aja, bukan pagar pembatas"), TAPI cuma bagian yang
+// datanya BENERAN ada di endpoint kita:
+// - KPI grid utama: TETAP 4 kartu asli (Total Parts/Active Lines/Part Butuh
+//   Perhatian/Line Kritis) - gak nambah kartu "PM Compliance"/"PM Overdue"
+//   segala dari mockup karena itu cuma nama lain buat angka yang SAMA
+//   (duplikat, bukan metric baru).
+// - 2 kartu "Needs Data" (MTBF/MTTR): diambil APA ADANYA dari mockup -
+//   di sana eksplisit ditandai "butuh sumber data breakdown/downtime" yang
+//   emang belum ada di app kita. Jujur soal keterbatasan data (`NeedsDataCard`
+//   di bawah), BUKAN diisi angka karangan.
+// - "Overall Health": dipetakan ke `LineStatusDonut` yang SUDAH ada,
+//   ditambah 3 kotak angka besar warna (pola `.health-item` di mockup,
+//   referensi visual: KPI berwarna di image4/widget-statistics) di sebelah
+//   donut - datanya SAMA kayak legend donut, cuma presentasinya lebih dense.
+// - "Lowest PM Compliance" table dari mockup: dipetakan ke
+//   `KetepatanAttentionPanel` yang SUDAH ada (data `ketepatan_attention`),
+//   badge-nya sekarang ngikutin pola visual StatusBadge.jsx (bukan
+//   `badge-*` class lama).
+// - "Subcont Performance Comparison"/"Action Required"/"Top Critical
+//   Issues"/filter period (Today/7D/30D/YTD) dari mockup DI-SKIP - gak ada
+//   endpoint yang nyediain data pembanding granular kayak gitu (yang ada
+//   cuma ringkasan per-site lewat `SiteSwitcher`, SUDAH dipakai di bawah).
+//   Ngarang angka pembanding melanggar prinsip "data & logic gak berubah"
+//   di RESKIN-PLAN.md §1.
+// Data/logic (hook, query, permission gating) TETAP SAMA - cuma markup yang
+// berubah.
 
 function formatKetepatan(percentage) {
   return percentage === null || percentage === undefined ? '-' : `${percentage}%`;
@@ -34,11 +70,74 @@ function ketepatanCaption(percentage, total, defaultCaption) {
   return `${defaultCaption} — dari ${total} event`;
 }
 
-function badgeClassFor(percentage) {
-  if (percentage === null || percentage === undefined) return 'badge badge-muted';
-  if (percentage >= 90) return 'badge badge-ok';
-  if (percentage >= 50) return 'badge badge-warning';
-  return 'badge badge-danger';
+// Badge kecil buat tabel "Ketepatan Terendah" - beda dari StatusBadge.jsx
+// (yang inputnya status literal OK/WARNING/DANGER), di sini inputnya %
+// mentah yang perlu dikonversi ke varian dulu (lewat `ketepatanStatus`).
+// Visualnya sengaja disamain persis sama StatusBadge (bg-*-dim + text-* +
+// dot) biar konsisten satu app, bukan gaya baru.
+const PERCENT_BADGE_CLASS = {
+  accent: { bg: 'bg-ok-dim', text: 'text-ok', dot: 'bg-ok' },
+  warn: { bg: 'bg-warn-dim', text: 'text-warn', dot: 'bg-warn' },
+  danger: { bg: 'bg-danger-dim', text: 'text-danger', dot: 'bg-danger' },
+  muted: { bg: 'bg-[var(--panel-3)]', text: 'text-[var(--text-faint)]', dot: 'bg-[var(--text-faint)]' },
+};
+
+function PercentBadge({ percentage }) {
+  const cfg = PERCENT_BADGE_CLASS[ketepatanStatus(percentage)];
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-[10px] py-[3px] font-[var(--font-mono)] text-xs ${cfg.bg} ${cfg.text}`}
+    >
+      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cfg.dot}`} />
+      {formatKetepatan(percentage)}
+    </span>
+  );
+}
+
+// Kartu placeholder buat metric yang mockup tandain "Needs Data" (MTBF/MTTR)
+// - border dashed + label jujur ("Belum tersedia"), BUKAN kartu KPI biasa
+// (gak ada angka nyata buat ditampilin, jangan dipaksa keliatan "penuh").
+function NeedsDataCard({ icon, label, note }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border p-4.5">
+      <div className="flex items-start justify-between">
+        <div className="flex h-[34px] w-[34px] items-center justify-center rounded-sm bg-[var(--panel-3)] text-[var(--text-faint)]">
+          {icon}
+        </div>
+        <span className="rounded-[5px] bg-[var(--panel-3)] px-[7px] py-px text-[9px] font-bold uppercase tracking-[0.3px] text-[var(--text-faint)]">
+          Needs Data
+        </span>
+      </div>
+      <div>
+        <div className="mb-1 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
+          {label}
+        </div>
+        <div className="font-[var(--font-display)] text-[15px] font-semibold italic text-[var(--text-faint)]">
+          Belum tersedia
+        </div>
+        <div className="mt-1 text-xs text-muted-foreground">{note}</div>
+      </div>
+    </div>
+  );
+}
+
+// Kotak angka besar warna, pendamping `LineStatusDonut` (pola `.health-item`
+// di mockup, referensi visual image4/widget-statistics) - datanya SAMA
+// kayak legend di dalam donut, cuma presentasi lebih dense/scannable.
+const HEALTH_STAT_CLASS = {
+  ok: { bg: 'bg-ok-dim', text: 'text-ok' },
+  warn: { bg: 'bg-warn-dim', text: 'text-warn' },
+  danger: { bg: 'bg-danger-dim', text: 'text-danger' },
+};
+
+function HealthStat({ value, label, tone }) {
+  const cfg = HEALTH_STAT_CLASS[tone];
+  return (
+    <div className={`flex-1 rounded-[10px] p-3.5 text-center ${cfg.bg}`}>
+      <div className={`font-[var(--font-display)] text-[22px] font-semibold ${cfg.text}`}>{value}</div>
+      <div className="mt-0.5 text-[11px] text-muted-foreground">{label}</div>
+    </div>
+  );
 }
 
 // Diubah jadi terima data lewat props (bukan manggil hook sendiri) supaya
@@ -48,47 +147,52 @@ function KetepatanAttentionPanel({ data = [], isLoading }) {
   if (isLoading) return null;
 
   return (
-    <div className="panel">
-      <div className="panel-header">
-        <h2 className="panel-title">
-          <TrendingDown size={16} style={{ verticalAlign: -2, marginRight: 6 }} />
+    <div className="rounded-lg border border-border bg-card p-4.5">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="m-0 flex items-center gap-1.5 font-[var(--font-display)] text-[15px] font-semibold">
+          <TrendingDown size={16} />
           Line Perlu Perhatian — Ketepatan PM Terendah (Tahun Berjalan)
         </h2>
       </div>
-      {data.length === 0 && (
-        <div className="empty-state">Belum ada data ketepatan PM tahun ini buat dirangking.</div>
-      )}
-      {data.length > 0 && (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Line</th>
-              <th className="mono">Ketepatan PM Part</th>
-              <th className="mono">Ketepatan Monthly</th>
-              <th className="mono">Ketepatan Weekly</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((row) => (
-              <tr key={row.line_id}>
-                <td className="mono">{row.line_name}</td>
-                <td>
-                  <span className={badgeClassFor(row.part_percentage)}>{formatKetepatan(row.part_percentage)}</span>
-                </td>
-                <td>
-                  <span className={badgeClassFor(row.monthly_percentage)}>
-                    {formatKetepatan(row.monthly_percentage)}
-                  </span>
-                </td>
-                <td>
-                  <span className={badgeClassFor(row.weekly_percentage)}>
-                    {formatKetepatan(row.weekly_percentage)}
-                  </span>
-                </td>
+      {data.length === 0 ? (
+        <div className="px-4 py-5.5 text-center text-[var(--text-faint)]">
+          Belum ada data ketepatan PM tahun ini buat dirangking.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                {['Line', 'Ketepatan PM Part', 'Ketepatan Monthly', 'Ketepatan Weekly'].map((h) => (
+                  <th
+                    key={h}
+                    className="border-b border-border px-2.5 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.map((row) => (
+                <tr key={row.line_id} className="hover:bg-[var(--panel-2)]">
+                  <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5 font-[var(--font-mono)] text-[13px]">
+                    {row.line_name}
+                  </td>
+                  <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5">
+                    <PercentBadge percentage={row.part_percentage} />
+                  </td>
+                  <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5">
+                    <PercentBadge percentage={row.monthly_percentage} />
+                  </td>
+                  <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5">
+                    <PercentBadge percentage={row.weekly_percentage} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
@@ -131,16 +235,20 @@ function DashboardPage() {
   const errorSummary = isRemoteView ? false : localSummary.isError;
 
   if (errorSummary) {
-    return <div className="error-state">Gagal memuat data dashboard. Coba lagi.</div>;
+    return (
+      <div className="rounded-lg bg-danger-dim px-4 py-5 text-center text-danger">
+        Gagal memuat data dashboard. Coba lagi.
+      </div>
+    );
   }
 
   // Site remote dipilih tapi belum pernah berhasil ditarik sama sekali
   // (status 'unreachable' + data null) - gak ada apa-apa buat ditampilin.
   if (isRemoteView && !remoteSite.data) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="flex flex-col gap-5">
         <SiteSwitcher sites={sites} selectedSiteId={selectedSiteId} onChange={setSelectedSiteId} />
-        <div className="empty-state">
+        <div className="px-4 py-5 text-center text-[var(--text-faint)]">
           Belum pernah berhasil narik data dari {remoteSite.site_label}.
           {remoteSite.error && ` (${remoteSite.error})`}
         </div>
@@ -149,19 +257,22 @@ function DashboardPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="flex flex-col gap-5">
       <SiteSwitcher sites={sites} selectedSiteId={selectedSiteId} onChange={setSelectedSiteId} />
 
       {loadingSummary ? (
-        <div className="kpi-grid">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="kpi-card empty-state">
+            <div
+              key={i}
+              className="flex h-[148px] items-center justify-center rounded-lg border border-border bg-card text-[var(--text-faint)]"
+            >
               ...
             </div>
           ))}
         </div>
       ) : (
-        <div className="kpi-grid">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             icon={<Package size={18} />}
             label="Total Parts"
@@ -193,12 +304,17 @@ function DashboardPage() {
         </div>
       )}
 
-      <div className="panel">
-        <div className="panel-header">
-          <h2 className="panel-title">Ketepatan PM (Tahun Berjalan)</h2>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <NeedsDataCard icon={<Activity size={18} />} label="MTBF" note="Butuh sumber data breakdown/downtime mesin" />
+        <NeedsDataCard icon={<Timer size={18} />} label="MTTR" note="Butuh sumber data breakdown/downtime mesin" />
+      </div>
+
+      <div className="rounded-lg border border-border bg-card p-4.5">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Ketepatan PM (Tahun Berjalan)</h2>
         </div>
         {!loadingSummary && (
-          <div className="kpi-grid">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <KpiCard
               icon={<Target size={18} />}
               label="Ketepatan PM Part"
@@ -241,20 +357,27 @@ function DashboardPage() {
         isLoading={isRemoteView ? false : localKetepatan.isLoading}
       />
 
-      <div className="panel">
-        <div className="panel-header">
-          <h2 className="panel-title">Ringkasan Status Line</h2>
+      <div className="rounded-lg border border-border bg-card p-4.5">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Ringkasan Status Line</h2>
         </div>
         {!loadingSummary && (
-          <LineStatusDonut
-            healthy={summary.lines_healthy}
-            warning={summary.lines_warning}
-            critical={summary.lines_critical}
-          />
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
+            <LineStatusDonut
+              healthy={summary.lines_healthy}
+              warning={summary.lines_warning}
+              critical={summary.lines_critical}
+            />
+            <div className="flex flex-1 gap-3">
+              <HealthStat value={summary.lines_healthy} label="Healthy" tone="ok" />
+              <HealthStat value={summary.lines_warning} label="Warning" tone="warn" />
+              <HealthStat value={summary.lines_critical} label="Critical" tone="danger" />
+            </div>
+          </div>
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {!(isRemoteView ? false : localAttention.isLoading) && <CriticalAlertsPanel items={attention} />}
         {!(isRemoteView ? false : localUpcoming.isLoading) && <GanttUpcomingPanel items={upcoming} />}
       </div>

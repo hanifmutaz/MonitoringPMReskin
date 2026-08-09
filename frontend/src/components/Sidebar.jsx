@@ -46,6 +46,26 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/t
 // 9. Jarak antar-grup nav (`NavGroup`) diperlonggar (feedback: kedempetan) -
 //    mb-1.5→mb-2.5.
 //
+// Revisi lanjutan (feedback batch berikutnya - 3 bug visual):
+// 10. BUG: jarak antar-`NavGroup` beda antara sidebar terbuka vs collapsed -
+//     sebelumnya tiap item nyimpen `mb-2.5` SENDIRI-SENDIRI (baik di cabang
+//     collapsed maupun expanded), jadi ada 2 sumber kebenaran yang gampang
+//     drift. Sekarang spacing dipindah ke SATU tempat: wrapper `<div>` di
+//     `<nav>` pakai `space-y-2.5`, NavGroup gak nyimpen margin sendiri lagi.
+//     Konsisten dijamin secara struktural, bukan disamain manual dua kali.
+// 11. BUG: markup NavGroup collapsed vs expanded sebelumnya 2 CABANG RETURN
+//     TERPISAH (return awal buat collapsed) - pas sidebar di-toggle, React
+//     unmount total lalu mount ulang struktur yang beda sama sekali, jadi
+//     transisinya "meloncat" (gak ada animasi antar 2 struktur berbeda).
+//     Sekarang disatuin jadi 1 struktur DOM yang sama buat kedua state -
+//     yang beda cuma label/chevron di-fade (opacity) + disusutin
+//     (max-width) via Tailwind, BUKAN di-unmount. Hasilnya collapse/expand
+//     jadi 1 animasi mulus yang nyambung sama transisi lebar `<aside>`,
+//     bukan swap kasar.
+// 12. Tombol toggle collapse (yang di Topbar) icon-nya sekarang crossfade
+//     (2 ikon ditumpuk, opacity di-transition) - bukan ganti ikon
+//     instan/loncat. Lihat `Topbar.jsx`.
+//
 // Data/logic (routing, badgeCount dari useDashboardSummary, logout,
 // isAdmin gating) TETAP SAMA - cuma markup/struktur nav yang berubah.
 
@@ -130,54 +150,59 @@ function SubNavItem({ to, children, badgeCount }) {
 
 function NavGroup({ group, isOpen, onToggle, isGroupActive, summary, collapsed }) {
   const Icon = group.icon;
+  const expandedOpen = isOpen && !collapsed;
 
-  if (collapsed) {
-    return (
-      <Tooltip delayDuration={200}>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-label={group.label}
-            className={`mb-2.5 flex w-full cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent p-2.5 no-underline transition-colors ${
-              isGroupActive
-                ? 'bg-[var(--accent-dim)] text-primary'
-                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-            }`}
-          >
-            <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="right">{group.label}</TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return (
-    <div className="mb-2.5">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={isOpen}
-        className={`flex w-full cursor-pointer items-center gap-3 rounded-lg border-0 bg-transparent px-3 py-2.5 text-sm no-underline transition-colors ${
-          isGroupActive
-            ? 'font-medium text-primary'
-            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+  const button = (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={expandedOpen}
+      aria-label={group.label}
+      className={`flex w-full cursor-pointer items-center gap-3 rounded-lg border-0 bg-transparent text-sm no-underline transition-[background-color,color,padding] duration-[250ms] ease-in-out ${
+        collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5'
+      } ${
+        isGroupActive
+          ? collapsed
+            ? 'bg-[var(--accent-dim)] text-primary'
+            : 'font-medium text-primary'
+          : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+      }`}
+    >
+      <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.8} />
+      {/* Label & chevron TETAP di-render selalu (gak di-unmount pas
+          collapsed) - cuma disusutin lewat max-width+opacity. Ini yang
+          bikin transisi collapse/expand nyambung mulus sama animasi lebar
+          `<aside>`, bukan pop instan kayak sebelumnya (poin 11). */}
+      <span
+        className={`overflow-hidden whitespace-nowrap text-left transition-[max-width,opacity] duration-[250ms] ease-in-out ${
+          collapsed ? 'max-w-0 opacity-0' : 'max-w-[170px] flex-1 opacity-100'
         }`}
       >
-        <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.8} />
-        <span className="flex-1 text-left">{group.label}</span>
-        <ChevronDown
-          className={`h-4 w-4 shrink-0 text-[var(--text-faint)] transition-transform duration-200 ${
-            isOpen ? 'rotate-180' : ''
-          }`}
-          strokeWidth={1.8}
-        />
-      </button>
+        {group.label}
+      </span>
+      <ChevronDown
+        className={`shrink-0 text-[var(--text-faint)] transition-[transform,max-width,opacity] duration-[250ms] ease-in-out ${
+          expandedOpen ? 'rotate-180' : ''
+        } ${collapsed ? 'max-w-0 opacity-0' : 'h-4 max-w-4 opacity-100'}`}
+        strokeWidth={1.8}
+      />
+    </button>
+  );
+
+  return (
+    <div>
+      {collapsed ? (
+        <Tooltip delayDuration={200}>
+          <TooltipTrigger asChild>{button}</TooltipTrigger>
+          <TooltipContent side="right">{group.label}</TooltipContent>
+        </Tooltip>
+      ) : (
+        button
+      )}
 
       <div
-        className={`grid overflow-hidden transition-[grid-template-rows] duration-200 ease-in-out ${
-          isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        className={`grid overflow-hidden transition-[grid-template-rows] duration-[250ms] ease-in-out ${
+          expandedOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
         }`}
       >
         <div className="min-h-0 space-y-1 pt-1">
@@ -254,47 +279,65 @@ function Sidebar() {
   return (
     <TooltipProvider>
       <aside
-        className={`sticky top-0 flex h-screen shrink-0 flex-col border-r border-border bg-card transition-[width] duration-200 ease-in-out ${
+        className={`sticky top-0 flex h-screen shrink-0 flex-col overflow-hidden border-r border-border bg-card transition-[width] duration-[250ms] ease-in-out ${
           collapsed ? 'w-[76px]' : 'w-[var(--sidebar-width)]'
         }`}
       >
         <div
-          className={`flex h-[60px] items-center gap-2.5 border-b border-border ${collapsed ? 'justify-center px-2' : 'px-4'}`}
+          className={`flex h-[60px] items-center gap-2.5 border-b border-border transition-[padding] duration-[250ms] ease-in-out ${collapsed ? 'justify-center px-2' : 'px-4'}`}
         >
           <img src="/logo.svg" alt="PM Monitor" className="h-10 w-10 shrink-0 object-contain" />
-          {!collapsed && (
-            <div className="min-w-0">
-              <div className="truncate font-[var(--font-display)] text-base font-semibold leading-tight">
-                PM Monitor
-              </div>
-              <div className="text-[11px] text-[var(--text-faint)]">Hirose Internal</div>
+          {/* Title selalu di-render (gak di-unmount) - disusutin lewat
+              max-width+opacity biar nyambung sama transisi lebar aside,
+              bukan hilang instan (poin 11). */}
+          <div
+            className={`min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-[250ms] ease-in-out ${
+              collapsed ? 'max-w-0 opacity-0' : 'max-w-[200px] opacity-100'
+            }`}
+          >
+            <div className="truncate font-[var(--font-display)] text-base font-semibold leading-tight">
+              PM Monitor
             </div>
-          )}
+            <div className="text-[11px] text-[var(--text-faint)]">Hirose Internal</div>
+          </div>
         </div>
 
         <nav
           onScroll={handleNavScroll}
-          className={`overlay-scroll flex-1 overflow-y-auto py-4 ${navScrolling ? 'is-scrolling' : ''} ${
+          className={`overlay-scroll flex-1 overflow-y-auto py-4 transition-[padding] duration-[250ms] ease-in-out ${navScrolling ? 'is-scrolling' : ''} ${
             collapsed ? 'px-2' : 'px-2.5'
           }`}
         >
-          {NAV_GROUPS.filter((g) => !g.adminOnly || isAdmin).map((group) => (
-            <NavGroup
-              key={group.key}
-              group={group}
-              isOpen={openGroups.has(group.key)}
-              onToggle={() => (collapsed ? handleGroupClickWhileCollapsed(group.key) : toggleGroup(group.key))}
-              isGroupActive={group.key === activeGroupKey}
-              summary={summary}
-              collapsed={collapsed}
-            />
-          ))}
+          {/* Jarak antar-grup SATU sumber kebenaran (`space-y-2.5`) di sini -
+              bukan `mb-2.5` per-item lagi (dulu ada 2 tempat berbeda buat
+              collapsed vs expanded, gampang drift - poin 10). */}
+          <div className="space-y-2.5">
+            {NAV_GROUPS.filter((g) => !g.adminOnly || isAdmin).map((group) => (
+              <NavGroup
+                key={group.key}
+                group={group}
+                isOpen={openGroups.has(group.key)}
+                onToggle={() => (collapsed ? handleGroupClickWhileCollapsed(group.key) : toggleGroup(group.key))}
+                isGroupActive={group.key === activeGroupKey}
+                summary={summary}
+                collapsed={collapsed}
+              />
+            ))}
+          </div>
         </nav>
 
-        <div className={`flex items-center gap-2.5 border-t border-border py-3.5 ${collapsed ? 'flex-col px-2' : 'px-4'}`}>
+        <div
+          className={`flex items-center gap-2.5 border-t border-border py-3.5 transition-[padding] duration-[250ms] ease-in-out ${collapsed ? 'flex-col px-2' : 'px-4'}`}
+        >
           <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[var(--accent-dim)] text-[13px] font-bold text-primary">
             {initials}
           </div>
+          {/* Beda dari title header di atas: kontainer footer ganti arah
+              flex (row→column) pas collapsed, jadi trik max-width gak aman
+              dipakai di sini (elemen width-0 di flex-col tetap makan tinggi
+              buat teksnya). Dibiarkan unmount kayak semula - footer cuma
+              berubah sekali pas collapsed (bukan elemen paling mencolok
+              pas animasi), beda kasus sama header/NavGroup di atas. */}
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <div className="truncate text-[13px] font-medium">{user?.full_name}</div>
