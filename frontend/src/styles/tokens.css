@@ -45,10 +45,10 @@
   --space-4-5: 18px;
   --space-5: 22px;
 
-  /* 280px (naik dari 230px) - perubahan token ini EKSPLISIT diminta lewat
-     chat (bukan keputusan sepihak AI) supaya label nav terpanjang
-     ("Dashboard PM Monthly and Weekly" sebagai sub-item) gak ke-truncate
-     "...". Lihat riwayat percakapan reskin Sidebar. */
-  --sidebar-width: 280px;
+  /* 300px (naik dari 280px, sebelumnya dari 230px) - perubahan token ini
+     EKSPLISIT diminta lewat chat (bukan keputusan sepihak AI). 280px masih
+     bikin sub-item terpanjang ("Monitoring PM Monthly and Weekly") wrap ke
+     baris kedua. Lihat riwayat percakapan reskin Sidebar. */
+  --sidebar-width: 300px;
   --content-max-width: 1400px;
 }

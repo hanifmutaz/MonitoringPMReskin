@@ -24,7 +24,8 @@ juga masih berstatus **PERENCANAAN**, belum disetujui buat eksekusi.
       backend search endpoint) atau skip dulu
 - [ ] Keputusan notifikasi topbar: expose notification job yang sudah ada
       ke UI (dropdown/bell icon) atau tidak
-- [ ] Keputusan sidebar collapse ke icon-only: dikerjakan sekarang atau nanti
+- [x] Keputusan sidebar collapse ke icon-only: **dikerjakan sekarang** —
+      selesai, lihat §3 & §4
 - [ ] Keputusan sparkline KPI card: tunda sampai ada endpoint snapshot
       harian, atau dikerjain sekalian bikin endpoint baru
 
@@ -56,9 +57,12 @@ juga masih berstatus **PERENCANAAN**, belum disetujui buat eksekusi.
 
 Urutan berikut sesuai rekomendasi §8 di `RESKIN-PLAN.md`:
 
-- [ ] **1. Sidebar** — reskin visual (ikon, active state, badge styling),
-      struktur nav TETAP flat 5 grup / 12 item (bukan collapsible, sesuai
-      rekomendasi §5.1)
+- [x] **1. Sidebar** — reskin visual (ikon, active state, badge styling)
+      selesai + FITUR TAMBAHAN: collapse/expand ke icon-only (state lokal +
+      persist localStorage, tooltip pas collapsed) — awalnya direncanakan
+      flat 5 grup/12 item TANPA collapsible, tapi berubah jadi grup
+      accordion collapsible (lihat komentar di `Sidebar.jsx`) ditambah
+      collapse icon-only di atas ini
 - [ ] **2. Topbar** — reskin visual dasar dulu, TANPA search/notifikasi
       beneran (itu task terpisah setelah discovery backend)
 - [ ] **3. `DashboardPage.jsx` layout** — lepas `.panel`/`.kpi-grid` lama,
@@ -72,9 +76,8 @@ Urutan berikut sesuai rekomendasi §8 di `RESKIN-PLAN.md`:
 
 ## 4. Item opsional / fase terpisah
 
-- [ ] Halaman 404 custom (cek dulu apakah React Router sudah punya
-      catch-all route)
-- [ ] Sidebar collapse ke icon-only
+- [x] Halaman 404 custom — udah ada catch-all route + `NotFoundPage.jsx`
+- [x] Sidebar collapse ke icon-only
 - [ ] Sparkline di KPI card (butuh endpoint data historis baru di backend)
 - [ ] Search bar topbar (fitur baru, bukan reskin — perlu endpoint search
       lintas Part/Line/Supplier)
