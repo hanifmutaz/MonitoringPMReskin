@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<title>Dashboard Management — Executive View</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0D1117; --panel:#171F2B; --panel-2:#1D2635;
+    --border:#2A3441; --border-soft:#232C38;
+    --text:#EAEEF3; --text-dim:#97A1B0; --text-faint:#616C7C;
+    --accent:#2F80ED; --accent-dim:rgba(47,128,237,.16);
+    --ok:#22C55E; --ok-dim:rgba(34,197,94,.15);
+    --warn:#F5A623; --warn-dim:rgba(245,166,35,.15);
+    --danger:#EF4444; --danger-dim:rgba(239,68,68,.15);
+    --font-body:'Public Sans',sans-serif; --font-mono:'IBM Plex Mono',monospace;
+    --radius:14px; --radius-sm:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:14px;}
+  .shell{display:flex;flex-direction:column;min-height:100vh;}
+
+  .topbar{height:56px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;}
+  .tb-logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;}
+  .tb-logo .dot{width:22px;height:22px;border-radius:6px;background:var(--accent);}
+  .tb-right{display:flex;align-items:center;gap:14px;}
+  .tb-avatar{width:30px;height:30px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;}
+
+  .main{padding:22px 28px 60px;max-width:1320px;margin:0 auto;display:flex;flex-direction:column;gap:16px;width:100%;}
+
+  /* ===== Filter bar ===== */
+  .filterbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  h1{font-size:19px;font-weight:700;}
+  .filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .pillgroup{display:flex;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:3px;}
+  .pillgroup button{border:none;background:none;color:var(--text-dim);font-size:12px;font-weight:600;padding:6px 12px;border-radius:7px;cursor:pointer;font-family:inherit;}
+  .pillgroup button.active{background:var(--accent);color:#fff;}
+  .updated{font-size:11px;color:var(--text-faint);display:flex;align-items:center;gap:5px;}
+  .updated .d{width:6px;height:6px;border-radius:50%;background:var(--ok);}
+
+  /* ===== Executive KPI ===== */
+  .kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:8px;}
+  .kpi.placeholder{border-style:dashed;background:transparent;}
+  .kpi-top{display:flex;justify-content:space-between;align-items:flex-start;}
+  .kpi-label{font-size:11.5px;color:var(--text-dim);font-weight:600;}
+  .status-pill{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:5px;text-transform:uppercase;letter-spacing:.3px;}
+  .status-pill.good{background:var(--ok-dim);color:var(--ok);}
+  .status-pill.warn{background:var(--warn-dim);color:var(--warn);}
+  .status-pill.crit{background:var(--danger-dim);color:var(--danger);}
+  .kpi-value{font-size:26px;font-weight:700;}
+  .kpi-value .unit{font-size:14px;color:var(--text-faint);font-weight:500;}
+  .kpi-meta{font-size:10.5px;color:var(--text-faint);display:flex;flex-direction:column;gap:2px;}
+  .kpi-meta .muted{font-style:italic;opacity:.75;}
+  .placeholder .kpi-value{font-size:13px;color:var(--text-faint);font-weight:600;font-style:italic;}
+  .placeholder .kpi-meta{color:var(--text-faint);}
+
+  /* ===== Panel ===== */
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px;}
+  .panel.placeholder{border-style:dashed;background:transparent;}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .panel-title{font-size:14px;font-weight:700;}
+  .panel-sub{font-size:11px;color:var(--text-faint);margin-top:2px;}
+  .viewall{font-size:11.5px;color:var(--accent);font-weight:600;cursor:pointer;}
+
+  /* ===== Health ===== */
+  .health-row{display:flex;align-items:center;gap:28px;}
+  .health-bars{display:flex;gap:18px;flex:1;}
+  .health-item{flex:1;background:var(--panel-2);border-radius:10px;padding:12px 14px;text-align:center;}
+  .health-item .n{font-size:22px;font-weight:700;}
+  .health-item .l{font-size:11px;color:var(--text-dim);margin-top:2px;}
+  .health-item.ok .n{color:var(--ok);} .health-item.warn .n{color:var(--warn);} .health-item.crit .n{color:var(--danger);}
+  .score-box{text-align:center;padding:0 16px;border-left:1px solid var(--border-soft);}
+  .score-box .n{font-size:13px;color:var(--text-faint);font-style:italic;font-weight:600;}
+  .score-box .l{font-size:10px;color:var(--text-faint);margin-top:4px;}
+
+  .row2{display:grid;grid-template-columns:1.1fr 0.9fr;gap:14px;}
+
+  /* ===== Comparison table ===== */
+  table{width:100%;border-collapse:collapse;}
+  th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-faint);font-weight:600;}
+  th.num,td.num{text-align:right;}
+  td{padding:10px 10px;border-bottom:1px solid var(--border-soft);font-size:12.5px;}
+  td.dash{color:var(--text-faint);font-style:italic;}
+  .winner{color:var(--ok);font-weight:700;}
+  .loser{color:var(--danger);font-weight:600;}
+
+  /* ===== Action required ===== */
+  .action-row{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border-radius:var(--radius-sm);margin-bottom:8px;}
+  .action-row.crit{background:var(--danger-dim);}
+  .action-row.warn{background:var(--warn-dim);}
+  .action-dot{width:8px;height:8px;border-radius:50%;margin-top:4px;flex-shrink:0;}
+  .action-row.crit .action-dot{background:var(--danger);}
+  .action-row.warn .action-dot{background:var(--warn);}
+  .action-body{flex:1;}
+  .action-title{font-size:12.5px;font-weight:600;}
+  .action-meta{font-size:11px;color:var(--text-dim);margin-top:2px;}
+  .action-sc{font-family:var(--font-mono);font-size:10px;background:var(--panel-2);padding:1px 6px;border-radius:5px;color:var(--text-dim);margin-right:6px;}
+  .action-link{font-size:11px;color:var(--accent);font-weight:600;white-space:nowrap;}
+
+  /* ===== Subcont line-health mini ===== */
+  .sc-block{margin-bottom:16px;}
+  .sc-block:last-child{margin-bottom:0;}
+  .sc-name{font-size:12px;font-weight:700;margin-bottom:8px;color:var(--text-dim);}
+  .sc-bars{display:flex;gap:8px;}
+  .sc-bars span{flex:1;background:var(--panel-2);border-radius:8px;padding:8px;text-align:center;font-size:11px;}
+  .sc-bars b{display:block;font-size:16px;}
+  .sc-bars .ok b{color:var(--ok);} .sc-bars .warn b{color:var(--warn);} .sc-bars .crit b{color:var(--danger);}
+
+  .empty-note{font-size:11.5px;color:var(--text-faint);line-height:1.6;}
+  .tag{display:inline-block;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:var(--panel-2);color:var(--text-faint);margin-left:6px;text-transform:uppercase;}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="tb-logo"><span class="dot"></span>PM Monitoring</div>
+    <div class="tb-right"><div class="tb-avatar">AF</div></div>
+  </div>
+
+  <div class="main">
+    <div class="filterbar">
+      <div>
+        <h1>Dashboard Management</h1>
+        <div class="updated"><span class="d"></span>Last updated 2 menit lalu</div>
+      </div>
+      <div class="filters">
+        <div class="pillgroup">
+          <button class="active">All Subcont</button>
+          <button>Subcont A</button>
+          <button>Subcont B</button>
+        </div>
+        <div class="pillgroup">
+          <button>Today</button>
+          <button>7 Days</button>
+          <button>30 Days</button>
+          <button class="active">YTD</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Executive KPI -->
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-top"><div class="kpi-label">PM Compliance (Part)</div><span class="status-pill warn">Warning</span></div>
+        <div class="kpi-value">94.2<span class="unit">%</span></div>
+        <div class="kpi-meta"><span>Target: <span class="muted">belum diatur</span></span><span class="muted">Trend: perlu data historis</span></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-top"><div class="kpi-label">PM Overdue</div><span class="status-pill crit">Critical</span></div>
+        <div class="kpi-value">8</div>
+        <div class="kpi-meta"><span class="muted">Proxy: part/line di atas threshold</span></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-top"><div class="kpi-label">Critical Line</div><span class="status-pill crit">Critical</span></div>
+        <div class="kpi-value">3</div>
+        <div class="kpi-meta"><span>dari 18 line aktif</span></div>
+      </div>
+      <div class="kpi placeholder">
+        <div class="kpi-top"><div class="kpi-label">MTBF</div><span class="tag">Needs Data</span></div>
+        <div class="kpi-value">Belum tersedia</div>
+        <div class="kpi-meta"><span>Butuh sumber data breakdown/downtime</span></div>
+      </div>
+      <div class="kpi placeholder">
+        <div class="kpi-top"><div class="kpi-label">MTTR</div><span class="tag">Needs Data</span></div>
+        <div class="kpi-value">Belum tersedia</div>
+        <div class="kpi-meta"><span>Butuh sumber data breakdown/downtime</span></div>
+      </div>
+      <div class="kpi placeholder">
+        <div class="kpi-top"><div class="kpi-label">Unplanned Downtime</div><span class="tag">Needs Data</span></div>
+        <div class="kpi-value">Belum tersedia</div>
+        <div class="kpi-meta"><span>Proxy parsial: jumlah part BROKEN (bukan jam)</span></div>
+      </div>
+    </div>
+
+    <!-- Overall Health -->
+    <div class="panel">
+      <div class="panel-head"><div><div class="panel-title">Overall Maintenance Health</div><div class="panel-sub">Konsolidasi seluruh Subcont</div></div></div>
+      <div class="health-row">
+        <div class="health-bars">
+          <div class="health-item ok"><div class="n">14</div><div class="l">Healthy</div></div>
+          <div class="health-item warn"><div class="n">3</div><div class="l">Warning</div></div>
+          <div class="health-item crit"><div class="n">1</div><div class="l">Critical</div></div>
+        </div>
+        <div class="score-box"><div class="n">TBD</div><div class="l">Health Score<br>(formula perlu<br>dikonfirmasi)</div></div>
+      </div>
+    </div>
+
+    <div class="row2">
+      <!-- Subcont Comparison -->
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Subcont Performance Comparison</div></div>
+        <table>
+          <thead><tr><th>KPI</th><th class="num">Subcont A</th><th class="num">Subcont B</th></tr></thead>
+          <tbody>
+            <tr><td>PM Compliance (Part)</td><td class="num winner">97%</td><td class="num loser">91%</td></tr>
+            <tr><td>Ketepatan Monthly</td><td class="num winner">96%</td><td class="num loser">88%</td></tr>
+            <tr><td>Ketepatan Weekly</td><td class="num winner">95%</td><td class="num">93%</td></tr>
+            <tr><td>PM Overdue (proxy)</td><td class="num winner">2</td><td class="num loser">6</td></tr>
+            <tr><td>Critical Line</td><td class="num winner">1</td><td class="num loser">2</td></tr>
+            <tr><td>MTBF</td><td class="num dash">—</td><td class="num dash">—</td></tr>
+            <tr><td>MTTR</td><td class="num dash">—</td><td class="num dash">—</td></tr>
+            <tr><td>Downtime</td><td class="num dash">—</td><td class="num dash">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Trend placeholder -->
+      <div class="panel placeholder">
+        <div class="panel-head"><div class="panel-title">PM Performance Trend</div><span class="tag">Needs Data</span></div>
+        <div class="empty-note">Data mentah (tanggal + status on-time per event) sudah tersimpan di riwayat PM, tapi query agregasi mingguan/bulanan buat chart ini belum dibuat. Butuh endpoint baru, bukan sumber data baru.</div>
+      </div>
+    </div>
+
+    <!-- Action Required -->
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">Action Required</div><div class="viewall">View All →</div></div>
+      <div class="action-row crit">
+        <span class="action-dot"></span>
+        <div class="action-body">
+          <div class="action-title"><span class="action-sc">SC-B</span>6 PM Overdue</div>
+          <div class="action-meta">Menyumbang mayoritas selisih compliance vs Subcont A</div>
+        </div>
+        <div class="action-link">Lihat detail →</div>
+      </div>
+      <div class="action-row crit">
+        <span class="action-dot"></span>
+        <div class="action-body">
+          <div class="action-title"><span class="action-sc">SC-B</span>L-04 Screw Barrel — 96% terpakai</div>
+          <div class="action-meta">Sisa 1.240 shot, mendekati batas kritis</div>
+        </div>
+        <div class="action-link">Lihat detail →</div>
+      </div>
+      <div class="action-row warn">
+        <span class="action-dot"></span>
+        <div class="action-body">
+          <div class="action-title"><span class="action-sc">SC-A</span>PM Compliance turun 5.2% bulan ini</div>
+          <div class="action-meta">Perlu dicek penyebab keterlambatan</div>
+        </div>
+        <div class="action-link">Lihat detail →</div>
+      </div>
+    </div>
+
+    <div class="row2">
+      <!-- Critical Line per Subcont -->
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Critical Line / Line Health</div></div>
+        <div class="sc-block">
+          <div class="sc-name">Subcont A</div>
+          <div class="sc-bars"><span class="ok"><b>8</b>Healthy</span><span class="warn"><b>1</b>Warning</span><span class="crit"><b>1</b>Critical</span></div>
+        </div>
+        <div class="sc-block">
+          <div class="sc-name">Subcont B</div>
+          <div class="sc-bars"><span class="ok"><b>6</b>Healthy</span><span class="warn"><b>2</b>Warning</span><span class="crit"><b>2</b>Critical</span></div>
+        </div>
+      </div>
+
+      <!-- Top Critical Issues -->
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Top Critical Issues</div><span class="panel-sub" style="margin:0">Top 5</span></div>
+        <table>
+          <thead><tr><th>SC</th><th>Line</th><th>Part</th><th class="num">Kondisi</th><th class="num">Impact*</th></tr></thead>
+          <tbody>
+            <tr><td>B</td><td class="mono">L04</td><td>Screw Barrel</td><td class="num">96%</td><td class="num loser">High</td></tr>
+            <tr><td>B</td><td class="mono">L09</td><td>Conveyor Belt</td><td class="num">89%</td><td class="num loser">High</td></tr>
+            <tr><td>A</td><td class="mono">L11</td><td>Motor</td><td class="num">82%</td><td class="num">Medium</td></tr>
+          </tbody>
+        </table>
+        <div class="empty-note" style="margin-top:10px;">*Impact diturunkan dari % pemakaian (contoh: ≥95% High, ≥85% Medium) — aturan ini bisa disesuaikan, belum ada definisi resmi dari management.</div>
+      </div>
+    </div>
+
+    <div class="row2">
+      <!-- Upcoming PM -->
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Upcoming PM (7 Hari)</div></div>
+        <div class="sc-block">
+          <div class="sc-name">Subcont A</div>
+          <div class="sc-bars"><span><b>12</b>Scheduled</span></div>
+        </div>
+        <div class="sc-block">
+          <div class="sc-name">Subcont B</div>
+          <div class="sc-bars"><span><b>16</b>Scheduled</span></div>
+        </div>
+        <div class="empty-note" style="margin-top:4px;">Breakdown Completed/Pending & capacity risk <span class="tag">Needs Data</span> — butuh query tambahan dari riwayat PM.</div>
+      </div>
+
+      <!-- Lowest Compliance -->
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Lowest PM Compliance</div><div class="viewall">View All →</div></div>
+        <table>
+          <thead><tr><th>Line</th><th class="num">Compliance</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">L-04 Molding</td><td class="num loser">42%</td></tr>
+            <tr><td class="mono">L-11 Assembly</td><td class="num">58%</td></tr>
+            <tr><td class="mono">L-16 Packing</td><td class="num">64%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

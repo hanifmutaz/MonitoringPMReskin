@@ -92,7 +92,7 @@ function SubNavItem({ to, children, badgeCount }) {
       to={to}
       end
       className={({ isActive }) =>
-        `group relative flex items-center gap-2 rounded-lg py-2 pl-5 pr-3 text-[13px] no-underline transition-colors ${
+        `group relative flex items-center gap-2 rounded-lg py-2.5 pl-5 pr-3 text-[13.5px] no-underline transition-colors ${
           isActive
             ? 'bg-[var(--accent-dim)] font-medium text-primary'
             : 'text-muted-foreground hover:bg-accent hover:text-foreground'
@@ -118,12 +118,12 @@ function NavGroup({ group, isOpen, onToggle, isGroupActive, summary }) {
   const Icon = group.icon;
 
   return (
-    <div className="mb-0.5">
+    <div className="mb-1.5">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={isOpen}
-        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] no-underline transition-colors ${
+        className={`flex w-full items-center gap-3 rounded-lg border-0 bg-transparent px-3 py-2.5 text-sm no-underline transition-colors ${
           isGroupActive
             ? 'font-medium text-primary'
             : 'text-muted-foreground hover:bg-accent hover:text-foreground'
@@ -144,7 +144,7 @@ function NavGroup({ group, isOpen, onToggle, isGroupActive, summary }) {
           isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
         }`}
       >
-        <div className="min-h-0 space-y-0.5 pt-0.5">
+        <div className="min-h-0 space-y-1 pt-1">
           {group.items.map((item) => (
             <SubNavItem key={item.to} to={item.to} badgeCount={item.badgeKey ? summary?.[item.badgeKey] : undefined}>
               {item.label}
@@ -200,7 +200,7 @@ function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 py-3">
+      <nav className="flex-1 overflow-y-auto px-2.5 py-4">
         {NAV_GROUPS.filter((g) => !g.adminOnly || isAdmin).map((group) => (
           <NavGroup
             key={group.key}
@@ -225,7 +225,7 @@ function Sidebar() {
           type="button"
           onClick={logout}
           title="Logout"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-danger"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-muted-foreground transition-colors hover:bg-accent hover:text-danger"
         >
           <LogOut className="h-4 w-4" strokeWidth={1.8} />
         </button>
