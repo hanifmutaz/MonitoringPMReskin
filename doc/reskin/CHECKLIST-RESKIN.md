@@ -7,10 +7,11 @@
 > checklist ini.
 
 **Ringkasan cepat:** Fase "infrastruktur + komponen kecil" **selesai**.
-Fase "halaman-halaman besar" (Sidebar, Topbar, Dashboard layout, semua
-tabel Master Data, PM Part/Line, User Management, Settings) **belum
-dimulai sama sekali** — masih 100% tampilan lama. Dokumen plan-nya sendiri
-juga masih berstatus **PERENCANAAN**, belum disetujui buat eksekusi.
+Fase "halaman-halaman besar": **Sidebar, Topbar (parsial), DashboardPage
+layout sudah jalan**. Master Data, PM Part/Line, User Management, Settings
+**belum dimulai sama sekali** — masih 100% tampilan lama. Dokumen plan-nya
+sendiri juga masih berstatus **PERENCANAAN**, belum disetujui buat eksekusi
+penuh (prasyarat §0 sebagian masih kosong).
 
 ---
 
@@ -53,20 +54,32 @@ juga masih berstatus **PERENCANAAN**, belum disetujui buat eksekusi.
 - [x] `CriticalAlertsPanel.jsx`
 - [x] `GanttUpcomingPanel.jsx`
 
-## 3. Halaman & layout besar (❌ Belum dimulai)
+## 3. Halaman & layout besar (🔶 Sebagian jalan)
 
 Urutan berikut sesuai rekomendasi §8 di `RESKIN-PLAN.md`:
 
 - [x] **1. Sidebar** — reskin visual (ikon, active state, badge styling)
-      selesai + FITUR TAMBAHAN: collapse/expand ke icon-only (state lokal +
-      persist localStorage, tooltip pas collapsed) — awalnya direncanakan
-      flat 5 grup/12 item TANPA collapsible, tapi berubah jadi grup
-      accordion collapsible (lihat komentar di `Sidebar.jsx`) ditambah
-      collapse icon-only di atas ini
-- [ ] **2. Topbar** — reskin visual dasar dulu, TANPA search/notifikasi
-      beneran (itu task terpisah setelah discovery backend)
-- [ ] **3. `DashboardPage.jsx` layout** — lepas `.panel`/`.kpi-grid` lama,
-      ganti Tailwind murni (komponen di dalamnya sudah siap dari §2)
+      selesai + FITUR TAMBAHAN: collapse/expand ke icon-only (state di
+      `SidebarContext`, persist localStorage, tooltip pas collapsed) —
+      awalnya direncanakan flat 5 grup/12 item TANPA collapsible, tapi
+      berubah jadi grup accordion collapsible (lihat komentar di
+      `Sidebar.jsx`) ditambah collapse icon-only di atas ini. Udah lewat
+      3 ronde fix visual (spacing antar-grup, animasi collapse/expand,
+      rata-tengah icon collapsed, hover state grup aktif) - lihat riwayat
+      commit + komentar di file.
+- [x] **2. Topbar** — SELESAI full Tailwind. `<header>`/judul halaman pindah
+      dari `.topbar`/`.page-title` (class lama, sekarang dead code di
+      `global.css`, dibiarin nganggur sesuai konvensi Sidebar) ke Tailwind
+      murni. Search/notifikasi beneran TETAP di luar scope ini (task
+      terpisah setelah discovery backend, lihat §4). `actions` slot
+      (tombol per-halaman) SENGAJA belum disentuh - masih `.btn`/
+      `.btn-primary` dari tiap page, kebagian pas reskin halaman itu
+      sendiri (item 4-6 di bawah).
+- [x] **3. `DashboardPage.jsx` layout** — `.panel`/`.kpi-grid` lama
+      dilepas, diganti Tailwind murni. Konten diadaptasi dari
+      `mockup-management-dashboard.html` (kartu Needs Data MTBF/MTTR,
+      health stat boxes, tabel ketepatan terendah) - lihat komentar
+      panjang di atas file buat detail apa yang diambil/di-skip & kenapa.
 - [ ] **4. Tabel Master Data** — `LinesTab`, `PartsTab`, `SuppliersTab`,
       `InventoryTab`: pola toolbar+search+row-actions+pagination
 - [ ] **5. PM Part & PM Monthly/Weekly** — monitoring + history + form
