@@ -86,6 +86,7 @@ const NAV_GROUPS = [
     icon: Wrench,
     items: [
       { to: '/pm-part', label: 'Monitoring PM Part', badgeKey: 'status_danger' },
+      { to: '/pm-part/form', label: 'Input Penggantian Part' },
       { to: '/pm-part/history', label: 'History PM Part' },
     ],
   },
@@ -95,6 +96,7 @@ const NAV_GROUPS = [
     icon: ClipboardList,
     items: [
       { to: '/pm-line', label: 'Monitoring PM Monthly and Weekly', badgeKey: 'lines_critical' },
+      { to: '/pm-line/form', label: 'Input PM Monthly/Weekly' },
       { to: '/pm-line/history', label: 'History PM Monthly and Weekly' },
     ],
   },
@@ -158,13 +160,32 @@ function NavGroup({ group, isOpen, onToggle, isGroupActive, summary, collapsed }
       onClick={onToggle}
       aria-expanded={expandedOpen}
       aria-label={group.label}
-      className={`flex w-full cursor-pointer items-center gap-3 rounded-lg border-0 bg-transparent text-sm no-underline transition-[background-color,color,padding] duration-[250ms] ease-in-out ${
-        collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5'
+      className={`flex w-full cursor-pointer items-center rounded-lg border-0 bg-transparent text-sm no-underline transition-[background-color,color,padding,gap] duration-[250ms] ease-in-out ${
+        // FIX: pas collapsed, gap HARUS 0 - label & chevron di bawah cuma
+        // disusutin lebarnya jadi 0 (max-w-0), bukan di-unmount, tapi kalau
+        // gap-3 tetap kepasang, flexbox masih ngasih jarak 12px ke tiap sisi
+        // elemen ber-lebar-0 itu. Efeknya `justify-center` ngerata-tengahin
+        // "icon + ruang kosong dari gap" (bukan icon doang), jadi icon
+        // keliatan nempel ke kiri, gak bener-bener center. Icon-only jadi
+        // gak butuh gap sama sekali karena cuma 1 elemen yang keliatan.
+        collapsed ? 'justify-center gap-0 p-2.5' : 'justify-start gap-3 px-3 py-2.5'
       } ${
+        // BUG (feedback via chat): grup yang lagi AKTIF (biasanya "Dashboard"
+        // karena itu landing page) sebelumnya SAMA SEKALI gak punya class
+        // `hover:*` - dikira "gak ke-hover" padahal emang gak ada hover
+        // state-nya. Sekarang tetap dikasih hover tipis (`hover:bg-accent`
+        // di atas warna aktif) biar konsisten sama grup lain, bukan
+        // ngilangin bg aktifnya.
         isGroupActive
           ? collapsed
-            ? 'bg-[var(--accent-dim)] text-primary'
-            : 'font-medium text-primary'
+            ? // `hover:bg-[var(--accent-dim)]/80` GAK dipakai - Tailwind gak
+              // bisa nerapin opacity modifier ke arbitrary `var(...)`
+              // (dicek manual di dist CSS: hasilnya identik sama base color,
+              // hover jadi keliatan "gak ngaruh" lagi). Pakai literal rgba
+              // langsung (--accent-dim base-nya rgba(76,141,255,.14), ini
+              // versi lebih pekat buat state hover).
+              'bg-[var(--accent-dim)] text-primary hover:bg-[rgba(76,141,255,0.24)]'
+            : 'font-medium text-primary hover:bg-accent'
           : 'text-muted-foreground hover:bg-accent hover:text-foreground'
       }`}
     >
