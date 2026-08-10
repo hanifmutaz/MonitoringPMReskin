@@ -15,6 +15,14 @@ const list = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Success', data });
 });
 
+// Lookup exact-match by Drawing No - dipakai hasil SCAN BARCODE (kamera
+// iPad) di Form PM Part, beda dari list() yang search-nya ILIKE partial.
+const lookupByDrawingNo = asyncHandler(async (req, res) => {
+  const { drawing_no } = req.query;
+  const data = await partService.lookupPartsByDrawingNo(drawing_no);
+  res.status(200).json({ success: true, message: 'Success', data });
+});
+
 const create = asyncHandler(async (req, res) => {
   const body = {
     ...req.body,
@@ -45,4 +53,4 @@ const remove = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Success' });
 });
 
-module.exports = { list, create, update, remove };
+module.exports = { list, lookupByDrawingNo, create, update, remove };

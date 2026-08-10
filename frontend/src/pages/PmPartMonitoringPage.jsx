@@ -69,6 +69,21 @@ function PmPartMonitoringPage() {
   const [lineId, setLineId] = useState('');
   const [page, setPage] = useState(1);
   const [gantiPartItem, setGantiPartItem] = useState(null);
+  // Notice kalau stock TIDAK berkurang otomatis pas submit Ganti Part
+  // (part belum di-link ke Inventory Item) - lihat pmPartHistoryService.js
+  // applyStockDeduction(). Persist sampai di-dismiss manual (bukan auto-
+  // hilang) karena ini info operasional yang perlu ditindaklanjuti (link
+  // part ke Inventory Item), bukan sekadar toast konfirmasi.
+  const [stockNotice, setStockNotice] = useState(null);
+
+  function handleGantiPartSuccess(result) {
+    setGantiPartItem(null);
+    if (result?.stock && !result.stock.deducted) {
+      setStockNotice(
+        'Riwayat penggantian tersimpan, tapi stock TIDAK berkurang otomatis karena part ini belum di-link ke Inventory Item.'
+      );
+    }
+  }
 
   const debouncedSearch = useDebouncedValue(search);
   const { data: lines = [] } = useLines({ isActive: true });
@@ -191,9 +206,29 @@ function PmPartMonitoringPage() {
             key={gantiPartItem.part_id}
             presetPart={gantiPartItem}
             onCancel={() => setGantiPartItem(null)}
-            onSuccess={() => setGantiPartItem(null)}
+            onSuccess={handleGantiPartSuccess}
           />
         </Modal>
+      )}
+
+      {stockNotice && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '10px 14px',
+            borderRadius: 8,
+            background: 'var(--warning-dim, var(--accent-dim))',
+            border: '1px solid var(--warning, var(--accent))',
+            fontSize: 13,
+          }}
+        >
+          <span style={{ flex: 1 }}>{stockNotice}</span>
+          <button type="button" className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setStockNotice(null)}>
+            Tutup
+          </button>
+        </div>
       )}
     </div>
   );

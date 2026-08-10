@@ -65,6 +65,23 @@ async function findPartTargetShot(partId, runner = db) {
   return result.rows[0] ? Number(result.rows[0].target_shot) : null;
 }
 
+// Ambil target_shot SEKALIGUS inventory_item_id + drawing_no - dipakai
+// createHistory() buat nentuin ketepatan DAN apakah part ini perlu
+// dikurangin stock inventory-nya (kalau sudah di-link). 1 query, dijalanin
+// di client transaksi yang sama biar konsisten sama findPartTargetShot.
+async function findPartForHistory(partId, runner = db) {
+  const result = await runner.query(
+    `SELECT target_shot, inventory_item_id, drawing_no FROM parts WHERE id = $1`,
+    [partId]
+  );
+  if (!result.rows[0]) return null;
+  return {
+    target_shot: Number(result.rows[0].target_shot),
+    inventory_item_id: result.rows[0].inventory_item_id,
+    drawing_no: result.rows[0].drawing_no,
+  };
+}
+
 async function create(data, runner = db) {
   const result = await runner.query(
     `INSERT INTO pm_part_history (part_id, tgl_ganti, shift, counter_saat_diganti, jenis_penggantian, remark, pic_name, user_id, on_time)
@@ -118,6 +135,7 @@ async function getKetepatanPerLine({ dateFrom }, runner = db) {
 }
 
 module.exports = {
+  findPartForHistory,
   findAll,
   partExists,
   findPartTargetShot,

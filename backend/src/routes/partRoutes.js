@@ -14,6 +14,10 @@ router.use(requireAuth);
 // Parts - GET: Admin & Operator
 router.get('/', requireRole('Admin', 'Operator'), partController.list);
 
+// Lookup exact-match by Drawing No (hasil scan barcode kamera iPad) - akses
+// sama dengan list biasa, cuma beda cara matching (exact, bukan ILIKE).
+router.get('/lookup', requireRole('Admin', 'Operator'), partController.lookupByDrawingNo);
+
 // Parts - POST/PATCH: Admin, atau Operator jika allow_operator_edit_master_data=true
 router.post('/', requireMasterDataEditAccess, partController.create);
 router.patch('/:id', requireMasterDataEditAccess, partController.update);

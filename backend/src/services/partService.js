@@ -10,6 +10,18 @@ async function listParts({ lineId, search, page, limit }) {
   return partQueries.findAll({ lineId, search, page: pageNum, limit: limitNum });
 }
 
+// Dipakai Form PM Part pas operator scan barcode Drawing No pakai kamera
+// iPad. AppError.badRequest kalau drawing_no kosong - biar konsisten sama
+// pola validasi endpoint lain (dicek di controller sebelum masuk service
+// sebenarnya lebih lazim, tapi lookup ini query tunggal simpel jadi cukup
+// di sini tanpa validator file terpisah).
+async function lookupPartsByDrawingNo(drawingNo) {
+  if (!drawingNo || typeof drawingNo !== 'string' || !drawingNo.trim()) {
+    throw AppError.badRequest('Validasi gagal', { drawing_no: 'Drawing No wajib diisi' });
+  }
+  return partQueries.findByDrawingNoExact(drawingNo.trim());
+}
+
 async function createPart(data, userId) {
   const client = await db.getClient();
   try {
@@ -122,4 +134,4 @@ async function deletePart(id, userId) {
   }
 }
 
-module.exports = { listParts, createPart, updatePart, deletePart };
+module.exports = { listParts, lookupPartsByDrawingNo, createPart, updatePart, deletePart };

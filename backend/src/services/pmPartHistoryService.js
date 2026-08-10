@@ -9,6 +9,7 @@
 
 const db = require('../config/db');
 const pmPartHistoryQueries = require('../sql/pmPartHistoryQueries');
+const inventoryService = require('./inventoryService');
 const { recordAudit } = require('../utils/auditLog');
 const dateUtils = require('../utils/dateUtils');
 const AppError = require('../utils/AppError');
@@ -37,18 +38,48 @@ function determineOnTime(jenisPenggantian, counterSaatDiganti, targetShot) {
   return Number(counterSaatDiganti) <= Number(targetShot);
 }
 
+// Efek "kurangin stock inventory" (fitur scan barcode Drawing No dari iPad,
+// lihat permission pm_part.submit) DISENGAJA cuma jalan kalau Part-nya
+// SUDAH di-link ke Inventory Item (parts.inventory_item_id NOT NULL).
+// Kalau belum di-link, submit TETAP boleh jalan (riwayat PM tetap penting
+// dicatat walau stock belum ke-setup) - cuma stock-nya gak berkurang,
+// ditandain di response lewat `stock` supaya frontend bisa kasih notice ke
+// operator, BUKAN silent (biar ketauan part ini perlu di-link nanti).
+// 1 penggantian part = 1 unit terpakai dari stock (qty selalu 1, bukan
+// dari input form - operator gak input qty di form PM Part).
+async function applyStockDeduction(part, historyId, userId, client) {
+  if (!part.inventory_item_id) {
+    return { deducted: false, reason: 'NOT_LINKED' };
+  }
+
+  const updatedItem = await inventoryService.adjustStock(
+    part.inventory_item_id,
+    {
+      movement_type: 'STOCK_OUT',
+      qty: 1,
+      note: `Auto: penggantian PM Part (Drawing No ${part.drawing_no})`,
+    },
+    userId,
+    { refType: 'pm_part_history', refId: historyId, runner: client }
+  );
+
+  return { deducted: true, current_stock: updatedItem.current_stock };
+}
+
 async function createHistory(data, userId) {
   const client = await db.getClient();
   try {
     await client.query('BEGIN');
 
-    const targetShot = await pmPartHistoryQueries.findPartTargetShot(data.part_id, client);
-    if (targetShot === null) {
+    const part = await pmPartHistoryQueries.findPartForHistory(data.part_id, client);
+    if (part === null) {
       throw AppError.badRequest('Validasi gagal', { part_id: 'Part tidak ditemukan' });
     }
 
-    const onTime = determineOnTime(data.jenis_penggantian, data.counter_saat_diganti, targetShot);
+    const onTime = determineOnTime(data.jenis_penggantian, data.counter_saat_diganti, part.target_shot);
     const created = await pmPartHistoryQueries.create({ ...data, user_id: userId, on_time: onTime }, client);
+
+    const stock = await applyStockDeduction(part, created.id, userId, client);
 
     await recordAudit(
       {
@@ -63,7 +94,7 @@ async function createHistory(data, userId) {
     );
 
     await client.query('COMMIT');
-    return created;
+    return { ...created, stock };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

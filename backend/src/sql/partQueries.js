@@ -60,6 +60,18 @@ async function findByLineJigAndDrawing(lineId, jigName, drawingNo, runner = db) 
   return result.rows[0] || null;
 }
 
+// Dipakai buat lookup hasil SCAN BARCODE (drawing_no dari kamera iPad) di
+// Form PM Part. EXACT match (bukan ILIKE %term% seperti findAll/search) -
+// barcode fisik harus match persis, gak boleh partial match yang salah part.
+// Bisa balikin >1 row karena drawing_no HANYA unik per (line_id, jig_name) -
+// part desain sama bisa kepasang di beberapa jig/line berbeda (lihat
+// migration 1700000006000). Frontend yang nentuin: 1 hasil -> auto-pick,
+// >1 hasil -> operator pilih Line/Jig mana yang dimaksud.
+async function findByDrawingNoExact(drawingNo, runner = db) {
+  const result = await runner.query(`${LIST_SELECT} WHERE p.drawing_no = $1 AND p.is_active = TRUE`, [drawingNo]);
+  return result.rows;
+}
+
 async function lineExists(lineId, runner = db) {
   const result = await runner.query(`SELECT id FROM lines WHERE id = $1`, [lineId]);
   return !!result.rows[0];
@@ -122,6 +134,7 @@ module.exports = {
   findAll,
   findById,
   findByLineJigAndDrawing,
+  findByDrawingNoExact,
   lineExists,
   create,
   update,
