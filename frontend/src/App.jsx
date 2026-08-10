@@ -18,6 +18,7 @@ import InventoryPage from './pages/InventoryPage';
 import InventoryHistoryPage from './pages/InventoryHistoryPage';
 import SettingsPage from './pages/SettingsPage';
 import UserManagementPage from './pages/UserManagementPage';
+import ProfilePage from './pages/ProfilePage';
 import NotFoundPage from './pages/NotFoundPage';
 
 function App() {
@@ -43,6 +44,11 @@ function App() {
           <Route path="/master-data" element={<MasterDataPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/inventory/history" element={<InventoryHistoryPage />} />
+
+          {/* Di luar ProtectedRoute allowedRoles - SEMUA role yang login
+              boleh akses profil sendiri, gak digating per-role kayak
+              /settings & /users di bawah. */}
+          <Route path="/profile" element={<ProfilePage />} />
 
           <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
             <Route path="/settings" element={<SettingsPage />} />

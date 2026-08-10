@@ -13,5 +13,7 @@ router.post('/register', loginRateLimiter, authController.register);
 // Semua user login
 router.post('/logout', requireAuth, authController.logout);
 router.get('/me', requireAuth, authController.me);
+router.patch('/me', requireAuth, authController.updateProfile);
+router.patch('/me/password', requireAuth, authController.changePassword);
 
 module.exports = router;

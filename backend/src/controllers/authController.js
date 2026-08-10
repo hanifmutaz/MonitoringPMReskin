@@ -1,6 +1,7 @@
 // src/controllers/authController.js
 const authService = require('../services/authService');
-const { validateLoginBody, validateRegisterBody } = require('../validators/authValidator');
+const profileService = require('../services/profileService');
+const { validateLoginBody, validateRegisterBody, validateUpdateProfileBody, validateChangePasswordBody } = require('../validators/authValidator');
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
 const env = require('../config/env');
@@ -66,4 +67,41 @@ const me = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Success', data: user });
 });
 
-module.exports = { login, register, logout, me };
+/**
+ * PATCH /auth/me - update profil sendiri (full_name & email doang).
+ * Whitelist DILAKUKAN DI SINI juga (bukan cuma validator) - defense in
+ * depth. Endpoint ini kebuka buat SEMUA role yang login (bukan Admin-only
+ * kayak PATCH /users/:id), jadi field yang diteruskan ke service HARUS
+ * eksplisit dipilih, gak boleh sekadar spread `...req.body` (itu pola yang
+ * dipakai userManagementController.update - AMAN di situ karena
+ * route-nya di-gate requireRole('Admin') dulu, jadi actor-nya trusted;
+ * TIDAK aman kalau ditiru di sini).
+ */
+const updateProfile = asyncHandler(async (req, res) => {
+  const { valid, errors } = validateUpdateProfileBody(req.body);
+  if (!valid) {
+    throw AppError.badRequest('Validasi gagal', errors);
+  }
+
+  const fields = {};
+  if (req.body.full_name !== undefined) fields.full_name = req.body.full_name;
+  if (req.body.email !== undefined) fields.email = req.body.email;
+
+  const data = await profileService.updateProfile(req.user.id, fields);
+  res.status(200).json({ success: true, message: 'Profil berhasil diubah', data });
+});
+
+/**
+ * PATCH /auth/me/password - ganti password sendiri, butuh current_password.
+ */
+const changePassword = asyncHandler(async (req, res) => {
+  const { valid, errors } = validateChangePasswordBody(req.body);
+  if (!valid) {
+    throw AppError.badRequest('Validasi gagal', errors);
+  }
+
+  await profileService.changePassword(req.user.id, req.body.current_password, req.body.new_password);
+  res.status(200).json({ success: true, message: 'Password berhasil diubah' });
+});
+
+module.exports = { login, register, logout, me, updateProfile, changePassword };

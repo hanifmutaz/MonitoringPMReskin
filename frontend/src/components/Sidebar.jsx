@@ -350,20 +350,44 @@ function Sidebar() {
         <div
           className={`flex items-center gap-2.5 border-t border-border py-3.5 transition-[padding] duration-[250ms] ease-in-out ${collapsed ? 'flex-col px-2' : 'px-4'}`}
         >
-          <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[var(--accent-dim)] text-[13px] font-bold text-primary">
-            {initials}
-          </div>
-          {/* Beda dari title header di atas: kontainer footer ganti arah
-              flex (row→column) pas collapsed, jadi trik max-width gak aman
-              dipakai di sini (elemen width-0 di flex-col tetap makan tinggi
-              buat teksnya). Dibiarkan unmount kayak semula - footer cuma
-              berubah sekali pas collapsed (bukan elemen paling mencolok
-              pas animasi), beda kasus sama header/NavGroup di atas. */}
-          {!collapsed && (
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px] font-medium">{user?.full_name}</div>
-              <div className="truncate text-[11.5px] text-[var(--text-faint)]">{user?.role}</div>
-            </div>
+          {/* Avatar + nama sekarang link ke /profile (fitur baru - user
+              sebelumnya gak punya cara sama sekali lihat/edit profil
+              sendiri). Dipisah 2 cabang render (bukan satu NavLink yang
+              disusutin kayak NavGroup) karena footer ini emang udah pakai
+              pola unmount pas collapsed (lihat komentar di bawah) - ngikutin
+              pola yang udah ada, bukan bikin pola baru cuma buat 1 elemen. */}
+          {collapsed ? (
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <NavLink
+                  to="/profile"
+                  className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[var(--accent-dim)] text-[13px] font-bold text-primary no-underline transition-opacity hover:opacity-80"
+                >
+                  {initials}
+                </NavLink>
+              </TooltipTrigger>
+              <TooltipContent side="right">Profil Saya</TooltipContent>
+            </Tooltip>
+          ) : (
+            <NavLink
+              to="/profile"
+              className="-mx-1 -my-1 flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 py-1 no-underline transition-colors hover:bg-accent"
+            >
+              <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[var(--accent-dim)] text-[13px] font-bold text-primary">
+                {initials}
+              </div>
+              {/* Beda dari title header di atas: kontainer footer ganti
+                  arah flex (row→column) pas collapsed, jadi trik max-width
+                  gak aman dipakai di sini (elemen width-0 di flex-col
+                  tetap makan tinggi buat teksnya). Dibiarkan unmount kayak
+                  semula - footer cuma berubah sekali pas collapsed (bukan
+                  elemen paling mencolok pas animasi), beda kasus sama
+                  header/NavGroup di atas. */}
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-medium">{user?.full_name}</div>
+                <div className="truncate text-[11.5px] text-[var(--text-faint)]">{user?.role}</div>
+              </div>
+            </NavLink>
           )}
           <Tooltip delayDuration={200}>
             <TooltipTrigger asChild>

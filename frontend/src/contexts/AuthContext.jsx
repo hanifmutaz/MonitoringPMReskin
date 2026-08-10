@@ -30,6 +30,17 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  // Dipanggil ProfilePage setelah PATCH /auth/me berhasil - re-fetch dari
+  // server (bukan cuma merge state lokal) biar SATU sumber kebenaran sama
+  // kayak initial load, dan Sidebar footer (nama/role) ikut ke-update
+  // otomatis tanpa perlu re-login (context di-share, bukan state lokal
+  // per-halaman).
+  const refreshUser = useCallback(async () => {
+    const data = await authApi.fetchMe();
+    setUser(data);
+    return data;
+  }, []);
+
   const value = {
     user,
     loading,
@@ -45,6 +56,7 @@ export function AuthProvider({ children }) {
     },
     login,
     logout,
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

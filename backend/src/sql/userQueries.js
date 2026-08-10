@@ -38,11 +38,13 @@ async function findActiveUserByUsername(username) {
 }
 
 /**
- * Ambil user by id, join role_name.
+ * Ambil user by id, join role_name. Menyertakan `email` (ditambahkan bareng
+ * fitur self-service profile - dipakai buat prefill form "Profil Saya" di
+ * frontend, GET /auth/me).
  */
 async function findUserById(id) {
   const result = await db.query(
-    `SELECT u.id, u.username, u.full_name, u.is_active, u.status,
+    `SELECT u.id, u.username, u.full_name, u.email, u.is_active, u.status,
             r.id AS role_id, r.name AS role_name
      FROM users u
      LEFT JOIN roles r ON r.id = u.role_id
@@ -202,10 +204,25 @@ async function findActiveEmailsByRoles(roleNames, runner = db) {
   return result.rows.map((r) => r.email);
 }
 
+/**
+ * Ambil password_hash by id - dipakai KHUSUS di alur ganti password sendiri
+ * (PATCH /auth/me/password), buat verifikasi password lama sebelum diganti.
+ * findUserById()/findRawById() SENGAJA gak nyertain password_hash (dipakai
+ * luas di banyak tempat termasuk buat dibentuk jadi response ke client) -
+ * query ini dipisah biar password_hash cuma ke-fetch pas bener-bener
+ * dibutuhkan, konsisten sama prinsip di findByUsernameAnyStatus (Development
+ * Rules - password gak boleh nyasar ke query yang gak perlu).
+ */
+async function findPasswordHashById(id, runner = db) {
+  const result = await runner.query(`SELECT password_hash FROM users WHERE id = $1`, [id]);
+  return result.rows[0] ? result.rows[0].password_hash : null;
+}
+
 module.exports = {
   findActiveUserByUsername,
   findByUsernameAnyStatus,
   findUserById,
+  findPasswordHashById,
   updateLastLogin,
   findAll,
   findRawById,

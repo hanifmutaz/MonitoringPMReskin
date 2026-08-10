@@ -8,13 +8,7 @@ import { useSidebar } from '../contexts/SidebarContext';
 // yang tadinya di Sidebar (dulu kotak bordered): di sini icon-only tanpa
 // border (border cuma nongol pas hover, lihat poin di bawah), cuma hover
 // background - ngikutin gaya tombol hamburger Mantis di topbar (bukan gaya
-<<<<<<< HEAD
-// tombol di dalam sidebar). Topbar sendiri masih pakai class CSS lama
-// (`.topbar`/`.page-title`, BELUM direskin - itu task terpisah), jadi cuma
-// nambahin 1 elemen baru pakai Tailwind, gak nyentuh elemen yang udah ada.
-=======
 // tombol di dalam sidebar).
->>>>>>> 0dda76c2fb0ba97de8d8fb18e167bbc66de8c9eb
 //
 // Revisi (feedback batch berikutnya - 2 dari 3 bug visual, yang ke-3 ada di
 // Sidebar.jsx):
@@ -30,8 +24,6 @@ import { useSidebar } from '../contexts/SidebarContext';
 //   swap total). Sekarang KEDUA ikon di-render bareng ditumpuk (`absolute`
 //   di atas 1 sama lain), yang keliatan cuma diatur lewat `opacity`
 //   di-transition - jadi crossfade mulus, bukan loncat.
-<<<<<<< HEAD
-=======
 //
 // Revisi (feedback ke-2, dari screenshot): "posisi icon tutup sidebar masih
 // sama jauh [pas collapsed]" - padding-left header dibikin KONDISIONAL
@@ -54,20 +46,15 @@ import { useSidebar } from '../contexts/SidebarContext';
 // History PM Line) SENGAJA gak disentuh - itu masih render `.btn`/
 // `.btn-primary` dari page masing-masing, di luar scope Topbar, nanti
 // kebagian pas reskin halaman itu sendiri (§3 item 4-6).
->>>>>>> 0dda76c2fb0ba97de8d8fb18e167bbc66de8c9eb
 function Topbar() {
   const { title, actions } = useCurrentPageHeader();
   const { collapsed, toggleCollapsed } = useSidebar();
 
   return (
-<<<<<<< HEAD
-    <header className="topbar">
-=======
     <header
       className="flex h-[60px] shrink-0 items-center justify-between border-b border-border pr-8"
       style={{ paddingLeft: collapsed ? '16px' : '32px', transition: 'padding-left 250ms ease-in-out' }}
     >
->>>>>>> 0dda76c2fb0ba97de8d8fb18e167bbc66de8c9eb
       <div className="flex items-center gap-3.5">
         <button
           type="button"
