@@ -1,4 +1,9 @@
 // src/components/Pagination.jsx
+// Reskin: props (page, limit, total, onPageChange) & logic PERSIS sama,
+// markup lama (div+button inline style) diganti Tailwind murni.
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { cn } from '../lib/utils';
+
 function Pagination({ page, limit, total, onPageChange }) {
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const start = total === 0 ? 0 : (page - 1) * limit + 1;
@@ -10,13 +15,13 @@ function Pagination({ page, limit, total, onPageChange }) {
   }
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
-      <span className="caption">
+    <div className="mt-4 flex items-center justify-between">
+      <span className="font-[var(--font-mono)] text-xs text-[var(--text-faint)]">
         Menampilkan {start}–{end} dari {total} entri
       </span>
-      <div style={{ display: 'flex', gap: 4 }}>
+      <div className="flex gap-1">
         <PageButton disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
-          &lsaquo;
+          <ChevronLeft size={14} />
         </PageButton>
         {pages.map((p) => (
           <PageButton key={p} active={p === page} onClick={() => onPageChange(p)}>
@@ -24,7 +29,7 @@ function Pagination({ page, limit, total, onPageChange }) {
           </PageButton>
         ))}
         <PageButton disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
-          &rsaquo;
+          <ChevronRight size={14} />
         </PageButton>
       </div>
     </div>
@@ -37,17 +42,14 @@ function PageButton({ children, active, disabled, onClick }) {
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="mono"
-      style={{
-        width: 26,
-        height: 26,
-        borderRadius: 6,
-        border: '1px solid var(--border)',
-        background: active ? 'var(--accent-dim)' : 'transparent',
-        color: active ? 'var(--accent)' : disabled ? 'var(--text-faint)' : 'var(--text-dim)',
-        fontSize: 12,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-      }}
+      className={cn(
+        'flex h-[26px] w-[26px] items-center justify-center rounded-md border font-[var(--font-mono)] text-xs transition-colors',
+        active
+          ? 'border-primary bg-[var(--accent-dim)] text-primary'
+          : disabled
+            ? 'cursor-not-allowed border-border text-[var(--text-faint)]'
+            : 'border-border text-[var(--text-dim)] hover:bg-secondary'
+      )}
     >
       {children}
     </button>

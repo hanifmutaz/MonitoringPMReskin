@@ -1,6 +1,11 @@
 // src/pages/MasterDataPage.jsx
+// Reskin (checklist §3 item 4, batch 1/N): `.panel`/`.tabs`/`.tab-item` lama
+// dilepas TOTAL (§7.3), diganti Tailwind murni - pola tab underline sama
+// persis (border-bottom 2px pas active, warna primary), cuma satuan lama
+// (10px 16px, 13px, dst) dipetakan ke utility Tailwind terdekat.
 import { useState } from 'react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
+import { cn } from '../lib/utils';
 import LinesTab from '../components/masterdata/LinesTab';
 import PartsTab from '../components/masterdata/PartsTab';
 import SuppliersTab from '../components/masterdata/SuppliersTab';
@@ -18,18 +23,26 @@ function MasterDataPage() {
   const [activeTab, setActiveTab] = useState('lines');
 
   return (
-    <div className="panel">
-      <div className="tabs">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            className={`tab-item${activeTab === tab.key ? ' active' : ''}`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
+    <div className="rounded-lg border border-border bg-card p-4.5">
+      <div className="mb-5 flex gap-1 border-b border-border">
+        {TABS.map((tab) => {
+          const active = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                'cursor-pointer border-b-2 px-4 py-2.5 text-[13px] font-medium transition-colors',
+                active
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-[var(--text-dim)] hover:text-foreground'
+              )}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       {activeTab === 'lines' && <LinesTab />}

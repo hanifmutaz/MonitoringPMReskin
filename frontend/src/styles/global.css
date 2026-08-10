@@ -24,12 +24,39 @@ a {
   color: inherit;
 }
 
-button,
-input,
-select,
-textarea {
-  font-family: inherit;
-  color: inherit;
+/* Dibungkus @layer base (bukan dibiarkan unlayered) - Tailwind v4 nge-import
+   utilities lewat @layer utilities (lihat tailwind.css). Rule CSS yang TIDAK
+   ada di @layer manapun otomatis menang atas SEMUA rule yang ada di @layer,
+   berapa pun specificity-nya (spec CSS Cascade Layers) - jadi kalau reset ini
+   dibiarin unlayered, `color: inherit` di sini bakal SELALU ngalahin class
+   Tailwind kayak `text-[var(--text-dim)]`/`text-primary` di button/input/
+   select manapun, bikin teks jadi warna hasil inherit (bukan warna yang
+   diminta) walau class-nya udah bener. Bug ini kelihatan pertama kali pas
+   reskin LinesTab (tab/filter pill yang butuh 2 warna teks beda per state).
+   `base` didefinisikan lebih dulu di sini (global.css di-import sebelum
+   tailwind.css di main.jsx) jadi levelnya otomatis DI BAWAH `utilities` -
+   utility class tetap menang seperti seharusnya. */
+@layer base {
+  button,
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+    color: inherit;
+    /* background-color/border/appearance native browser TIDAK direset di
+       sini sebelumnya - ketahuan pas kotak putih native <button> browser
+       (ButtonFace) nongol di belakang tab/pill LinesTab, soalnya elemen itu
+       Tailwind-only dan gak set bg-* apapun (sengaja transparan). Class
+       lama (.tab-item/.btn di components.css) selama ini AMAN karena
+       masing-masing eksplisit nulis `background: none`/`border: none`
+       sendiri (unlayered, menang lepas dari fix ini). Reset appearance di
+       sini scoped ke @layer base juga, jadi elemen manapun yang emang mau
+       background/border sendiri (button.btn-primary, Input/Select shadcn
+       lewat Tailwind bg-secondary dst) tetap menang seperti biasa. */
+    background-color: transparent;
+    border: none;
+    appearance: none;
+  }
 }
 
 /* Fokus keyboard tetap terlihat (aksesibilitas dasar) - warna aksen, gak dihilangkan */
