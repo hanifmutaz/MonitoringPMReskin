@@ -98,7 +98,7 @@ function PartSupplierModal({ part, onClose }) {
                       onClick={() => handleTogglePrimary(l)}
                       disabled={setPrimary.isPending}
                       className={cn(
-                        'flex h-7 w-7 items-center justify-center rounded-md border border-border transition-colors hover:bg-secondary',
+                        'flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50',
                         l.is_primary ? 'text-warn' : 'text-[var(--text-faint)]'
                       )}
                     >

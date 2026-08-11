@@ -217,7 +217,7 @@ function SuppliersTab() {
                 type="button"
                 onClick={() => handleFilterChange(f.key)}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors',
+                  'flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors',
                   active ? 'bg-[var(--accent-dim)] text-primary' : 'text-[var(--text-dim)] hover:bg-secondary'
                 )}
               >
