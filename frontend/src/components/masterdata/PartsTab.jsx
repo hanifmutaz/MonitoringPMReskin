@@ -1,6 +1,20 @@
 // src/components/masterdata/PartsTab.jsx
+// Reskin (checklist §3 item 4, batch 3/N - ngikutin pattern LinesTab/
+// SuppliersTab): `.data-table`/`.btn`/`.form-*` lama dilepas TOTAL (§7.3),
+// diganti Tailwind + shadcn ui murni. Toolbar (search + filter Line + tombol
+// tambah) ngikutin pola LinesTab/referensi Mantis Invoice List. BEDA dari
+// LinesTab: search/line_id/pagination di sini SERVER-SIDE (bukan
+// client-side) karena udah gitu dari awal (lihat partsApi.js/partQueries.js
+// - backend nerima param search/line_id/page/limit) - jadi TIDAK diubah
+// jadi client-side kayak LinesTab, cuma dibungkus debounce yang sama kayak
+// SuppliersTab. Gak ada kartu stat Aktif/Nonaktif kayak Lines/Suppliers
+// karena API /parts gak expose filter/count is_active - drpd ngarang angka,
+// cuma dikasih 2 kartu yang datanya nyata: Total Part (dari `data.total`,
+// hasil query yang lagi aktif) & Line Aktif (dari `lines`, query terpisah
+// yang emang udah jalan). Logic create/update/delete/CL-mapping/Supplier-link
+// TIDAK berubah sama sekali.
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Link2, Truck } from 'lucide-react';
+import { Plus, Pencil, Trash2, Link2, Truck, Package, ListChecks } from 'lucide-react';
 import { useParts } from '../../hooks/useParts';
 import { usePartMutations } from '../../hooks/usePartMutations';
 import { useLines } from '../../hooks/useLines';
@@ -9,11 +23,17 @@ import { useInventoryMutations } from '../../hooks/useInventoryMutations';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
 import Modal from '../Modal';
+import KpiCard from '../KpiCard';
 import SearchBar from '../SearchBar';
 import Pagination from '../Pagination';
 import PageSizeSelector from '../PageSizeSelector';
 import ClMappingModal from './ClMappingModal';
 import PartSupplierModal from './PartSupplierModal';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 const DEFAULT_LIMIT = 50;
 
@@ -34,7 +54,7 @@ function PartFormModal({ initial, lines, onClose }) {
   const [form, setForm] = useState(
     initial
       ? {
-          line_id: initial.line_id,
+          line_id: String(initial.line_id),
           jig_name: initial.jig_name,
           drawing_no: initial.drawing_no,
           part_name: initial.part_name,
@@ -77,111 +97,100 @@ function PartFormModal({ initial, lines, onClose }) {
   }
 
   return (
-    <Modal title={isEdit ? 'Edit Part' : 'Tambah Part'} onClose={onClose} width={520}>
-      <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+    <Modal title={isEdit ? 'Edit Part' : 'Tambah Part'} onClose={onClose} width={560}>
+      <form onSubmit={handleSubmit} className="space-y-3.5">
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <div>
-            <label className="form-label">Line</label>
-            <select
-              className="form-select"
-              style={{ width: '100%' }}
-              value={form.line_id}
-              onChange={(e) => setForm({ ...form, line_id: e.target.value })}
-              required
-            >
-              <option value="">Pilih Line</option>
-              {lines.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.line_name}
-                </option>
-              ))}
-            </select>
+            <Label className="mb-1.5">Line</Label>
+            <Select value={form.line_id} onValueChange={(v) => setForm({ ...form, line_id: v })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih Line" />
+              </SelectTrigger>
+              <SelectContent>
+                {lines.map((l) => (
+                  <SelectItem key={l.id} value={String(l.id)}>
+                    {l.line_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
-            <label className="form-label">Jig Name</label>
-            <input
-              className="form-input"
-              style={{ width: '100%' }}
+            <Label className="mb-1.5">Jig Name</Label>
+            <Input
               value={form.jig_name}
               onChange={(e) => setForm({ ...form, jig_name: e.target.value })}
               placeholder="mis. Contact Cutting A"
               required
             />
-            {errors.jig_name && <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.jig_name}</span>}
+            {errors.jig_name && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.jig_name}</p>}
           </div>
           <div>
-            <label className="form-label">Drawing No</label>
-            <input
-              className="form-input mono"
-              style={{ width: '100%' }}
+            <Label className="mb-1.5">Drawing No</Label>
+            <Input
+              className="font-[var(--font-mono)]"
               value={form.drawing_no}
               onChange={(e) => setForm({ ...form, drawing_no: e.target.value })}
               required
             />
-            {errors.drawing_no && <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.drawing_no}</span>}
+            {errors.drawing_no && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.drawing_no}</p>}
           </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label">Part Name</label>
-            <input
-              className="form-input"
-              style={{ width: '100%' }}
+          <div className="sm:col-span-2">
+            <Label className="mb-1.5">Part Name</Label>
+            <Input
               value={form.part_name}
               onChange={(e) => setForm({ ...form, part_name: e.target.value })}
               required
             />
           </div>
           <div>
-            <label className="form-label">Target Shot</label>
-            <input
+            <Label className="mb-1.5">Target Shot</Label>
+            <Input
               type="number"
-              className="form-input mono"
-              style={{ width: '100%', textAlign: 'right' }}
+              className="text-right font-[var(--font-mono)]"
               value={form.target_shot}
               min={1}
               onChange={(e) => setForm({ ...form, target_shot: e.target.value })}
               required
             />
-            {errors.target_shot && <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.target_shot}</span>}
+            {errors.target_shot && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.target_shot}</p>}
           </div>
 
-          <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--border-soft)', paddingTop: 10 }}>
-            <span className="caption">Referensi Spare Part (opsional — manual, integrasi Inventory ditunda)</span>
+          <div className="border-t border-[var(--border-soft)] pt-3 sm:col-span-2">
+            <span className="text-xs text-muted-foreground">
+              Referensi Spare Part (opsional — manual, integrasi Inventory ditunda)
+            </span>
           </div>
 
           <div>
-            <label className="form-label">Spare Part Number</label>
-            <input
-              className="form-input mono"
-              style={{ width: '100%' }}
+            <Label className="mb-1.5">Spare Part Number</Label>
+            <Input
+              className="font-[var(--font-mono)]"
               value={form.spare_part_number}
               onChange={(e) => setForm({ ...form, spare_part_number: e.target.value })}
             />
           </div>
           <div>
-            <label className="form-label">Qty</label>
-            <input
+            <Label className="mb-1.5">Qty</Label>
+            <Input
               type="number"
-              className="form-input mono"
-              style={{ width: '100%', textAlign: 'right' }}
+              className="text-right font-[var(--font-mono)]"
               value={form.spare_part_qty}
               min={0}
               onChange={(e) => setForm({ ...form, spare_part_qty: e.target.value })}
             />
           </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label">Lokasi</label>
-            <input
-              className="form-input"
-              style={{ width: '100%' }}
+          <div className="sm:col-span-2">
+            <Label className="mb-1.5">Lokasi</Label>
+            <Input
               value={form.spare_part_location}
               onChange={(e) => setForm({ ...form, spare_part_location: e.target.value })}
             />
           </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label">Catatan</label>
-            <textarea
-              className="form-input"
-              style={{ width: '100%', minHeight: 50 }}
+          <div className="sm:col-span-2">
+            <Label className="mb-1.5">Catatan</Label>
+            <Textarea
+              className="min-h-[60px]"
               value={form.spare_part_note}
               onChange={(e) => setForm({ ...form, spare_part_note: e.target.value })}
             />
@@ -189,14 +198,14 @@ function PartFormModal({ initial, lines, onClose }) {
         </div>
 
         {errors._general && (
-          <div className="error-state" style={{ marginTop: 12, padding: 8, fontSize: 12 }}>
+          <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
             {errors._general}
           </div>
         )}
 
-        <button type="submit" className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending}>
+        <Button type="submit" disabled={pending}>
           {pending ? 'Menyimpan...' : 'Simpan'}
-        </button>
+        </Button>
       </form>
 
       {isEdit && <InventoryLinkSection part={initial} />}
@@ -207,41 +216,47 @@ function PartFormModal({ initial, lines, onClose }) {
 function InventoryLinkSection({ part }) {
   const { data: inventoryData } = useInventoryItems({ limit: 100 });
   const { linkPart } = useInventoryMutations();
-  const [selectedId, setSelectedId] = useState(part.inventory_item_id || '');
+  const [selectedId, setSelectedId] = useState(part.inventory_item_id ? String(part.inventory_item_id) : 'none');
   const [error, setError] = useState('');
 
   async function handleLink() {
     setError('');
     try {
-      await linkPart.mutateAsync({ partId: part.id, inventoryItemId: selectedId === '' ? null : Number(selectedId) });
+      await linkPart.mutateAsync({
+        partId: part.id,
+        inventoryItemId: selectedId === 'none' ? null : Number(selectedId),
+      });
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal link Inventory Item');
     }
   }
 
   return (
-    <div style={{ marginTop: 16, borderTop: '1px solid var(--border-soft)', paddingTop: 12 }}>
-      <div className="caption" style={{ marginBottom: 8 }}>
-        Link ke Inventory Item (stok spare part fisik) — opsional, bisa dishare dengan Part lain kalau spare part-nya
-        identik.
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <select className="form-select" style={{ flex: 1 }} value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
-          <option value="">Tidak di-link</option>
-          {(inventoryData?.items || []).map((inv) => (
-            <option key={inv.id} value={inv.id}>
-              {inv.spare_part_number} — {inv.part_name} (stok: {inv.current_stock})
-            </option>
-          ))}
-        </select>
-        <button type="button" className="btn btn-primary" onClick={handleLink} disabled={linkPart.isPending}>
+    <div className="mt-4 border-t border-[var(--border-soft)] pt-3">
+      <p className="mb-2 text-xs text-muted-foreground">
+        Link ke Inventory Item (stok spare part fisik) — opsional, bisa dishare dengan Part lain kalau spare
+        part-nya identik.
+      </p>
+      <div className="flex gap-2">
+        <Select value={selectedId} onValueChange={setSelectedId}>
+          <SelectTrigger className="flex-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Tidak di-link</SelectItem>
+            {(inventoryData?.items || []).map((inv) => (
+              <SelectItem key={inv.id} value={String(inv.id)}>
+                {inv.spare_part_number} — {inv.part_name} (stok: {inv.current_stock})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button type="button" onClick={handleLink} disabled={linkPart.isPending}>
           {linkPart.isPending ? 'Menyimpan...' : 'Simpan Link'}
-        </button>
+        </Button>
       </div>
       {error && (
-        <div className="error-state" style={{ marginTop: 8, padding: 8, fontSize: 12 }}>
-          {error}
-        </div>
+        <div className="mt-2 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{error}</div>
       )}
     </div>
   );
@@ -249,7 +264,7 @@ function InventoryLinkSection({ part }) {
 
 function PartsTab() {
   const [search, setSearch] = useState('');
-  const [lineId, setLineId] = useState('');
+  const [lineId, setLineId] = useState('all');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(DEFAULT_LIMIT);
   const [modalState, setModalState] = useState(null);
@@ -261,7 +276,7 @@ function PartsTab() {
   const { data: lines = [] } = useLines({ isActive: true });
   const { data, isLoading } = useParts({
     search: debouncedSearch || undefined,
-    line_id: lineId || undefined,
+    line_id: lineId === 'all' ? undefined : lineId,
     page,
     limit,
   });
@@ -280,8 +295,13 @@ function PartsTab() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+      <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+        <KpiCard icon={<Package size={16} />} label="Total Part" value={data?.total ?? '—'} status="accent" />
+        <KpiCard icon={<ListChecks size={16} />} label="Line Aktif" value={lines.length} status="ok" />
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <SearchBar
             value={search}
             onChange={(v) => {
@@ -290,21 +310,25 @@ function PartsTab() {
             }}
             placeholder="Cari drawing no / nama part..."
           />
-          <select
-            className="form-select"
+          <Select
             value={lineId}
-            onChange={(e) => {
-              setLineId(e.target.value);
+            onValueChange={(v) => {
+              setLineId(v);
               setPage(1);
             }}
           >
-            <option value="">Semua Line</option>
-            {lines.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.line_name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="h-9 w-[180px]">
+              <SelectValue placeholder="Semua Line" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Line</SelectItem>
+              {lines.map((l) => (
+                <SelectItem key={l.id} value={String(l.id)}>
+                  {l.line_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <PageSizeSelector
             value={limit}
             onChange={(v) => {
@@ -313,93 +337,123 @@ function PartsTab() {
             }}
           />
         </div>
-        <button type="button" className="btn btn-primary" onClick={() => setModalState({ mode: 'create' })}>
-          <Plus size={14} style={{ verticalAlign: -2, marginRight: 4 }} /> Tambah Part
-        </button>
+        <Button onClick={() => setModalState({ mode: 'create' })}>
+          <Plus size={14} /> Tambah Part
+        </Button>
       </div>
 
       {deleteError && (
-        <div className="error-state" style={{ marginBottom: 12, padding: 8, fontSize: 12 }}>
+        <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
           {deleteError}
         </div>
       )}
 
-      {isLoading && !data && <div className="empty-state">Memuat data...</div>}
-      {data && data.items.length === 0 && <div className="empty-state">Belum ada part yang cocok.</div>}
+      {isLoading && !data && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
+      {data && data.items.length === 0 && (
+        <div className="py-8 text-center text-sm text-[var(--text-faint)]">Belum ada part yang cocok.</div>
+      )}
 
       {data && data.items.length > 0 && (
         <>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Line</th>
-                <th>Jig</th>
-                <th>Drawing No / Part Name</th>
-                <th className="mono">Target Shot</th>
-                <th className="mono">CL Count</th>
-                <th className="mono">Supplier</th>
-                <th>Status</th>
-                <th style={{ width: 160 }}>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((part) => (
-                <tr key={part.id}>
-                  <td className="mono">{part.line_name}</td>
-                  <td className="caption">{part.jig_name}</td>
-                  <td>
-                    <div>{part.part_name}</div>
-                    <div className="caption mono">{part.drawing_no}</div>
-                    {part.inventory_item_id && (
-                      <div className="caption" style={{ fontSize: 10 }}>
-                        Stok: {part.inv_spare_part_number} ({part.inv_current_stock})
-                      </div>
+          <div className="overflow-hidden rounded-lg border border-border">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-border">
+                    {['Line', 'Jig', 'Drawing No / Part Name', 'Target Shot', 'CL', 'Supplier', 'Status', 'Aksi'].map(
+                      (h) => (
+                        <th
+                          key={h}
+                          className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
+                        >
+                          {h}
+                        </th>
+                      )
                     )}
-                  </td>
-                  <td className="mono">{part.target_shot.toLocaleString('id-ID')}</td>
-                  <td className="mono">{part.cl_count}</td>
-                  <td className="mono">{part.supplier_count}</td>
-                  <td className="caption">{part.is_active ? 'Aktif' : 'Nonaktif'}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn-secondary btn"
-                      style={{ padding: 6, marginRight: 4 }}
-                      title="CL Mapping"
-                      onClick={() => setClMappingPart(part)}
-                    >
-                      <Link2 size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary btn"
-                      style={{ padding: 6, marginRight: 4 }}
-                      title="Supplier"
-                      onClick={() => setSupplierPart(part)}
-                    >
-                      <Truck size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary btn"
-                      style={{ padding: 6, marginRight: 4 }}
-                      onClick={() => setModalState({ mode: 'edit', part })}
-                    >
-                      <Pencil size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary btn"
-                      style={{ padding: 6 }}
-                      onClick={() => handleDelete(part)}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.items.map((part) => (
+                    <tr key={part.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{part.line_name}</td>
+                      <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{part.jig_name}</td>
+                      <td className="px-3 py-3">
+                        <div className="text-[13px]">{part.part_name}</div>
+                        <div className="font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
+                          {part.drawing_no}
+                        </div>
+                        {part.inventory_item_id && (
+                          <div className="text-[10px] text-[var(--text-faint)]">
+                            Stok: {part.inv_spare_part_number} ({part.inv_current_stock})
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-right font-[var(--font-mono)] text-[13px]">
+                        {part.target_shot.toLocaleString('id-ID')}
+                      </td>
+                      <td className="px-3 py-3 text-center font-[var(--font-mono)] text-[13px]">{part.cl_count}</td>
+                      <td className="px-3 py-3 text-center font-[var(--font-mono)] text-[13px]">
+                        {part.supplier_count}
+                      </td>
+                      <td className="px-3 py-3">
+                        <span
+                          className={
+                            part.is_active
+                              ? 'rounded px-1.5 py-0.5 text-[11px] font-medium bg-ok-dim text-ok'
+                              : 'rounded px-1.5 py-0.5 text-[11px] font-medium bg-[var(--panel-3)] text-[var(--text-faint)]'
+                          }
+                        >
+                          {part.is_active ? 'Aktif' : 'Nonaktif'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            title="CL Mapping"
+                            onClick={() => setClMappingPart(part)}
+                          >
+                            <Link2 size={13} />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            title="Supplier"
+                            onClick={() => setSupplierPart(part)}
+                          >
+                            <Truck size={13} />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => setModalState({ mode: 'edit', part })}
+                          >
+                            <Pencil size={13} />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => handleDelete(part)}
+                          >
+                            <Trash2 size={13} />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
           <Pagination page={data.page} limit={data.limit} total={data.total} onPageChange={setPage} />
         </>
       )}

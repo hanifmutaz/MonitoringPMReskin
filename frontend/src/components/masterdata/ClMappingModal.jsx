@@ -1,9 +1,16 @@
 // src/components/masterdata/ClMappingModal.jsx
+// Reskin (checklist §3 item 4, batch 3/N): `.data-table`/`.btn`/`.form-*`
+// lama dilepas TOTAL, diganti Tailwind + shadcn ui murni supaya konsisten
+// sama PartsTab (Modal pembungkusnya) yang udah direskin. Logic
+// create/remove mapping TIDAK berubah sama sekali.
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { useClMapping, useClMappingMutations } from '../../hooks/useClMapping';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
 import Modal from '../Modal';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 
 const emptyForm = { cl_no: '', product_name: '', jig_name: '' };
 
@@ -31,82 +38,76 @@ function ClMappingModal({ part, onClose }) {
   }
 
   return (
-    <Modal title={`CL Mapping — ${part.drawing_no} (${part.jig_name})`} onClose={onClose} width={520}>
+    <Modal title={`CL Mapping — ${part.drawing_no} (${part.jig_name})`} onClose={onClose} width={560}>
       {isLoading ? (
-        <div className="empty-state">Memuat data...</div>
+        <div className="py-6 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>
       ) : (
-        <table className="data-table" style={{ marginBottom: 16 }}>
-          <thead>
-            <tr>
-              <th>CL No</th>
-              <th>Product</th>
-              <th>Jig</th>
-              <th style={{ width: 40 }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {mappings.length === 0 && (
-              <tr>
-                <td colSpan={4} className="empty-state">
-                  Belum ada CL No terpetakan.
-                </td>
+        <div className="mb-4 overflow-hidden rounded-lg border border-border">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
+                  CL No
+                </th>
+                <th className="px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
+                  Product
+                </th>
+                <th className="px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
+                  Jig
+                </th>
+                <th className="w-[44px] px-3 py-2" />
               </tr>
-            )}
-            {mappings.map((m) => (
-              <tr key={m.id}>
-                <td className="mono">{m.cl_no}</td>
-                <td>{m.product_name || '-'}</td>
-                <td>{m.jig_name || '-'}</td>
-                <td>
-                  <button
-                    type="button"
-                    className="btn-secondary btn"
-                    style={{ padding: 4 }}
-                    onClick={() => handleRemove(m.id)}
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {mappings.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-3 py-6 text-center text-sm text-[var(--text-faint)]">
+                    Belum ada CL No terpetakan.
+                  </td>
+                </tr>
+              )}
+              {mappings.map((m) => (
+                <tr key={m.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                  <td className="px-3 py-2.5 font-[var(--font-mono)] text-[13px]">{m.cl_no}</td>
+                  <td className="px-3 py-2.5 text-[13px]">{m.product_name || '-'}</td>
+                  <td className="px-3 py-2.5 text-[13px]">{m.jig_name || '-'}</td>
+                  <td className="px-3 py-2.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => handleRemove(m.id)}
+                    >
+                      <Trash2 size={12} />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      <form onSubmit={handleAdd} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+      <form onSubmit={handleAdd} className="flex flex-wrap items-end gap-2">
         <div>
-          <label className="form-label">CL No</label>
-          <input
-            className="form-input"
-            value={form.cl_no}
-            onChange={(e) => setForm({ ...form, cl_no: e.target.value })}
-            required
-          />
+          <Label className="mb-1.5">CL No</Label>
+          <Input value={form.cl_no} onChange={(e) => setForm({ ...form, cl_no: e.target.value })} required />
         </div>
         <div>
-          <label className="form-label">Product</label>
-          <input
-            className="form-input"
-            value={form.product_name}
-            onChange={(e) => setForm({ ...form, product_name: e.target.value })}
-          />
+          <Label className="mb-1.5">Product</Label>
+          <Input value={form.product_name} onChange={(e) => setForm({ ...form, product_name: e.target.value })} />
         </div>
         <div>
-          <label className="form-label">Jig</label>
-          <input
-            className="form-input"
-            value={form.jig_name}
-            onChange={(e) => setForm({ ...form, jig_name: e.target.value })}
-          />
+          <Label className="mb-1.5">Jig</Label>
+          <Input value={form.jig_name} onChange={(e) => setForm({ ...form, jig_name: e.target.value })} />
         </div>
-        <button type="submit" className="btn btn-primary" disabled={create.isPending}>
-          <Plus size={14} style={{ verticalAlign: -2 }} />
-        </button>
+        <Button type="submit" size="icon" disabled={create.isPending}>
+          <Plus size={14} />
+        </Button>
       </form>
       {error && (
-        <div className="error-state" style={{ marginTop: 10, padding: 8, fontSize: 12 }}>
-          {error}
-        </div>
+        <div className="mt-2.5 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{error}</div>
       )}
     </Modal>
   );
