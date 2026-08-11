@@ -1,19 +1,53 @@
 // src/components/masterdata/InventoryTab.jsx
-import { useState } from 'react';
-import { Plus, Pencil, Trash2, History, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+// Reskin (checklist §3 item 4, batch 5/N - Inventory): `.data-table`/`.btn`/
+// `.form-*` lama dilepas TOTAL, diganti Tailwind + shadcn ui murni. Toolbar
+// (search + tombol tambah) ngikutin pola tab lain, search/pagination TETAP
+// server-side (gak diubah, sama kayak sebelumnya). Kartu stat BEDA dari
+// Parts - di sini datanya jujur/agregat asli karena `/inventory/rop-status`
+// (dipakai useInventoryRopStatus) balikin status SEMUA item sekaligus
+// (bukan per-halaman kayak /parts), jadi 3 kartu Total/Perlu Order/Belum
+// Lengkap dihitung dari situ, bukan dikarang. Warna status ROP di tabel &
+// modal detail sebelumnya hardcode var(--danger)/var(--success,#2e7d32)/
+// var(--warning,#b8860b) - dipetakan ke token bg-danger-dim/text-danger,
+// bg-ok-dim/text-ok, bg-warn-dim/text-warn yang udah dipakai di seluruh app.
+// Logic create/update/delete/adjustStock/detail/histori mutasi TIDAK
+// berubah sama sekali.
+import { useMemo, useState } from 'react';
+import { Plus, Pencil, Trash2, History, ArrowDownCircle, ArrowUpCircle, Package, ShoppingCart, AlertCircle } from 'lucide-react';
 import { useInventoryItems, useInventoryRopStatus } from '../../hooks/useInventoryItems';
 import { useInventoryItemDetail, useInventoryMovements } from '../../hooks/useInventoryItemDetail';
 import { useInventoryMutations } from '../../hooks/useInventoryMutations';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
+import { cn } from '../../lib/utils';
 import Modal from '../Modal';
+import KpiCard from '../KpiCard';
 import SearchBar from '../SearchBar';
 import Pagination from '../Pagination';
 import PageSizeSelector from '../PageSizeSelector';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 const DEFAULT_LIMIT = 50;
 
 const emptyForm = { spare_part_number: '', part_name: '', location: '', note: '', lead_time_days: '', initial_stock: '' };
+
+function RopBadge({ rop }) {
+  if (!rop || rop.status === 'NOT_CONFIGURED') {
+    return <span className="rounded px-1.5 py-0.5 text-[11px] font-medium bg-warn-dim text-warn">Belum lengkap</span>;
+  }
+  if (rop.status === 'ORDER') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium bg-danger-dim text-danger">
+        <ShoppingCart size={11} /> Order ({rop.order_qty})
+      </span>
+    );
+  }
+  return <span className="rounded px-1.5 py-0.5 text-[11px] font-medium bg-ok-dim text-ok">OK</span>;
+}
 
 function ItemFormModal({ initial, onClose }) {
   const isEdit = !!initial;
@@ -56,82 +90,71 @@ function ItemFormModal({ initial, onClose }) {
   }
 
   return (
-    <Modal title={isEdit ? 'Edit Inventory Item' : 'Tambah Inventory Item'} onClose={onClose} width={480}>
-      <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label">Spare Part Number</label>
-            <input
-              className="form-input mono"
-              style={{ width: '100%' }}
+    <Modal title={isEdit ? 'Edit Inventory Item' : 'Tambah Inventory Item'} onClose={onClose} width={520}>
+      <form onSubmit={handleSubmit} className="space-y-3.5">
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <Label className="mb-1.5">Spare Part Number</Label>
+            <Input
+              className="font-[var(--font-mono)]"
               value={form.spare_part_number}
               onChange={(e) => setForm({ ...form, spare_part_number: e.target.value })}
               required
             />
             {errors.spare_part_number && (
-              <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.spare_part_number}</span>
+              <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.spare_part_number}</p>
             )}
           </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label">Part Name</label>
-            <input
-              className="form-input"
-              style={{ width: '100%' }}
+          <div className="sm:col-span-2">
+            <Label className="mb-1.5">Part Name</Label>
+            <Input
               value={form.part_name}
               onChange={(e) => setForm({ ...form, part_name: e.target.value })}
               required
             />
-            {errors.part_name && <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.part_name}</span>}
+            {errors.part_name && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.part_name}</p>}
           </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label">Lokasi (rak/gudang)</label>
-            <input
-              className="form-input"
-              style={{ width: '100%' }}
-              value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })}
-            />
+          <div className="sm:col-span-2">
+            <Label className="mb-1.5">Lokasi (rak/gudang)</Label>
+            <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
           </div>
           <div>
-            <label className="form-label">Lead Time (hari)</label>
-            <input
+            <Label className="mb-1.5">Lead Time (hari)</Label>
+            <Input
               type="number"
-              className="form-input mono"
-              style={{ width: '100%', textAlign: 'right' }}
+              className="text-right font-[var(--font-mono)]"
               value={form.lead_time_days}
               min={0}
               onChange={(e) => setForm({ ...form, lead_time_days: e.target.value })}
               placeholder="mis. 14"
             />
             {errors.lead_time_days && (
-              <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.lead_time_days}</span>
+              <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.lead_time_days}</p>
             )}
-            <div className="caption" style={{ fontSize: 10 }}>
+            <p className="mt-1 text-[10px] text-muted-foreground">
               Wajib diisi supaya ROP bisa dihitung. Beda-beda per supplier (lokal vs import).
-            </div>
+            </p>
           </div>
           {!isEdit && (
             <div>
-              <label className="form-label">Stok Awal</label>
-              <input
+              <Label className="mb-1.5">Stok Awal</Label>
+              <Input
                 type="number"
-                className="form-input mono"
-                style={{ width: '100%', textAlign: 'right' }}
+                className="text-right font-[var(--font-mono)]"
                 value={form.initial_stock}
                 min={0}
                 onChange={(e) => setForm({ ...form, initial_stock: e.target.value })}
                 placeholder="0"
               />
               {errors.initial_stock && (
-                <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.initial_stock}</span>
+                <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.initial_stock}</p>
               )}
             </div>
           )}
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label">Catatan</label>
-            <textarea
-              className="form-input"
-              style={{ width: '100%', minHeight: 50 }}
+          <div className="sm:col-span-2">
+            <Label className="mb-1.5">Catatan</Label>
+            <Textarea
+              className="min-h-[60px]"
               value={form.note}
               onChange={(e) => setForm({ ...form, note: e.target.value })}
             />
@@ -139,14 +162,14 @@ function ItemFormModal({ initial, onClose }) {
         </div>
 
         {errors._general && (
-          <div className="error-state" style={{ marginTop: 12, padding: 8, fontSize: 12 }}>
+          <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
             {errors._general}
           </div>
         )}
 
-        <button type="submit" className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending}>
+        <Button type="submit" disabled={pending}>
           {pending ? 'Menyimpan...' : 'Simpan'}
-        </button>
+        </Button>
       </form>
     </Modal>
   );
@@ -173,38 +196,40 @@ function AdjustStockForm({ item, onDone }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+    <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-2">
       <div>
-        <label className="form-label">Jenis</label>
-        <select className="form-select" value={movementType} onChange={(e) => setMovementType(e.target.value)}>
-          <option value="STOCK_IN">Stock In (tambah)</option>
-          <option value="STOCK_OUT">Stock Out (kurang)</option>
-          <option value="ADJUSTMENT">Adjustment (koreksi, tambah)</option>
-        </select>
+        <Label className="mb-1.5">Jenis</Label>
+        <Select value={movementType} onValueChange={setMovementType}>
+          <SelectTrigger className="w-[190px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="STOCK_IN">Stock In (tambah)</SelectItem>
+            <SelectItem value="STOCK_OUT">Stock Out (kurang)</SelectItem>
+            <SelectItem value="ADJUSTMENT">Adjustment (koreksi, tambah)</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div>
-        <label className="form-label">Qty</label>
-        <input
+        <Label className="mb-1.5">Qty</Label>
+        <Input
           type="number"
-          className="form-input mono"
-          style={{ width: 90, textAlign: 'right' }}
+          className="w-[90px] text-right font-[var(--font-mono)]"
           value={qty}
           min={1}
           onChange={(e) => setQty(e.target.value)}
           required
         />
       </div>
-      <div style={{ flex: 1, minWidth: 160 }}>
-        <label className="form-label">Catatan</label>
-        <input className="form-input" style={{ width: '100%' }} value={note} onChange={(e) => setNote(e.target.value)} />
+      <div className="min-w-[160px] flex-1">
+        <Label className="mb-1.5">Catatan</Label>
+        <Input value={note} onChange={(e) => setNote(e.target.value)} />
       </div>
-      <button type="submit" className="btn btn-primary" disabled={adjustStock.isPending}>
+      <Button type="submit" disabled={adjustStock.isPending}>
         {adjustStock.isPending ? 'Menyimpan...' : 'Catat'}
-      </button>
+      </Button>
       {error && (
-        <div className="error-state" style={{ width: '100%', padding: 8, fontSize: 12 }}>
-          {error}
-        </div>
+        <div className="w-full rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{error}</div>
       )}
     </form>
   );
@@ -220,75 +245,61 @@ function ItemDetailModal({ itemId, onClose }) {
   const rop = (ropData || []).find((r) => r.id === itemId);
 
   return (
-    <Modal title={`${item.spare_part_number} — ${item.part_name}`} onClose={onClose} width={620}>
-      <div style={{ display: 'flex', gap: 20, marginBottom: 16, flexWrap: 'wrap' }}>
+    <Modal title={`${item.spare_part_number} — ${item.part_name}`} onClose={onClose} width={640}>
+      <div className="mb-4 flex flex-wrap gap-5">
         <div>
-          <div className="caption">Stok Saat Ini</div>
-          <div style={{ fontSize: 22, fontWeight: 700 }}>{item.current_stock.toLocaleString('id-ID')}</div>
+          <div className="text-xs text-muted-foreground">Stok Saat Ini</div>
+          <div className="font-[var(--font-display)] text-[22px] font-bold">
+            {item.current_stock.toLocaleString('id-ID')}
+          </div>
         </div>
         <div>
-          <div className="caption">Lokasi</div>
-          <div>{item.location || '-'}</div>
+          <div className="text-xs text-muted-foreground">Lokasi</div>
+          <div className="text-sm">{item.location || '-'}</div>
         </div>
         <div>
-          <div className="caption">Lead Time</div>
-          <div>{item.lead_time_days !== null ? `${item.lead_time_days} hari` : 'Belum diisi'}</div>
+          <div className="text-xs text-muted-foreground">Lead Time</div>
+          <div className="text-sm">{item.lead_time_days !== null ? `${item.lead_time_days} hari` : 'Belum diisi'}</div>
         </div>
         <div>
-          <div className="caption">Dipakai oleh Part</div>
-          <div>{item.linked_parts?.length || 0} part</div>
+          <div className="text-xs text-muted-foreground">Dipakai oleh Part</div>
+          <div className="text-sm">{item.linked_parts?.length || 0} part</div>
         </div>
       </div>
 
       {rop && rop.status !== 'NOT_CONFIGURED' ? (
-        <div
-          style={{
-            marginBottom: 16,
-            padding: 10,
-            borderRadius: 8,
-            border: '1px solid var(--border-soft)',
-            display: 'flex',
-            gap: 20,
-            flexWrap: 'wrap',
-          }}
-        >
+        <div className="mb-4 flex flex-wrap gap-5 rounded-lg border border-[var(--border-soft)] p-2.5">
           <div>
-            <div className="caption">Konsumsi/Hari</div>
-            <div className="mono">{rop.konsumsi_spare_per_hari}</div>
+            <div className="text-xs text-muted-foreground">Konsumsi/Hari</div>
+            <div className="font-[var(--font-mono)] text-sm">{rop.konsumsi_spare_per_hari}</div>
           </div>
           <div>
-            <div className="caption">Kebutuhan Spare</div>
-            <div className="mono">{rop.kebutuhan_spare}</div>
+            <div className="text-xs text-muted-foreground">Kebutuhan Spare</div>
+            <div className="font-[var(--font-mono)] text-sm">{rop.kebutuhan_spare}</div>
           </div>
           <div>
-            <div className="caption">Safety Stock</div>
-            <div className="mono">{rop.safety_stock}</div>
+            <div className="text-xs text-muted-foreground">Safety Stock</div>
+            <div className="font-[var(--font-mono)] text-sm">{rop.safety_stock}</div>
           </div>
           <div>
-            <div className="caption">ROP</div>
-            <div className="mono" style={{ fontWeight: 700 }}>
-              {rop.rop}
-            </div>
+            <div className="text-xs text-muted-foreground">ROP</div>
+            <div className="font-[var(--font-mono)] text-sm font-bold">{rop.rop}</div>
           </div>
           <div>
-            <div className="caption">Status</div>
-            <div style={{ color: rop.status === 'ORDER' ? 'var(--danger)' : 'var(--success, #2e7d32)' }}>
-              {rop.status === 'ORDER' ? `🛒 Order (${rop.order_qty})` : '✅ OK'}
-            </div>
+            <div className="text-xs text-muted-foreground">Status</div>
+            <RopBadge rop={rop} />
           </div>
         </div>
       ) : (
-        <div className="caption" style={{ marginBottom: 16, fontStyle: 'italic' }}>
+        <p className="mb-4 text-xs italic text-muted-foreground">
           ROP belum bisa dihitung - isi Lead Time dan pastikan item ini sudah di-link ke minimal 1 Part.
-        </div>
+        </p>
       )}
 
       {item.linked_parts?.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div className="caption" style={{ marginBottom: 4 }}>
-            Part yang terhubung ke stok ini:
-          </div>
-          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
+        <div className="mb-4">
+          <div className="mb-1 text-xs text-muted-foreground">Part yang terhubung ke stok ini:</div>
+          <ul className="m-0 list-disc pl-[18px] text-xs">
             {item.linked_parts.map((p) => (
               <li key={p.id}>
                 {p.line_name} — {p.jig_name} — {p.drawing_no} ({p.part_name})
@@ -298,56 +309,60 @@ function ItemDetailModal({ itemId, onClose }) {
         </div>
       )}
 
-      <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 12, marginBottom: 16 }}>
-        <div className="caption" style={{ marginBottom: 8 }}>
-          Catat mutasi stok baru
-        </div>
+      <div className="mb-4 border-t border-[var(--border-soft)] pt-3">
+        <div className="mb-2 text-xs text-muted-foreground">Catat mutasi stok baru</div>
         <AdjustStockForm item={item} />
       </div>
 
-      <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 12 }}>
-        <div className="caption" style={{ marginBottom: 8 }}>
-          <History size={12} style={{ verticalAlign: -2, marginRight: 4 }} />
-          Histori Mutasi
+      <div className="border-t border-[var(--border-soft)] pt-3">
+        <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <History size={12} /> Histori Mutasi
         </div>
         {(!movementData || movementData.items.length === 0) && (
-          <div className="empty-state" style={{ padding: 12 }}>
-            Belum ada mutasi.
-          </div>
+          <div className="py-4 text-center text-sm text-[var(--text-faint)]">Belum ada mutasi.</div>
         )}
         {movementData?.items.length > 0 && (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Tanggal</th>
-                <th>Jenis</th>
-                <th className="mono">Qty</th>
-                <th>Catatan</th>
-                <th>Oleh</th>
-              </tr>
-            </thead>
-            <tbody>
-              {movementData.items.map((m) => (
-                <tr key={m.id}>
-                  <td className="mono caption">{new Date(m.created_at).toLocaleString('id-ID')}</td>
-                  <td>
-                    {m.movement_type === 'STOCK_OUT' ? (
-                      <span style={{ color: 'var(--danger)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <ArrowDownCircle size={12} /> Stock Out
-                      </span>
-                    ) : (
-                      <span style={{ color: 'var(--success, #2e7d32)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <ArrowUpCircle size={12} /> {m.movement_type === 'ADJUSTMENT' ? 'Adjustment' : 'Stock In'}
-                      </span>
-                    )}
-                  </td>
-                  <td className="mono">{m.qty.toLocaleString('id-ID')}</td>
-                  <td className="caption">{m.note || '-'}</td>
-                  <td className="caption">{m.user_full_name}</td>
+          <div className="overflow-hidden rounded-lg border border-border">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-border">
+                  {['Tanggal', 'Jenis', 'Qty', 'Catatan', 'Oleh'].map((h) => (
+                    <th
+                      key={h}
+                      className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {movementData.items.map((m) => (
+                  <tr key={m.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                    <td className="px-3 py-2 font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
+                      {new Date(m.created_at).toLocaleString('id-ID')}
+                    </td>
+                    <td className="px-3 py-2">
+                      {m.movement_type === 'STOCK_OUT' ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-danger">
+                          <ArrowDownCircle size={12} /> Stock Out
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-ok">
+                          <ArrowUpCircle size={12} /> {m.movement_type === 'ADJUSTMENT' ? 'Adjustment' : 'Stock In'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 font-[var(--font-mono)] text-[13px]">
+                      {m.qty.toLocaleString('id-ID')}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-[var(--text-dim)]">{m.note || '-'}</td>
+                    <td className="px-3 py-2 text-xs text-[var(--text-dim)]">{m.user_full_name}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </Modal>
@@ -368,7 +383,16 @@ function InventoryTab() {
   const { remove } = useInventoryMutations();
   const confirm = useConfirm();
 
-  const ropById = new Map((ropData || []).map((r) => [r.id, r]));
+  const ropById = useMemo(() => new Map((ropData || []).map((r) => [r.id, r])), [ropData]);
+
+  const ropCounts = useMemo(() => {
+    const list = ropData || [];
+    return {
+      total: list.length,
+      order: list.filter((r) => r.status === 'ORDER').length,
+      incomplete: list.filter((r) => r.status === 'NOT_CONFIGURED').length,
+    };
+  }, [ropData]);
 
   async function handleDelete(item) {
     if (!(await confirm(`Hapus Inventory Item "${item.spare_part_number}"?`))) return;
@@ -382,13 +406,20 @@ function InventoryTab() {
 
   return (
     <div>
-      <div className="caption" style={{ marginBottom: 12 }}>
+      <p className="mb-4 text-xs text-muted-foreground">
         Stok spare part fisik di gudang. 1 Inventory Item bisa dipakai (di-link) oleh lebih dari 1 Part di tab
-        &ldquo;Parts&rdquo; — kalau spare part-nya identik (dipasang di jig/line berbeda tapi ambil dari stok yang sama).
+        &ldquo;Parts&rdquo; — kalau spare part-nya identik (dipasang di jig/line berbeda tapi ambil dari stok yang
+        sama).
+      </p>
+
+      <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+        <KpiCard icon={<Package size={16} />} label="Total Item" value={ropCounts.total} status="accent" />
+        <KpiCard icon={<ShoppingCart size={16} />} label="Perlu Order" value={ropCounts.order} status="danger" />
+        <KpiCard icon={<AlertCircle size={16} />} label="Belum Lengkap" value={ropCounts.incomplete} status="warn" />
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <SearchBar
             value={search}
             onChange={(v) => {
@@ -405,90 +436,100 @@ function InventoryTab() {
             }}
           />
         </div>
-        <button type="button" className="btn btn-primary" onClick={() => setModalState({ mode: 'create' })}>
-          <Plus size={14} style={{ verticalAlign: -2, marginRight: 4 }} /> Tambah Inventory Item
-        </button>
+        <Button onClick={() => setModalState({ mode: 'create' })}>
+          <Plus size={14} /> Tambah Inventory Item
+        </Button>
       </div>
 
       {actionError && (
-        <div className="error-state" style={{ marginBottom: 12, padding: 8, fontSize: 12 }}>
+        <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
           {actionError}
         </div>
       )}
 
-      {isLoading && !data && <div className="empty-state">Memuat data...</div>}
-      {data && data.items.length === 0 && <div className="empty-state">Belum ada Inventory Item.</div>}
+      {isLoading && !data && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
+      {data && data.items.length === 0 && (
+        <div className="py-8 text-center text-sm text-[var(--text-faint)]">Belum ada Inventory Item.</div>
+      )}
 
       {data && data.items.length > 0 && (
         <>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Spare Part Number / Nama</th>
-                <th>Lokasi</th>
-                <th className="mono">Stok</th>
-                <th className="mono">ROP</th>
-                <th>Status</th>
-                <th className="mono">Dipakai Part</th>
-                <th style={{ width: 130 }}>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((item) => {
-                const rop = ropById.get(item.id);
-                return (
-                  <tr key={item.id}>
-                    <td>
-                      <div className="mono">{item.spare_part_number}</div>
-                      <div className="caption">{item.part_name}</div>
-                    </td>
-                    <td className="caption">{item.location || '-'}</td>
-                    <td className="mono">{item.current_stock.toLocaleString('id-ID')}</td>
-                    <td className="mono">{rop?.rop ?? '-'}</td>
-                    <td>
-                      {!rop || rop.status === 'NOT_CONFIGURED' ? (
-                        <span className="caption" style={{ color: 'var(--warning, #b8860b)' }}>
-                          Belum lengkap
-                        </span>
-                      ) : rop.status === 'ORDER' ? (
-                        <span style={{ color: 'var(--danger)' }}>🛒 Order ({rop.order_qty})</span>
-                      ) : (
-                        <span style={{ color: 'var(--success, #2e7d32)' }}>✅ OK</span>
-                      )}
-                    </td>
-                    <td className="mono">{item.linked_part_count}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn-secondary btn"
-                        style={{ padding: 6, marginRight: 4 }}
-                        title="Detail & Mutasi Stok"
-                        onClick={() => setDetailItemId(item.id)}
-                      >
-                        <History size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-secondary btn"
-                        style={{ padding: 6, marginRight: 4 }}
-                        onClick={() => setModalState({ mode: 'edit', item })}
-                      >
-                        <Pencil size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-secondary btn"
-                        style={{ padding: 6 }}
-                        onClick={() => handleDelete(item)}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </td>
+          <div className="overflow-hidden rounded-lg border border-border">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-border">
+                    {['Spare Part Number / Nama', 'Lokasi', 'Stok', 'ROP', 'Status', 'Dipakai Part', 'Aksi'].map(
+                      (h) => (
+                        <th
+                          key={h}
+                          className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
+                        >
+                          {h}
+                        </th>
+                      )
+                    )}
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {data.items.map((item) => {
+                    const rop = ropById.get(item.id);
+                    return (
+                      <tr key={item.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                        <td className="px-3 py-3">
+                          <div className="font-[var(--font-mono)] text-[13px]">{item.spare_part_number}</div>
+                          <div className="text-xs text-[var(--text-dim)]">{item.part_name}</div>
+                        </td>
+                        <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{item.location || '-'}</td>
+                        <td className="px-3 py-3 text-right font-[var(--font-mono)] text-[13px]">
+                          {item.current_stock.toLocaleString('id-ID')}
+                        </td>
+                        <td className="px-3 py-3 text-right font-[var(--font-mono)] text-[13px]">{rop?.rop ?? '-'}</td>
+                        <td className="px-3 py-3">
+                          <RopBadge rop={rop} />
+                        </td>
+                        <td className="px-3 py-3 text-center font-[var(--font-mono)] text-[13px]">
+                          {item.linked_part_count}
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="flex gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              title="Detail & Mutasi Stok"
+                              onClick={() => setDetailItemId(item.id)}
+                            >
+                              <History size={13} />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => setModalState({ mode: 'edit', item })}
+                            >
+                              <Pencil size={13} />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleDelete(item)}
+                            >
+                              <Trash2 size={13} />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
           <Pagination page={data.page} limit={data.limit} total={data.total} onPageChange={setPage} />
         </>
       )}
