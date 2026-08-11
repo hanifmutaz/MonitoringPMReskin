@@ -40,3 +40,25 @@ export async function changePassword(currentPassword, newPassword) {
   });
   return data;
 }
+
+/**
+ * POST /auth/me/avatar - upload/ganti foto profil (opsional). `file` =
+ * objek File dari <input type="file">. multipart/form-data - JANGAN set
+ * Content-Type manual, biarkan browser/axios yang nentuin boundary-nya
+ * sendiri (kalau di-set manual ke 'multipart/form-data' polos tanpa
+ * boundary, request-nya bakal gagal diparse server).
+ */
+export async function uploadAvatar(file) {
+  const formData = new FormData();
+  formData.append('avatar', file);
+  const { data } = await apiClient.post('/auth/me/avatar', formData);
+  return data.data; // { avatar_url }
+}
+
+/**
+ * DELETE /auth/me/avatar - hapus foto profil (balik ke fallback inisial).
+ */
+export async function deleteAvatar() {
+  const { data } = await apiClient.delete('/auth/me/avatar');
+  return data;
+}

@@ -5,3 +5,7 @@ npm-debug.log
 .DS_Store
 .reset-password.js
 .env.hirose
+# Foto profil hasil upload user (fitur avatar) - file binary, gak boleh
+# ke-commit ke git. Folder dibuat otomatis di runtime (fs.mkdirSync di
+# profileService.js) begitu ada upload pertama.
+uploads/

@@ -38,13 +38,13 @@ async function findActiveUserByUsername(username) {
 }
 
 /**
- * Ambil user by id, join role_name. Menyertakan `email` (ditambahkan bareng
- * fitur self-service profile - dipakai buat prefill form "Profil Saya" di
- * frontend, GET /auth/me).
+ * Ambil user by id, join role_name. Menyertakan `email`/`avatar_url`
+ * (ditambahkan bareng fitur self-service profile - dipakai buat prefill
+ * form "Profil Saya" di frontend, GET /auth/me).
  */
 async function findUserById(id) {
   const result = await db.query(
-    `SELECT u.id, u.username, u.full_name, u.email, u.is_active, u.status,
+    `SELECT u.id, u.username, u.full_name, u.email, u.avatar_url, u.is_active, u.status,
             r.id AS role_id, r.name AS role_name
      FROM users u
      LEFT JOIN roles r ON r.id = u.role_id
@@ -102,7 +102,7 @@ async function findAll({ role, isActive, status } = {}, runner = db) {
  */
 async function findRawById(id, runner = db) {
   const result = await runner.query(
-    `SELECT u.id, u.username, u.full_name, u.email, u.role_id, u.is_active, u.status,
+    `SELECT u.id, u.username, u.full_name, u.email, u.avatar_url, u.role_id, u.is_active, u.status,
             u.approved_by, u.approved_at, u.last_login, u.created_at, u.updated_at
      FROM users u WHERE u.id = $1`,
     [id]

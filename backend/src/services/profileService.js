@@ -19,6 +19,9 @@
 // alur validasi dari update profil biasa (yang gak butuh re-auth).
 
 const bcrypt = require('bcrypt');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 const db = require('../config/db');
 const userQueries = require('../sql/userQueries');
 const { recordAudit } = require('../utils/auditLog');
@@ -26,6 +29,17 @@ const { validatePassword } = require('../utils/passwordPolicy');
 const AppError = require('../utils/AppError');
 
 const BCRYPT_ROUNDS = 10;
+
+// Foto profil OPSIONAL (user boleh gak pernah upload sama sekali, avatar_url
+// tetap NULL - lihat migration 1700000016000). Disk lokal (bukan cloud
+// storage - app ini gak punya integrasi S3/dst di config manapun), diserve
+// statis lewat app.js. Nama file di-generate RANDOM (userId + random hex),
+// SENGAJA gak pakai originalname dari user - originalname gak boleh
+// dipercaya jadi bagian path/filename (path traversal risk kalau ada
+// karakter aneh kayak "../../etc/passwd.jpg").
+const AVATAR_DIR = path.join(__dirname, '..', '..', 'uploads', 'avatars');
+const ALLOWED_AVATAR_MIME = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2MB - foto profil, bukan dokumen/Excel
 
 /**
  * @param {number} userId
@@ -137,4 +151,118 @@ async function changePassword(userId, currentPassword, newPassword) {
   }
 }
 
-module.exports = { updateProfile, changePassword };
+/**
+ * Upload/ganti foto profil sendiri. `file` = objek dari multer
+ * (memoryStorage: { buffer, mimetype, size, ... }).
+ */
+async function updateAvatar(userId, file) {
+  if (!ALLOWED_AVATAR_MIME[file.mimetype]) {
+    throw AppError.badRequest('Validasi gagal', { avatar: 'Format harus JPG, PNG, atau WebP' });
+  }
+  if (file.size > MAX_AVATAR_BYTES) {
+    throw AppError.badRequest('Validasi gagal', { avatar: `Ukuran file maksimal ${MAX_AVATAR_BYTES / (1024 * 1024)}MB` });
+  }
+
+  fs.mkdirSync(AVATAR_DIR, { recursive: true });
+  const ext = ALLOWED_AVATAR_MIME[file.mimetype];
+  const filename = `${userId}-${crypto.randomBytes(8).toString('hex')}.${ext}`;
+  const filePath = path.join(AVATAR_DIR, filename);
+  // Tulis file KE DISK DULU, sebelum transaksi DB - kalau DB gagal, file
+  // yang baru ditulis ini yang di-bersihin (lihat catch di bawah), bukan
+  // sebaliknya (DB berhasil tapi file gak ada).
+  fs.writeFileSync(filePath, file.buffer);
+
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const before = await userQueries.findRawById(userId, client);
+    if (!before) {
+      throw AppError.notFound('User tidak ditemukan');
+    }
+
+    const avatarUrl = `/uploads/avatars/${filename}`;
+    await userQueries.updateUser(userId, { avatar_url: avatarUrl }, client);
+
+    await recordAudit(
+      {
+        tableName: 'users',
+        recordId: userId,
+        action: 'UPDATE',
+        oldValue: { avatar_url: before.avatar_url },
+        newValue: { avatar_url: avatarUrl },
+        userId,
+        actionDetail: 'Foto profil diubah',
+      },
+      client
+    );
+
+    await client.query('COMMIT');
+
+    // File avatar LAMA (kalau ada) dihapus SETELAH commit sukses, best-
+    // effort (gak throw kalau gagal hapus - itu bukan alasan buat gagalin
+    // keseluruhan request, cukup jadi file yatim di disk yang gak
+    // berbahaya, cuma makan sedikit storage).
+    if (before.avatar_url) {
+      const oldPath = path.join(AVATAR_DIR, path.basename(before.avatar_url));
+      fs.unlink(oldPath, () => {});
+    }
+
+    return avatarUrl;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    // DB gagal - file yang BARU ditulis di atas jadi yatim, bersihin biar
+    // gak numpuk.
+    fs.unlink(filePath, () => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Hapus foto profil sendiri (balik ke fallback inisial di frontend).
+ * Idempotent - manggil ini pas avatar_url udah NULL bukan error, no-op.
+ */
+async function removeAvatar(userId) {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const before = await userQueries.findRawById(userId, client);
+    if (!before) {
+      throw AppError.notFound('User tidak ditemukan');
+    }
+    if (!before.avatar_url) {
+      await client.query('ROLLBACK');
+      return;
+    }
+
+    await userQueries.updateUser(userId, { avatar_url: null }, client);
+
+    await recordAudit(
+      {
+        tableName: 'users',
+        recordId: userId,
+        action: 'UPDATE',
+        oldValue: { avatar_url: before.avatar_url },
+        newValue: { avatar_url: null },
+        userId,
+        actionDetail: 'Foto profil dihapus',
+      },
+      client
+    );
+
+    await client.query('COMMIT');
+
+    const oldPath = path.join(AVATAR_DIR, path.basename(before.avatar_url));
+    fs.unlink(oldPath, () => {});
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { updateProfile, changePassword, updateAvatar, removeAvatar };

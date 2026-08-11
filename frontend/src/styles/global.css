@@ -85,12 +85,46 @@ input[type='password']::-webkit-strong-password-auto-fill-button {
   right: 0;
 }
 
+/* ================= Scrollbar tipis GLOBAL =================
+   Feedback: scrollbar dokumen (browser default) gede & kotak, gak
+   matching desain gelap ini. Beda dari .overlay-scroll di bawah (yang
+   auto-hide pas idle, butuh JS toggle class `.is-scrolling` - dipakai
+   KHUSUS di nav Sidebar): di sini scrollbar SELALU tipis+redup tanpa JS
+   sama sekali, berlaku ke SEMUA elemen yang bisa discroll di seluruh app
+   (dokumen/halaman, tabel dengan overflow-x-auto, modal, dst) - gak
+   worth pasang scroll-listener JS di tiap tempat cuma buat efek
+   auto-hide, thin+redup permanen udah jauh lebih baik dari default
+   browser. Selector `*` sengaja dipilih (bukan cuma `html`/`body`) biar
+   ke-cover semua container overflow-y/x-auto yang udah ada di seluruh
+   halaman (Master Data, tabel history, dst) tanpa perlu nambahin class
+   satu-satu ke tiap elemen. */
+* {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: var(--border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-faint);
+}
+
 /* ================= Overlay scrollbar tipis (auto-hide) =================
    Dipakai di nav Sidebar (referensi Mantis: scrollbar tipis, cuma nongol
    pas discroll, transparan lagi setelah idle - state idle-nya diatur dari
    JS (lihat Sidebar.jsx, class `.is-scrolling` ditoggle via timer 3 detik),
    CSS di sini cuma nentuin TAMPILANNYA (lebar & fade transition). Track
-   selalu transparan (gak makan tempat/gak ada background kotak). */
+   selalu transparan (gak makan tempat/gak ada background kotak). LEBIH
+   SPESIFIK dari aturan global `*` di atas (class selector menang lawan
+   universal selector), jadi override-nya jalan normal di elemen nav ini.*/
 .overlay-scroll {
   scrollbar-width: thin; /* Firefox - lebar tipis, warnanya sendiri diatur scrollbar-color */
   scrollbar-color: transparent transparent;
@@ -190,6 +224,16 @@ input[type='password']::-webkit-strong-password-auto-fill-button {
 .content-area {
   flex: 1;
   max-width: var(--content-max-width);
+  /* BUG (feedback via screenshot): pas sidebar collapsed, area kerja
+     (.main-column) jadi lebih lebar dari --content-max-width (1400px).
+     Tanpa margin auto, box yang kena max-width itu nempel ke KIRI (default
+     block alignment), bukan di tengah - jadi gap kanan jauh lebih gede
+     daripada gap kiri. Kejadian di SEMUA halaman (bukan cuma satu page)
+     karena .content-area ini shared wrapper buat <Outlet/> di
+     MainLayout.jsx. margin:0 auto bikin box-nya rata tengah begitu lebar
+     parent-nya ngelebihin max-width, jadi gap kiri-kanan selalu SAMA
+     berapa pun lebar sidebar (collapsed/expanded). */
+  margin: 0 auto;
   width: 100%;
   padding: 26px 32px;
 }

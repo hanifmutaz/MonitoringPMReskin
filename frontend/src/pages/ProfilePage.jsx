@@ -1,12 +1,13 @@
 // src/pages/ProfilePage.jsx
-import { useState } from 'react';
-import { User, KeyRound, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { User, KeyRound, Loader2, CheckCircle2, AlertCircle, Camera, Trash2 } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useAuth } from '../contexts/AuthContext';
 import * as authApi from '../api/authApi';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import Avatar from '../components/Avatar';
 
 // Halaman BARU (fitur belum ada sebelumnya - user gak punya cara sama
 // sekali buat lihat/edit profil sendiri, cuma tampil read-only di footer
@@ -32,6 +33,12 @@ import { Label } from '../components/ui/label';
 // kartu identitas fixed 300px di kiri (sticky), form ngisi SISA lebar
 // (`1fr`) di kanan - otomatis melebar/menyempit ngikutin sidebar
 // collapsed/expanded, gak ada lagi ruang kosong yang gak kepake.
+//
+// Foto profil (fitur baru): OPSIONAL beneran - upload/hapus GAK ADA di
+// salah satu dari 2 form di atas, itu aksi TERPISAH (langsung ke-submit pas
+// pilih file / klik hapus, gak nunggu tombol "Simpan Perubahan" form
+// Informasi Profil) - konsisten sama backend (POST/DELETE /auth/me/avatar
+// itu endpoint sendiri, beda dari PATCH /auth/me buat nama/email).
 
 function FieldError({ message }) {
   if (!message) return null;
@@ -135,16 +142,114 @@ function ProfilePage() {
     }
   }
 
+  // --- Foto profil (opsional) ---
+  const fileInputRef = useRef(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState('');
+
+  async function handleAvatarChange(e) {
+    const file = e.target.files?.[0];
+    // Reset value-nya SEKARANG (bukan nunggu upload selesai) - biar user
+    // bisa pilih file yang SAMA lagi kalau upload pertama gagal terus mau
+    // dicoba ulang (browser gak nge-trigger onChange kalau value-nya gak
+    // berubah dari file yang sama).
+    e.target.value = '';
+    if (!file) return;
+
+    setAvatarError('');
+    setAvatarUploading(true);
+    try {
+      await authApi.uploadAvatar(file);
+      await refreshUser();
+    } catch (err) {
+      const errors = extractErrors(err, 'Gagal upload foto.');
+      setAvatarError(errors.avatar || errors._general || 'Gagal upload foto.');
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
+  async function handleAvatarDelete() {
+    setAvatarError('');
+    setAvatarUploading(true);
+    try {
+      await authApi.deleteAvatar();
+      await refreshUser();
+    } catch {
+      setAvatarError('Gagal menghapus foto.');
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
   return (
     <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[300px_1fr]">
-      {/* Kartu identitas - read-only, murni display dari session (bukan
-          form). Sticky biar tetep keliatan pas kolom kanan di-scroll kalau
-          form-nya panjang - pola yang sama dipakai referensi Mantis
-          (kartu kiri diem, panel kanan yang discroll). */}
+      {/* Kartu identitas - sticky biar tetep keliatan pas kolom kanan
+          di-scroll kalau form-nya panjang (pola sama kayak referensi
+          Mantis: kartu kiri diem, panel kanan yang discroll). Foto profil
+          di sini SATU-SATUNYA yang bukan bagian dari 2 form di bawah -
+          upload/hapus langsung ke-submit begitu dipilih/diklik, gak nunggu
+          tombol "Simpan Perubahan". */}
       <div className="flex items-center gap-4 rounded-lg border border-border bg-card p-4.5 lg:sticky lg:top-4 lg:flex-col lg:items-start lg:text-left">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[var(--accent-dim)] text-lg font-bold text-primary">
-          {initials}
+        <div className="flex flex-col items-center gap-1.5">
+          {/* Revisi (feedback via screenshot referensi Mantis): SELURUH
+              lingkaran foto sekarang jadi 1 <button> yang clickable (bukan
+              cuma badge kamera kecil di pojok kayak sebelumnya) - hover-nya
+              nge-gelapin foto + munculin ikon kamera gede di tengah, jelas
+              affordance-nya. `cursor-pointer` DIWAJIBKAN ditulis eksplisit
+              di sini - preflight Tailwind reset cursor <button> balik ke
+              "default" (bukan browser default "pointer"), jadi kalau lupa
+              nulis ini, tombolnya keliatan gak clickable sama sekali biar
+              pun fungsinya jalan (ini juga kenapa dari awal tombol-tombol
+              custom di Sidebar/Topbar/dll SEMUA eksplisit nulis
+              cursor-pointer, bukan andelin default) . */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={avatarUploading}
+            aria-label="Ganti foto profil"
+            className="group relative cursor-pointer rounded-full border-0 bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Avatar avatarUrl={user?.avatar_url} initials={initials} size={64} className="text-xl" />
+            {/* Overlay hover - gelap + ikon kamera gede, nutupin SELURUH
+                lingkaran foto (bukan cuma badge kecil) pas di-hover. */}
+            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 opacity-0 transition-all duration-150 group-hover:bg-black/50 group-hover:opacity-100">
+              <Camera className="h-5 w-5 text-white" />
+            </span>
+            {/* Badge kamera kecil di pojok - affordance PERMANEN (gak cuma
+                pas hover doang, biar dari awal keliatan foto ini bisa
+                diganti) + nunjukkin status upload lagi jalan. */}
+            <span className="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground">
+              {avatarUploading ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Camera className="h-3 w-3" />
+              )}
+            </span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleAvatarChange}
+          />
+          {/* "Hapus foto" cuma nongol kalau BENERAN ada foto yang bisa
+              dihapus - foto ini opsional, gak ada tombol hapus yang
+              nganggur pas user emang belum pernah upload. */}
+          {user?.avatar_url && (
+            <button
+              type="button"
+              onClick={handleAvatarDelete}
+              disabled={avatarUploading}
+              className="flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 className="h-3 w-3" />
+              Hapus foto
+            </button>
+          )}
         </div>
+
         <div className="min-w-0">
           <div className="truncate font-[var(--font-display)] text-lg font-semibold text-foreground">
             {user?.full_name}
@@ -155,6 +260,8 @@ function ProfilePage() {
             <span>{user?.role}</span>
           </div>
         </div>
+
+        {avatarError && <p className="text-xs text-destructive lg:w-full">{avatarError}</p>}
       </div>
 
       {/* Kolom kanan: 2 form ditumpuk, ngisi sisa lebar grid (1fr) - bukan

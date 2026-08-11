@@ -104,4 +104,26 @@ const changePassword = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Password berhasil diubah' });
 });
 
-module.exports = { login, register, logout, me, updateProfile, changePassword };
+/**
+ * POST /auth/me/avatar - upload/ganti foto profil sendiri. `req.file` dari
+ * multer (lihat authRoutes.js - handleAvatarUpload wrapper).
+ */
+const uploadAvatar = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw AppError.badRequest('Validasi gagal', { avatar: 'File wajib diupload' });
+  }
+
+  const avatarUrl = await profileService.updateAvatar(req.user.id, req.file);
+  res.status(200).json({ success: true, message: 'Foto profil berhasil diubah', data: { avatar_url: avatarUrl } });
+});
+
+/**
+ * DELETE /auth/me/avatar - hapus foto profil sendiri (balik ke fallback
+ * inisial).
+ */
+const deleteAvatar = asyncHandler(async (req, res) => {
+  await profileService.removeAvatar(req.user.id);
+  res.status(200).json({ success: true, message: 'Foto profil dihapus' });
+});
+
+module.exports = { login, register, logout, me, updateProfile, changePassword, uploadAvatar, deleteAvatar };

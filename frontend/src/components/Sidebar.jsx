@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useDashboardSummary } from '../hooks/useDashboardSummary';
 import { useSidebar } from '../contexts/SidebarContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import Avatar from './Avatar';
 
 // Reskin lanjutan (revisi setelah feedback via chat):
 // 1. FIX BUG: nav item ke-underline - kelewatan pas reskin pertama, elemen
@@ -361,9 +362,9 @@ function Sidebar() {
               <TooltipTrigger asChild>
                 <NavLink
                   to="/profile"
-                  className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[var(--accent-dim)] text-[13px] font-bold text-primary no-underline transition-opacity hover:opacity-80"
+                  className="block shrink-0 overflow-hidden rounded-full no-underline transition-opacity hover:opacity-80"
                 >
-                  {initials}
+                  <Avatar avatarUrl={user?.avatar_url} initials={initials} size={34} className="text-[13px]" />
                 </NavLink>
               </TooltipTrigger>
               <TooltipContent side="right">Profil Saya</TooltipContent>
@@ -373,9 +374,7 @@ function Sidebar() {
               to="/profile"
               className="-mx-1 -my-1 flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 py-1 no-underline transition-colors hover:bg-accent"
             >
-              <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[var(--accent-dim)] text-[13px] font-bold text-primary">
-                {initials}
-              </div>
+              <Avatar avatarUrl={user?.avatar_url} initials={initials} size={34} className="text-[13px]" />
               {/* Beda dari title header di atas: kontainer footer ganti
                   arah flex (row→column) pas collapsed, jadi trik max-width
                   gak aman dipakai di sini (elemen width-0 di flex-col

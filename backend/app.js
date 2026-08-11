@@ -1,4 +1,5 @@
 // app.js
+const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -57,6 +58,23 @@ app.use(cookieParser());
 app.get('/health', (req, res) => {
   res.status(200).json({ success: true, message: 'OK' });
 });
+
+// Serve foto profil (fitur avatar - profileService.js/authRoutes.js).
+// App ini gak punya integrasi cloud storage (S3/dst) - disk lokal server,
+// diserve statis dari sini. `Cross-Origin-Resource-Policy: cross-origin`
+// WAJIB di-set manual - helmet() di atas default-nya "same-origin", yang
+// bakal nge-block <img> dari Vite dev server (localhost:5173) muat gambar
+// dari sini (localhost:4000) karena beda port dianggap origin beda oleh
+// browser. Cuma di-scope ke route /uploads ini doang (bukan ubah helmet()
+// secara global) - endpoint API lain tetap same-origin protected.
+app.use(
+  '/uploads',
+  express.static(path.join(__dirname, 'uploads'), {
+    setHeaders: (res) => {
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  })
+);
 
 app.use('/api/v1', routes);
 

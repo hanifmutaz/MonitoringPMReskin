@@ -155,6 +155,7 @@ async function getMe(userId) {
     username: user.username,
     full_name: user.full_name,
     email: user.email,
+    avatar_url: user.avatar_url,
     role: user.role_name,
     permissions,
   };
