@@ -202,4 +202,154 @@ async function bulkSoftDelete(entityKey, ids, userId) {
   }
 }
 
-module.exports = { listEntities, listDeleted, restore, permanentDelete, bulkSoftDelete };
+/**
+ * Bulk restore (checkbox massal di halaman Recycle Bin) - kebalikan dari
+ * bulkSoftDelete. protectColumn TIDAK relevan di sini (row yang mau
+ * di-restore ya memang row yang sebelumnya berhasil di-soft-delete, sudah
+ * lolos protectColumn waktu itu). Sama seperti restore satuan, unique
+ * constraint (23505) ditangani per-row - kalau satu row bentrok nama/kode
+ * sama data aktif lain, row itu di-skip (bukan bikin seluruh batch gagal),
+ * biar sisanya yang gak bentrok tetap ke-restore.
+ */
+async function bulkRestore(entityKey, ids, userId) {
+  const config = requireEntity(entityKey);
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw AppError.badRequest('Validasi gagal', { ids: 'ids wajib berupa array dan tidak boleh kosong' });
+  }
+  const numericIds = ids.map(Number).filter((n) => Number.isInteger(n));
+  if (numericIds.length === 0) {
+    throw AppError.badRequest('Validasi gagal', { ids: 'ids harus berisi angka valid' });
+  }
+
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const restoredIds = [];
+    const skippedIds = [];
+
+    // Row-by-row (bukan satu UPDATE ... ANY($ids)) SENGAJA - unique
+    // constraint bentrok di satu row gak boleh nge-rollback seluruh batch,
+    // row lain yang gak bentrok tetap harus jalan.
+    for (const id of numericIds) {
+      try {
+        const result = await client.query(
+          `UPDATE ${config.table} SET deleted_at = NULL, deleted_by = NULL
+           WHERE id = $1 AND deleted_at IS NOT NULL RETURNING id`,
+          [id]
+        );
+        if (result.rows[0]) {
+          restoredIds.push(id);
+        } else {
+          skippedIds.push(id);
+        }
+      } catch (err) {
+        if (err.code === '23505') {
+          skippedIds.push(id);
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    await recordAudit(
+      {
+        tableName: config.table,
+        recordId: null,
+        action: 'RESTORE',
+        oldValue: null,
+        newValue: { ids: restoredIds },
+        userId,
+        actionDetail: `BULK RESTORE (${config.label}) - ${restoredIds.length} data direstore dari Recycle Bin${
+          skippedIds.length ? `, ${skippedIds.length} dilewati (bentrok nama/kode dengan data aktif lain)` : ''
+        }`,
+      },
+      client
+    );
+
+    await client.query('COMMIT');
+    return { restoredIds, skippedIds };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Bulk permanent-delete (checkbox massal di halaman Recycle Bin) -
+ * IRREVERSIBLE, sama kayak permanentDelete satuan. Row-by-row juga (lihat
+ * alasan yang sama di bulkRestore) - row yang masih direferensikan data
+ * lain (FK 23503) di-skip, BUKAN nge-gagalin seluruh batch.
+ */
+async function bulkPermanentDelete(entityKey, ids, userId) {
+  const config = requireEntity(entityKey);
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw AppError.badRequest('Validasi gagal', { ids: 'ids wajib berupa array dan tidak boleh kosong' });
+  }
+  const numericIds = ids.map(Number).filter((n) => Number.isInteger(n));
+  if (numericIds.length === 0) {
+    throw AppError.badRequest('Validasi gagal', { ids: 'ids harus berisi angka valid' });
+  }
+
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const deletedIds = [];
+    const skippedIds = [];
+
+    for (const id of numericIds) {
+      const before = await client.query(`SELECT * FROM ${config.table} WHERE id = $1 AND deleted_at IS NOT NULL`, [
+        id,
+      ]);
+      if (!before.rows[0]) {
+        skippedIds.push(id);
+        continue;
+      }
+
+      try {
+        await client.query(`DELETE FROM ${config.table} WHERE id = $1`, [id]);
+        deletedIds.push(id);
+
+        await recordAudit(
+          {
+            tableName: config.table,
+            recordId: id,
+            action: 'DELETE',
+            oldValue: before.rows[0],
+            newValue: null,
+            userId,
+            actionDetail: `PERMANEN (BULK) - dihapus dari Recycle Bin (${config.label}), tidak bisa direstore lagi`,
+          },
+          client
+        );
+      } catch (err) {
+        if (err.code === '23503') {
+          skippedIds.push(id);
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    await client.query('COMMIT');
+    return { deletedIds, skippedIds };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = {
+  listEntities,
+  listDeleted,
+  restore,
+  permanentDelete,
+  bulkSoftDelete,
+  bulkRestore,
+  bulkPermanentDelete,
+};

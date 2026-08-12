@@ -31,4 +31,28 @@ const bulkDelete = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Success', data });
 });
 
-module.exports = { listEntities, listDeleted, restore, permanentDelete, bulkDelete };
+const bulkRestore = asyncHandler(async (req, res) => {
+  if (!Array.isArray(req.body.ids)) {
+    throw AppError.badRequest('Validasi gagal', { ids: 'ids harus berupa array' });
+  }
+  const data = await recycleBinService.bulkRestore(req.params.entity, req.body.ids, req.user.id);
+  res.status(200).json({ success: true, message: 'Success', data });
+});
+
+const bulkPermanentDelete = asyncHandler(async (req, res) => {
+  if (!Array.isArray(req.body.ids)) {
+    throw AppError.badRequest('Validasi gagal', { ids: 'ids harus berupa array' });
+  }
+  const data = await recycleBinService.bulkPermanentDelete(req.params.entity, req.body.ids, req.user.id);
+  res.status(200).json({ success: true, message: 'Success', data });
+});
+
+module.exports = {
+  listEntities,
+  listDeleted,
+  restore,
+  permanentDelete,
+  bulkDelete,
+  bulkRestore,
+  bulkPermanentDelete,
+};

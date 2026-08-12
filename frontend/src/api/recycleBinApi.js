@@ -27,3 +27,16 @@ export async function bulkDeleteItems(entity, ids) {
   const { data } = await apiClient.post(`/recycle-bin/${entity}/bulk-delete`, { ids });
   return data.data;
 }
+
+// Dua fungsi di bawah KHUSUS halaman Recycle Bin sendiri (checkbox massal
+// di atas daftar data yang udah ke-trash) - beda dari bulkDeleteItems di
+// atas yang dipanggil dari tabel Master Data aktif.
+export async function bulkRestoreItems(entity, ids) {
+  const { data } = await apiClient.post(`/recycle-bin/${entity}/bulk-restore`, { ids });
+  return data.data;
+}
+
+export async function bulkPermanentDeleteItems(entity, ids) {
+  const { data } = await apiClient.post(`/recycle-bin/${entity}/bulk-permanent-delete`, { ids });
+  return data.data;
+}

@@ -20,6 +20,11 @@ router.use(requireRole('Admin'));
 router.get('/', recycleBinController.listEntities);
 router.get('/:entity', recycleBinController.listDeleted);
 router.post('/:entity/bulk-delete', recycleBinController.bulkDelete);
+// Bulk restore & bulk permanent-delete KHUSUS halaman Recycle Bin sendiri
+// (checkbox massal di atas daftar data yang udah ke-trash) - beda dari
+// bulk-delete di atas yang dipanggil dari tabel Master Data aktif.
+router.post('/:entity/bulk-restore', recycleBinController.bulkRestore);
+router.post('/:entity/bulk-permanent-delete', recycleBinController.bulkPermanentDelete);
 router.post('/:entity/:id/restore', recycleBinController.restore);
 router.delete('/:entity/:id', recycleBinController.permanentDelete);
 

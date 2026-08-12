@@ -57,6 +57,23 @@ a {
     border: none;
     appearance: none;
   }
+
+  /* BUG (ketahuan pas checklist bulk-delete): rule di atas kena juga ke
+     input[type=checkbox]/[type=radio] - appearance:none + border:none +
+     background transparent = checkbox jadi kotak KOSONG TOTAL, checked
+     ataupun tidak (bukan cuma "warnanya kurang keliatan"). `accent-color`
+     yang dipasang tiap checkbox (mis. `accent-[var(--accent)]` di
+     LinesTab/PartsTab/dst) gak ngaruh sama sekali karena accent-color cuma
+     berlaku selama browser masih gambar tampilan native-nya, sedangkan di
+     sini appearance-nya keburu dimatiin duluan oleh rule generik di atas.
+     Kembalikan appearance native checkbox/radio supaya accent-color yang
+     sudah dipasang di tiap pemakaian bisa kepakai lagi. */
+  input[type='checkbox'],
+  input[type='radio'] {
+    appearance: auto;
+    border: revert;
+    background-color: revert;
+  }
 }
 
 /* Fokus keyboard tetap terlihat (aksesibilitas dasar) - warna aksen, gak dihilangkan */

@@ -6,6 +6,8 @@ import {
   restoreItem,
   permanentDeleteItem,
   bulkDeleteItems,
+  bulkRestoreItems,
+  bulkPermanentDeleteItems,
 } from '../api/recycleBinApi';
 
 // Query key react-query yang dipakai TIAP entity di halaman normalnya (di
@@ -74,5 +76,34 @@ export function useBulkDeleteMutation(entity) {
       invalidateEntity(queryClient, entity);
       queryClient.invalidateQueries({ queryKey: ['recycle-bin', entity] });
     },
+  });
+}
+
+/**
+ * Bulk restore (checkbox massal) - KHUSUS halaman Recycle Bin sendiri.
+ * Sukses -> data balik ke tabel aktifnya, hilang dari daftar Recycle Bin.
+ */
+export function useBulkRestoreMutation(entity) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids) => bulkRestoreItems(entity, ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recycle-bin', entity] });
+      invalidateEntity(queryClient, entity);
+    },
+  });
+}
+
+/**
+ * Bulk permanent-delete (checkbox massal) - KHUSUS halaman Recycle Bin
+ * sendiri. IRREVERSIBLE - dipastikan sudah confirm 2x di sisi UI
+ * (RecycleBinPage.jsx) sebelum mutation ini dipanggil, sama seperti
+ * permanent-delete satuan.
+ */
+export function useBulkPermanentDeleteMutation(entity) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids) => bulkPermanentDeleteItems(entity, ids),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['recycle-bin', entity] }),
   });
 }

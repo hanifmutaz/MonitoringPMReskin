@@ -1,0 +1,487 @@
+diff --git a/backend/src/controllers/recycleBinController.js b/backend/src/controllers/recycleBinController.js
+index a693a3b..97357d1 100644
+--- a/backend/src/controllers/recycleBinController.js
++++ b/backend/src/controllers/recycleBinController.js
+@@ -31,4 +31,28 @@ const bulkDelete = asyncHandler(async (req, res) => {
+   res.status(200).json({ success: true, message: 'Success', data });
+ });
+ 
+-module.exports = { listEntities, listDeleted, restore, permanentDelete, bulkDelete };
+\ No newline at end of file
++const bulkRestore = asyncHandler(async (req, res) => {
++  if (!Array.isArray(req.body.ids)) {
++    throw AppError.badRequest('Validasi gagal', { ids: 'ids harus berupa array' });
++  }
++  const data = await recycleBinService.bulkRestore(req.params.entity, req.body.ids, req.user.id);
++  res.status(200).json({ success: true, message: 'Success', data });
++});
++
++const bulkPermanentDelete = asyncHandler(async (req, res) => {
++  if (!Array.isArray(req.body.ids)) {
++    throw AppError.badRequest('Validasi gagal', { ids: 'ids harus berupa array' });
++  }
++  const data = await recycleBinService.bulkPermanentDelete(req.params.entity, req.body.ids, req.user.id);
++  res.status(200).json({ success: true, message: 'Success', data });
++});
++
++module.exports = {
++  listEntities,
++  listDeleted,
++  restore,
++  permanentDelete,
++  bulkDelete,
++  bulkRestore,
++  bulkPermanentDelete,
++};
+\ No newline at end of file
+diff --git a/backend/src/routes/recycleBinRoutes.js b/backend/src/routes/recycleBinRoutes.js
+index 3f40b3d..e36aaea 100644
+--- a/backend/src/routes/recycleBinRoutes.js
++++ b/backend/src/routes/recycleBinRoutes.js
+@@ -20,6 +20,11 @@ router.use(requireRole('Admin'));
+ router.get('/', recycleBinController.listEntities);
+ router.get('/:entity', recycleBinController.listDeleted);
+ router.post('/:entity/bulk-delete', recycleBinController.bulkDelete);
++// Bulk restore & bulk permanent-delete KHUSUS halaman Recycle Bin sendiri
++// (checkbox massal di atas daftar data yang udah ke-trash) - beda dari
++// bulk-delete di atas yang dipanggil dari tabel Master Data aktif.
++router.post('/:entity/bulk-restore', recycleBinController.bulkRestore);
++router.post('/:entity/bulk-permanent-delete', recycleBinController.bulkPermanentDelete);
+ router.post('/:entity/:id/restore', recycleBinController.restore);
+ router.delete('/:entity/:id', recycleBinController.permanentDelete);
+ 
+diff --git a/backend/src/services/recycleBinService.js b/backend/src/services/recycleBinService.js
+index 006e06f..8e85b56 100644
+--- a/backend/src/services/recycleBinService.js
++++ b/backend/src/services/recycleBinService.js
+@@ -202,4 +202,154 @@ async function bulkSoftDelete(entityKey, ids, userId) {
+   }
+ }
+ 
+-module.exports = { listEntities, listDeleted, restore, permanentDelete, bulkSoftDelete };
+\ No newline at end of file
++/**
++ * Bulk restore (checkbox massal di halaman Recycle Bin) - kebalikan dari
++ * bulkSoftDelete. protectColumn TIDAK relevan di sini (row yang mau
++ * di-restore ya memang row yang sebelumnya berhasil di-soft-delete, sudah
++ * lolos protectColumn waktu itu). Sama seperti restore satuan, unique
++ * constraint (23505) ditangani per-row - kalau satu row bentrok nama/kode
++ * sama data aktif lain, row itu di-skip (bukan bikin seluruh batch gagal),
++ * biar sisanya yang gak bentrok tetap ke-restore.
++ */
++async function bulkRestore(entityKey, ids, userId) {
++  const config = requireEntity(entityKey);
++  if (!Array.isArray(ids) || ids.length === 0) {
++    throw AppError.badRequest('Validasi gagal', { ids: 'ids wajib berupa array dan tidak boleh kosong' });
++  }
++  const numericIds = ids.map(Number).filter((n) => Number.isInteger(n));
++  if (numericIds.length === 0) {
++    throw AppError.badRequest('Validasi gagal', { ids: 'ids harus berisi angka valid' });
++  }
++
++  const client = await db.getClient();
++  try {
++    await client.query('BEGIN');
++
++    const restoredIds = [];
++    const skippedIds = [];
++
++    // Row-by-row (bukan satu UPDATE ... ANY($ids)) SENGAJA - unique
++    // constraint bentrok di satu row gak boleh nge-rollback seluruh batch,
++    // row lain yang gak bentrok tetap harus jalan.
++    for (const id of numericIds) {
++      try {
++        const result = await client.query(
++          `UPDATE ${config.table} SET deleted_at = NULL, deleted_by = NULL
++           WHERE id = $1 AND deleted_at IS NOT NULL RETURNING id`,
++          [id]
++        );
++        if (result.rows[0]) {
++          restoredIds.push(id);
++        } else {
++          skippedIds.push(id);
++        }
++      } catch (err) {
++        if (err.code === '23505') {
++          skippedIds.push(id);
++          continue;
++        }
++        throw err;
++      }
++    }
++
++    await recordAudit(
++      {
++        tableName: config.table,
++        recordId: null,
++        action: 'RESTORE',
++        oldValue: null,
++        newValue: { ids: restoredIds },
++        userId,
++        actionDetail: `BULK RESTORE (${config.label}) - ${restoredIds.length} data direstore dari Recycle Bin${
++          skippedIds.length ? `, ${skippedIds.length} dilewati (bentrok nama/kode dengan data aktif lain)` : ''
++        }`,
++      },
++      client
++    );
++
++    await client.query('COMMIT');
++    return { restoredIds, skippedIds };
++  } catch (err) {
++    await client.query('ROLLBACK');
++    throw err;
++  } finally {
++    client.release();
++  }
++}
++
++/**
++ * Bulk permanent-delete (checkbox massal di halaman Recycle Bin) -
++ * IRREVERSIBLE, sama kayak permanentDelete satuan. Row-by-row juga (lihat
++ * alasan yang sama di bulkRestore) - row yang masih direferensikan data
++ * lain (FK 23503) di-skip, BUKAN nge-gagalin seluruh batch.
++ */
++async function bulkPermanentDelete(entityKey, ids, userId) {
++  const config = requireEntity(entityKey);
++  if (!Array.isArray(ids) || ids.length === 0) {
++    throw AppError.badRequest('Validasi gagal', { ids: 'ids wajib berupa array dan tidak boleh kosong' });
++  }
++  const numericIds = ids.map(Number).filter((n) => Number.isInteger(n));
++  if (numericIds.length === 0) {
++    throw AppError.badRequest('Validasi gagal', { ids: 'ids harus berisi angka valid' });
++  }
++
++  const client = await db.getClient();
++  try {
++    await client.query('BEGIN');
++
++    const deletedIds = [];
++    const skippedIds = [];
++
++    for (const id of numericIds) {
++      const before = await client.query(`SELECT * FROM ${config.table} WHERE id = $1 AND deleted_at IS NOT NULL`, [
++        id,
++      ]);
++      if (!before.rows[0]) {
++        skippedIds.push(id);
++        continue;
++      }
++
++      try {
++        await client.query(`DELETE FROM ${config.table} WHERE id = $1`, [id]);
++        deletedIds.push(id);
++
++        await recordAudit(
++          {
++            tableName: config.table,
++            recordId: id,
++            action: 'DELETE',
++            oldValue: before.rows[0],
++            newValue: null,
++            userId,
++            actionDetail: `PERMANEN (BULK) - dihapus dari Recycle Bin (${config.label}), tidak bisa direstore lagi`,
++          },
++          client
++        );
++      } catch (err) {
++        if (err.code === '23503') {
++          skippedIds.push(id);
++          continue;
++        }
++        throw err;
++      }
++    }
++
++    await client.query('COMMIT');
++    return { deletedIds, skippedIds };
++  } catch (err) {
++    await client.query('ROLLBACK');
++    throw err;
++  } finally {
++    client.release();
++  }
++}
++
++module.exports = {
++  listEntities,
++  listDeleted,
++  restore,
++  permanentDelete,
++  bulkSoftDelete,
++  bulkRestore,
++  bulkPermanentDelete,
++};
+\ No newline at end of file
+diff --git a/frontend/src/api/recycleBinApi.js b/frontend/src/api/recycleBinApi.js
+index 0a9ff81..924658c 100644
+--- a/frontend/src/api/recycleBinApi.js
++++ b/frontend/src/api/recycleBinApi.js
+@@ -26,4 +26,17 @@ export async function permanentDeleteItem(entity, id) {
+ export async function bulkDeleteItems(entity, ids) {
+   const { data } = await apiClient.post(`/recycle-bin/${entity}/bulk-delete`, { ids });
+   return data.data;
++}
++
++// Dua fungsi di bawah KHUSUS halaman Recycle Bin sendiri (checkbox massal
++// di atas daftar data yang udah ke-trash) - beda dari bulkDeleteItems di
++// atas yang dipanggil dari tabel Master Data aktif.
++export async function bulkRestoreItems(entity, ids) {
++  const { data } = await apiClient.post(`/recycle-bin/${entity}/bulk-restore`, { ids });
++  return data.data;
++}
++
++export async function bulkPermanentDeleteItems(entity, ids) {
++  const { data } = await apiClient.post(`/recycle-bin/${entity}/bulk-permanent-delete`, { ids });
++  return data.data;
+ }
+\ No newline at end of file
+diff --git a/frontend/src/hooks/useRecycleBin.js b/frontend/src/hooks/useRecycleBin.js
+index 834167a..0ef8a82 100644
+--- a/frontend/src/hooks/useRecycleBin.js
++++ b/frontend/src/hooks/useRecycleBin.js
+@@ -6,6 +6,8 @@ import {
+   restoreItem,
+   permanentDeleteItem,
+   bulkDeleteItems,
++  bulkRestoreItems,
++  bulkPermanentDeleteItems,
+ } from '../api/recycleBinApi';
+ 
+ // Query key react-query yang dipakai TIAP entity di halaman normalnya (di
+@@ -75,4 +77,33 @@ export function useBulkDeleteMutation(entity) {
+       queryClient.invalidateQueries({ queryKey: ['recycle-bin', entity] });
+     },
+   });
++}
++
++/**
++ * Bulk restore (checkbox massal) - KHUSUS halaman Recycle Bin sendiri.
++ * Sukses -> data balik ke tabel aktifnya, hilang dari daftar Recycle Bin.
++ */
++export function useBulkRestoreMutation(entity) {
++  const queryClient = useQueryClient();
++  return useMutation({
++    mutationFn: (ids) => bulkRestoreItems(entity, ids),
++    onSuccess: () => {
++      queryClient.invalidateQueries({ queryKey: ['recycle-bin', entity] });
++      invalidateEntity(queryClient, entity);
++    },
++  });
++}
++
++/**
++ * Bulk permanent-delete (checkbox massal) - KHUSUS halaman Recycle Bin
++ * sendiri. IRREVERSIBLE - dipastikan sudah confirm 2x di sisi UI
++ * (RecycleBinPage.jsx) sebelum mutation ini dipanggil, sama seperti
++ * permanent-delete satuan.
++ */
++export function useBulkPermanentDeleteMutation(entity) {
++  const queryClient = useQueryClient();
++  return useMutation({
++    mutationFn: (ids) => bulkPermanentDeleteItems(entity, ids),
++    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['recycle-bin', entity] }),
++  });
+ }
+\ No newline at end of file
+diff --git a/frontend/src/pages/RecycleBinPage.jsx b/frontend/src/pages/RecycleBinPage.jsx
+index 95548ca..61c2d31 100644
+--- a/frontend/src/pages/RecycleBinPage.jsx
++++ b/frontend/src/pages/RecycleBinPage.jsx
+@@ -9,25 +9,76 @@
+ // Delete = IRREVERSIBLE, makanya minta confirm dua kali (confirm() biasa +
+ // harus ketik ulang label datanya) supaya gak ke-klik gak sengaja.
+ import { useState } from 'react';
+-import { Trash2, RotateCcw, Flame } from 'lucide-react';
++import { Trash2, RotateCcw, Flame, X } from 'lucide-react';
+ import { usePageHeader } from '../contexts/PageHeaderContext';
+ import {
+   useRecycleBinEntities,
+   useDeletedItems,
+   useRestoreMutation,
+   usePermanentDeleteMutation,
++  useBulkRestoreMutation,
++  useBulkPermanentDeleteMutation,
+ } from '../hooks/useRecycleBin';
+ import { useConfirm } from '../contexts/ConfirmDialogContext';
++import { useRowSelection } from '../hooks/useRowSelection';
+ import { cn } from '../lib/utils';
+ import { Button } from '../components/ui/button';
+ 
++// Bar aksi massal Recycle Bin - beda dari BulkDeleteBar generik (yang cuma
++// punya 1 tombol "Hapus") karena di sini ada DUA aksi yang mungkin: Restore
++// Terpilih (reversible) dan Hapus Permanen Terpilih (IRREVERSIBLE). Dibikin
++// khusus di sini (bukan dipaksa reuse BulkDeleteBar) daripada nambahin
++// prop kedua yang cuma dipakai satu tempat.
++function RecycleBinBulkBar({ count, onRestore, onPermanentDelete, onClear, restorePending, deletePending }) {
++  if (count === 0) return null;
++
++  return (
++    <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-[var(--accent-dim)] bg-[var(--accent-dim)] px-3 py-2">
++      <span className="text-[13px] font-medium text-primary">{count} data dipilih</span>
++      <div className="flex items-center gap-2">
++        <Button type="button" variant="outline" size="sm" className="h-7" onClick={onClear} disabled={restorePending || deletePending}>
++          <X size={13} /> Batal
++        </Button>
++        <Button
++          type="button"
++          variant="outline"
++          size="sm"
++          className="h-7"
++          onClick={onRestore}
++          disabled={restorePending || deletePending}
++        >
++          <RotateCcw size={13} /> {restorePending ? 'Merestore...' : 'Restore Terpilih'}
++        </Button>
++        <Button
++          type="button"
++          variant="destructive"
++          size="sm"
++          className="h-7"
++          onClick={onPermanentDelete}
++          disabled={restorePending || deletePending}
++        >
++          <Flame size={13} /> {deletePending ? 'Menghapus...' : 'Hapus Permanen Terpilih'}
++        </Button>
++      </div>
++    </div>
++  );
++}
++
+ function RecycleBinList({ entityKey }) {
+   const { data: items = [], isLoading } = useDeletedItems(entityKey);
+   const restore = useRestoreMutation(entityKey);
+   const permanentDelete = usePermanentDeleteMutation(entityKey);
++  const bulkRestore = useBulkRestoreMutation(entityKey);
++  const bulkPermanentDelete = useBulkPermanentDeleteMutation(entityKey);
+   const confirm = useConfirm();
+   const [error, setError] = useState('');
+ 
++  // Semua data di halaman Recycle Bin sekaligus kebaca di memori (bukan
++  // server-paginated), jadi "select all" langsung nyakup semua row yang
++  // lagi tampil - sama pola dengan LinesTab/SuppliersTab (client-side).
++  const itemIds = items.map((i) => i.id);
++  const selection = useRowSelection(itemIds);
++
+   async function handleRestore(item) {
+     setError('');
+     try {
+@@ -52,6 +103,43 @@ function RecycleBinList({ entityKey }) {
+     }
+   }
+ 
++  async function handleBulkRestore() {
++    if (!(await confirm(`Restore ${selection.selectedCount} data terpilih ke tabel aktifnya?`))) return;
++    setError('');
++    try {
++      const result = await bulkRestore.mutateAsync(selection.selectedIds);
++      selection.clear();
++      if (result?.skippedIds?.length) {
++        setError(
++          `${result.skippedIds.length} data dilewati (bentrok nama/kode dengan data aktif lain) - sisanya berhasil direstore.`
++        );
++      }
++    } catch (err) {
++      setError(err.response?.data?.message || 'Gagal restore data terpilih');
++    }
++  }
++
++  async function handleBulkPermanentDelete() {
++    if (
++      !(await confirm(
++        `Hapus PERMANEN ${selection.selectedCount} data terpilih? Aksi ini TIDAK BISA dibatalkan/direstore lagi.`
++      ))
++    )
++      return;
++    setError('');
++    try {
++      const result = await bulkPermanentDelete.mutateAsync(selection.selectedIds);
++      selection.clear();
++      if (result?.skippedIds?.length) {
++        setError(
++          `${result.skippedIds.length} data dilewati (masih direferensikan data lain di sistem) - sisanya berhasil dihapus permanen.`
++        );
++      }
++    } catch (err) {
++      setError(err.response?.data?.message || 'Gagal menghapus permanen data terpilih');
++    }
++  }
++
+   if (isLoading) return <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>;
+ 
+   if (items.length === 0) {
+@@ -67,11 +155,32 @@ function RecycleBinList({ entityKey }) {
+       {error && (
+         <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{error}</div>
+       )}
++
++      <RecycleBinBulkBar
++        count={selection.selectedCount}
++        onRestore={handleBulkRestore}
++        onPermanentDelete={handleBulkPermanentDelete}
++        onClear={selection.clear}
++        restorePending={bulkRestore.isPending}
++        deletePending={bulkPermanentDelete.isPending}
++      />
++
+       <div className="overflow-hidden rounded-lg border border-border">
+         <div className="overflow-x-auto">
+           <table className="w-full border-collapse">
+             <thead>
+               <tr className="border-b border-border">
++                <th className="w-[36px] px-3 py-2">
++                  <input
++                    type="checkbox"
++                    checked={selection.allOnPageSelected}
++                    ref={(el) => {
++                      if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
++                    }}
++                    onChange={selection.toggleAllOnPage}
++                    className="h-3.5 w-3.5 accent-[var(--accent)]"
++                  />
++                </th>
+                 {['Data', 'Konteks', 'Dihapus Pada', 'Dihapus Oleh', 'Aksi'].map((h) => (
+                   <th
+                     key={h}
+@@ -85,6 +194,14 @@ function RecycleBinList({ entityKey }) {
+             <tbody>
+               {items.map((item) => (
+                 <tr key={item.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
++                  <td className="px-3 py-3">
++                    <input
++                      type="checkbox"
++                      checked={selection.isSelected(item.id)}
++                      onChange={() => selection.toggle(item.id)}
++                      className="h-3.5 w-3.5 accent-[var(--accent)]"
++                    />
++                  </td>
+                   <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{item.label}</td>
+                   <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{item.context || '-'}</td>
+                   <td className="px-3 py-3 font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
+diff --git a/frontend/src/styles/global.css b/frontend/src/styles/global.css
+index c25cff0..776f412 100644
+--- a/frontend/src/styles/global.css
++++ b/frontend/src/styles/global.css
+@@ -57,6 +57,23 @@ a {
+     border: none;
+     appearance: none;
+   }
++
++  /* BUG (ketahuan pas checklist bulk-delete): rule di atas kena juga ke
++     input[type=checkbox]/[type=radio] - appearance:none + border:none +
++     background transparent = checkbox jadi kotak KOSONG TOTAL, checked
++     ataupun tidak (bukan cuma "warnanya kurang keliatan"). `accent-color`
++     yang dipasang tiap checkbox (mis. `accent-[var(--accent)]` di
++     LinesTab/PartsTab/dst) gak ngaruh sama sekali karena accent-color cuma
++     berlaku selama browser masih gambar tampilan native-nya, sedangkan di
++     sini appearance-nya keburu dimatiin duluan oleh rule generik di atas.
++     Kembalikan appearance native checkbox/radio supaya accent-color yang
++     sudah dipasang di tiap pemakaian bisa kepakai lagi. */
++  input[type='checkbox'],
++  input[type='radio'] {
++    appearance: auto;
++    border: revert;
++    background-color: revert;
++  }
+ }
+ 
+ /* Fokus keyboard tetap terlihat (aksesibilitas dasar) - warna aksen, gak dihilangkan */
