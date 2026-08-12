@@ -1,4 +1,13 @@
 // src/components/PmPartHistoryForm.jsx
+// Reskin (checklist §3 item 6 "PM pages", batch 5/N): `.panel`/
+// `.panel-header`/`.panel-title`/`.form-label`/`.form-select`/`.form-input`/
+// `.error-state`/`.caption`/`.btn`/`.mono`/inline style lama dilepas total,
+// diganti Tailwind + shadcn ui (Select/Input/Textarea/Label/Button). 2 mode
+// render TETAP SAMA (bare di Modal dari Monitoring VS standalone panel di
+// /pm-part/form). Card info "Part dikunci dari scan" & tombol "Scan ulang"
+// dipetakan ke Button/token yang sama dipakai form lain (bg-[var(--accent-
+// dim)] border-primary, sama kayak Banner.jsx). Logic scan barcode/lookup
+// drawing no/candidate selection/create mutation TIDAK berubah sama sekali.
 import { useState } from 'react';
 import { ScanLine } from 'lucide-react';
 import { useLines } from '../hooks/useLines';
@@ -6,6 +15,11 @@ import { useParts } from '../hooks/useParts';
 import { useCreatePmPartHistory } from '../hooks/usePmPartHistory';
 import { lookupPartsByDrawingNo } from '../api/partsApi';
 import BarcodeScannerModal from './BarcodeScannerModal';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 const JENIS_OPTIONS = [
   { value: 'TERJADWAL', label: 'Terjadwal' },
@@ -19,7 +33,7 @@ const emptyForm = {
   line_id: '',
   part_id: '',
   tgl_ganti: todayStr(),
-  shift: '',
+  shift: 'none',
   counter_saat_diganti: '',
   jenis_penggantian: 'TERJADWAL',
   pic_name: '',
@@ -123,7 +137,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
       const result = await createMutation.mutateAsync({
         part_id: Number(form.part_id),
         tgl_ganti: form.tgl_ganti,
-        shift: form.shift ? Number(form.shift) : undefined,
+        shift: form.shift === 'none' ? undefined : Number(form.shift),
         counter_saat_diganti: Number(form.counter_saat_diganti),
         jenis_penggantian: form.jenis_penggantian,
         pic_name: form.pic_name,
@@ -141,44 +155,39 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
   // maupun di dalam Modal dari Monitoring (Modal sudah kasih panel + judul,
   // jadi wrapper di sini dilewatin biar gak dobel border/padding).
   return (
-    <form onSubmit={handleSubmit} className={isPrefilled ? undefined : 'panel'}>
+    <form onSubmit={handleSubmit} className={isPrefilled ? undefined : 'rounded-lg border border-border bg-card p-4.5'}>
       {!isPrefilled && (
-        <div className="panel-header">
-          <h2 className="panel-title">Input Penggantian Part</h2>
+        <div className="mb-4">
+          <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Input Penggantian Part</h2>
         </div>
       )}
 
       {!isPrefilled && (
-        <div style={{ marginBottom: 14 }}>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => setScannerOpen(true)}
-            disabled={scanLoading}
-          >
-            <ScanLine size={14} style={{ marginRight: 6 }} />
+        <div className="mb-3.5">
+          <Button type="button" variant="outline" onClick={() => setScannerOpen(true)} disabled={scanLoading}>
+            <ScanLine size={14} />
             {scanLoading ? 'Mencari Drawing No...' : 'Scan Barcode Drawing No'}
-          </button>
+          </Button>
           {scanError && (
-            <div className="error-state" style={{ marginTop: 8, padding: 10, fontSize: 13 }}>
+            <div className="mt-2 rounded-lg bg-[var(--danger-dim)] px-2.5 py-2.5 text-[13px] text-[var(--danger)]">
               {scanError}
             </div>
           )}
           {scanCandidates && (
-            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span className="caption">
+            <div className="mt-2 flex flex-col gap-1.5">
+              <span className="text-xs text-muted-foreground">
                 Drawing No ini kepakai di {scanCandidates.length} Line/Jig berbeda — pilih yang dimaksud:
               </span>
               {scanCandidates.map((c) => (
-                <button
+                <Button
                   key={c.id}
                   type="button"
-                  className="btn btn-secondary"
-                  style={{ justifyContent: 'flex-start', textAlign: 'left' }}
+                  variant="outline"
+                  className="justify-start text-left"
                   onClick={() => applyScannedPart(c)}
                 >
                   {c.line_name} — {c.jig_name} ({c.part_name})
-                </button>
+                </Button>
               ))}
             </div>
           )}
@@ -186,186 +195,152 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
       )}
 
       {isLockedFromScan && lockedPart && (
-        <div
-          style={{
-            marginBottom: 14,
-            padding: '10px 14px',
-            borderRadius: 8,
-            background: 'var(--accent-dim)',
-            border: '1px solid var(--accent)',
-            fontSize: 13,
-          }}
-        >
+        <div className="mb-3.5 rounded-lg border border-primary bg-[var(--accent-dim)] px-3.5 py-2.5 text-[13px]">
           <strong>{lockedPart.drawing_no}</strong> — {lockedPart.part_name} ({lockedPart.jig_name}) di{' '}
           <strong>{lockedPart.line_name}</strong>
-          <br />
-          <span className="caption">
+          <div className="mt-1 text-xs text-muted-foreground">
             {lockedPart.inventory_item_id
               ? `Stock saat ini: ${lockedPart.inv_current_stock ?? '-'} ${lockedPart.inv_spare_part_number ?? ''}. Akan dikurangi 1 otomatis saat disimpan.`
               : 'Part ini belum di-link ke Inventory Item — stock TIDAK akan otomatis berkurang.'}
-          </span>
-          <br />
-          <button
-            type="button"
-            className="btn btn-secondary"
-            style={{ marginTop: 8, padding: '4px 10px', fontSize: 12 }}
-            onClick={resetScan}
-          >
+          </div>
+          <Button type="button" variant="outline" size="sm" className="mt-2" onClick={resetScan}>
             Scan ulang / pilih manual
-          </button>
+          </Button>
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         <div>
-          <label className="form-label">Line</label>
-          <select
-            className="form-select"
-            style={{ width: '100%' }}
-            value={form.line_id}
-            disabled={isPrefilled || isLockedFromScan}
-            onChange={(e) => update('line_id', e.target.value)}
-          >
-            <option value="">Pilih Line</option>
-            {lines.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.line_name}
-              </option>
-            ))}
-          </select>
+          <Label className="mb-1.5">Line</Label>
+          <Select value={form.line_id} onValueChange={(v) => update('line_id', v)} disabled={isPrefilled || isLockedFromScan}>
+            <SelectTrigger>
+              <SelectValue placeholder="Pilih Line" />
+            </SelectTrigger>
+            <SelectContent>
+              {lines.map((l) => (
+                <SelectItem key={l.id} value={String(l.id)}>
+                  {l.line_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div>
-          <label className="form-label">Part (Drawing No / Nama)</label>
-          <select
-            className="form-select"
-            style={{ width: '100%' }}
-            value={form.part_id}
-            disabled={isPrefilled || isLockedFromScan}
-            onChange={(e) => update('part_id', e.target.value)}
-          >
-            <option value="">Pilih Part</option>
-            {(isLockedFromScan && lockedPart ? [lockedPart] : parts).map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.drawing_no} ({p.jig_name}) — {p.part_name}
-              </option>
-            ))}
-          </select>
-          {errors.part_id && <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.part_id}</span>}
+          <Label className="mb-1.5">Part (Drawing No / Nama)</Label>
+          <Select value={form.part_id} onValueChange={(v) => update('part_id', v)} disabled={isPrefilled || isLockedFromScan}>
+            <SelectTrigger>
+              <SelectValue placeholder="Pilih Part" />
+            </SelectTrigger>
+            <SelectContent>
+              {(isLockedFromScan && lockedPart ? [lockedPart] : parts).map((p) => (
+                <SelectItem key={p.id} value={String(p.id)}>
+                  {p.drawing_no} ({p.jig_name}) — {p.part_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.part_id && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.part_id}</p>}
           {isPrefilled && (
-            <span className="caption" style={{ display: 'block', marginTop: 4 }}>
+            <p className="mt-1 text-xs text-muted-foreground">
               Part dikunci dari Monitoring. Batal dan buka lagi kalau salah pilih baris.
-            </span>
+            </p>
           )}
         </div>
 
         <div>
-          <label className="form-label">Tanggal Ganti</label>
-          <input
+          <Label className="mb-1.5">Tanggal Ganti</Label>
+          <Input
             type="date"
-            className="form-input"
-            style={{ width: '100%' }}
             value={form.tgl_ganti}
             max={todayStr()}
             onChange={(e) => update('tgl_ganti', e.target.value)}
             required
           />
-          {errors.tgl_ganti && <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.tgl_ganti}</span>}
+          {errors.tgl_ganti && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.tgl_ganti}</p>}
         </div>
 
         <div>
-          <label className="form-label">Shift</label>
-          <select
-            className="form-select"
-            style={{ width: '100%' }}
-            value={form.shift}
-            onChange={(e) => update('shift', e.target.value)}
-          >
-            <option value="">-</option>
-            <option value="1">Shift 1</option>
-            <option value="2">Shift 2</option>
-            <option value="3">Shift 3</option>
-          </select>
+          <Label className="mb-1.5">Shift</Label>
+          <Select value={form.shift} onValueChange={(v) => update('shift', v)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">-</SelectItem>
+              <SelectItem value="1">Shift 1</SelectItem>
+              <SelectItem value="2">Shift 2</SelectItem>
+              <SelectItem value="3">Shift 3</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div>
-          <label className="form-label">Counter Saat Diganti</label>
-          <input
+          <Label className="mb-1.5">Counter Saat Diganti</Label>
+          <Input
             type="number"
-            className="form-input mono"
-            style={{ width: '100%', textAlign: 'right' }}
+            className="text-right font-[var(--font-mono)]"
             value={form.counter_saat_diganti}
             min={0}
             onChange={(e) => update('counter_saat_diganti', e.target.value)}
             required
           />
           {errors.counter_saat_diganti && (
-            <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.counter_saat_diganti}</span>
+            <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.counter_saat_diganti}</p>
           )}
         </div>
 
         <div>
-          <label className="form-label">Jenis Penggantian</label>
-          <select
-            className="form-select"
-            style={{ width: '100%' }}
-            value={form.jenis_penggantian}
-            onChange={(e) => update('jenis_penggantian', e.target.value)}
-          >
-            {JENIS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <Label className="mb-1.5">Jenis Penggantian</Label>
+          <Select value={form.jenis_penggantian} onValueChange={(v) => update('jenis_penggantian', v)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {JENIS_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div>
-          <label className="form-label">PIC</label>
-          <input
-            className="form-input"
-            style={{ width: '100%' }}
+          <Label className="mb-1.5">PIC</Label>
+          <Input
             value={form.pic_name}
             onChange={(e) => update('pic_name', e.target.value)}
             placeholder="Nama yang mengerjakan"
             required
           />
-          {errors.pic_name && <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.pic_name}</span>}
+          {errors.pic_name && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.pic_name}</p>}
         </div>
 
-        <div style={{ gridColumn: '1 / -1' }}>
-          <label className="form-label">Remark (opsional)</label>
-          <textarea
-            className="form-input"
-            style={{ width: '100%', minHeight: 60, resize: 'vertical' }}
-            value={form.remark}
-            onChange={(e) => update('remark', e.target.value)}
-          />
+        <div className="sm:col-span-2">
+          <Label className="mb-1.5">Remark (opsional)</Label>
+          <Textarea className="min-h-[60px]" value={form.remark} onChange={(e) => update('remark', e.target.value)} />
         </div>
       </div>
 
       {errors._general && (
-        <div className="error-state" style={{ marginTop: 12, padding: 10, fontSize: 13, textAlign: 'left' }}>
+        <div className="mt-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
           {errors._general}
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-        <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>
+      <div className="mt-4 flex gap-2.5">
+        <Button type="submit" disabled={createMutation.isPending}>
           {createMutation.isPending ? 'Menyimpan...' : 'Simpan Penggantian'}
-        </button>
+        </Button>
         {onCancel && (
-          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={createMutation.isPending}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={createMutation.isPending}>
             Batal
-          </button>
+          </Button>
         )}
       </div>
 
-      <BarcodeScannerModal
-        open={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onDetected={handleBarcodeDetected}
-      />
+      <BarcodeScannerModal open={scannerOpen} onClose={() => setScannerOpen(false)} onDetected={handleBarcodeDetected} />
     </form>
   );
 }

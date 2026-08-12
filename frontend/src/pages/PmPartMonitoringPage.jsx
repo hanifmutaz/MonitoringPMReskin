@@ -1,6 +1,22 @@
 // src/pages/PmPartMonitoringPage.jsx
+// Reskin (checklist §3 item 6 "PM pages", batch 4/N): `.panel`/`.data-table`/
+// `.form-select`/`.error-state`/`.empty-state`/`.caption`/`.kpi-label`/
+// `.kpi-value`/`.kpi-caption`/`.btn`/`.mono`/inline style lama dilepas
+// total, diganti Tailwind + shadcn ui (Select/Button), ngikutin pola tabel
+// Master Data. Kartu "Ketepatan per Line" dipetakan ke token HealthStat-
+// style yang sama dipakai DashboardPage.jsx (bg-*-dim + text-* buat
+// warna), ganti fungsi `ketepatanColor` (inline var()) yang tadinya
+// duplikat logic sama `ketepatanStatus` di DashboardPage.jsx. WearRing.jsx
+// SENGAJA TIDAK disentuh - dia SVG murni yang emang harus rujuk CSS var
+// langsung (fill/stroke gak bisa lewat Tailwind utility class buat SVG
+// paint props tanpa arbitrary value ribet), dan udah konsisten token dari
+// awal (bukan style lama). stockNotice banner sebelumnya pakai
+// `var(--warning-dim, var(--accent-dim))` (fallback ke token yang gak ada -
+// --warning-dim gak pernah didefinisikan di tokens.css, cuma numpang
+// fallback) - diganti bg-warn-dim/border-warn yang emang ada. Data/logic
+// (query, filter, Ganti Part flow, stock notice) TIDAK berubah sama sekali.
 import { useState } from 'react';
-import { Truck } from 'lucide-react';
+import { Truck, X } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { usePmPartList, usePmPartKetepatanPerLine } from '../hooks/usePmPartList';
 import { useLines } from '../hooks/useLines';
@@ -12,14 +28,23 @@ import SearchBar from '../components/SearchBar';
 import Pagination from '../components/Pagination';
 import Modal from '../components/Modal';
 import PmPartHistoryForm from '../components/PmPartHistoryForm';
+import { Button } from '../components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 const LIMIT = 20;
 
-function ketepatanColor(percentage) {
-  if (percentage === null || percentage === undefined) return 'var(--text-faint)';
-  if (percentage >= 90) return 'var(--ok)';
-  if (percentage >= 50) return 'var(--warn)';
-  return 'var(--danger)';
+const KETEPATAN_CLASS = {
+  ok: 'text-ok',
+  warn: 'text-warn',
+  danger: 'text-danger',
+  muted: 'text-[var(--text-faint)]',
+};
+
+function ketepatanTone(percentage) {
+  if (percentage === null || percentage === undefined) return 'muted';
+  if (percentage >= 90) return 'ok';
+  if (percentage >= 50) return 'warn';
+  return 'danger';
 }
 
 // Mini-card per Line (bukan chip "Line X: 92%" seperti sebelumnya) - pola
@@ -33,27 +58,18 @@ function KetepatanPerLinePanel() {
   if (isLoading || !data || data.length === 0) return null;
 
   return (
-    <div className="panel" style={{ padding: '12px 16px' }}>
-      <div className="caption" style={{ marginBottom: 10 }}>
-        Ketepatan PM Part per Line (tahun berjalan)
-      </div>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+    <div className="rounded-lg border border-border bg-card p-3.5">
+      <div className="mb-2.5 text-xs text-muted-foreground">Ketepatan PM Part per Line (tahun berjalan)</div>
+      <div className="flex flex-wrap gap-2.5">
         {data.map((l) => (
-          <div
-            key={l.line_id}
-            style={{
-              background: 'var(--panel-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-sm)',
-              padding: '10px 14px',
-              minWidth: 120,
-            }}
-          >
-            <div className="kpi-label">{l.line_name}</div>
-            <div className="kpi-value" style={{ color: ketepatanColor(l.percentage), fontSize: 22 }}>
+          <div key={l.line_id} className="min-w-[120px] rounded-md border border-border bg-[var(--panel-2)] px-3.5 py-2.5">
+            <div className="text-xs text-muted-foreground">{l.line_name}</div>
+            <div className={`font-[var(--font-display)] text-[22px] font-semibold ${KETEPATAN_CLASS[ketepatanTone(l.percentage)]}`}>
               {l.percentage === null ? '-' : `${l.percentage}%`}
             </div>
-            <div className="kpi-caption">{l.percentage === null ? 'belum ada data' : `${l.total} event`}</div>
+            <div className="text-[11px] text-[var(--text-faint)]">
+              {l.percentage === null ? 'belum ada data' : `${l.total} event`}
+            </div>
           </div>
         ))}
       </div>
@@ -66,7 +82,7 @@ function PmPartMonitoringPage() {
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
-  const [lineId, setLineId] = useState('');
+  const [lineId, setLineId] = useState('all');
   const [page, setPage] = useState(1);
   const [gantiPartItem, setGantiPartItem] = useState(null);
   // Notice kalau stock TIDAK berkurang otomatis pas submit Ganti Part
@@ -91,7 +107,7 @@ function PmPartMonitoringPage() {
   const { data, isLoading, isError } = usePmPartList({
     search: debouncedSearch || undefined,
     status: status || undefined,
-    line_id: lineId || undefined,
+    line_id: lineId === 'all' ? undefined : lineId,
     page,
     limit: LIMIT,
   });
@@ -104,96 +120,105 @@ function PmPartMonitoringPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="flex flex-col gap-4">
       <KetepatanPerLinePanel />
 
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="flex flex-wrap items-center gap-3">
         <SearchBar value={search} onChange={handleFilterChange(setSearch)} placeholder="Cari drawing no / nama part..." />
 
-        <select
-          className="form-select"
-          value={lineId}
-          onChange={(e) => handleFilterChange(setLineId)(e.target.value)}
-        >
-          <option value="">Semua Line</option>
-          {lines.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.line_name}
-            </option>
-          ))}
-        </select>
+        <Select value={lineId} onValueChange={handleFilterChange(setLineId)}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Semua Line" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Semua Line</SelectItem>
+            {lines.map((l) => (
+              <SelectItem key={l.id} value={String(l.id)}>
+                {l.line_name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <StatusFilterPills value={status} onChange={handleFilterChange(setStatus)} />
       </div>
 
-      <div className="panel">
-        {isError && <div className="error-state">Gagal memuat data. Coba lagi.</div>}
+      <div className="rounded-lg border border-border bg-card p-4.5">
+        {isError && (
+          <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
+            Gagal memuat data. Coba lagi.
+          </div>
+        )}
 
-        {isLoading && !data && <div className="empty-state">Memuat data...</div>}
+        {isLoading && !data && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
 
         {data && data.items.length === 0 && (
-          <div className="empty-state">Belum ada part yang cocok dengan filter ini.</div>
+          <div className="py-8 text-center text-sm text-[var(--text-faint)]">Belum ada part yang cocok dengan filter ini.</div>
         )}
 
         {data && data.items.length > 0 && (
           <>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 60 }}></th>
-                  <th>Line</th>
-                  <th>Drawing No / Part Name</th>
-                  <th className="mono">Counter</th>
-                  <th className="mono">Target Shot</th>
-                  <th className="mono">Sisa Shot</th>
-                  <th className="mono">Estimasi PM</th>
-                  <th>Status</th>
-                  <th style={{ width: 120 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.items.map((item) => (
-                  <tr key={item.part_id}>
-                    <td>
-                      <WearRing percentage={item.wear_percentage} status={item.status} />
-                    </td>
-                    <td className="mono">{item.line_name}</td>
-                    <td>
-                      <div>{item.part_name}</div>
-                      <div className="caption mono">
-                        {item.drawing_no} <span className="caption">({item.jig_name})</span>
-                      </div>
-                      {item.primary_supplier_name ? (
-                        <div className="caption" style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                          <Truck size={11} /> {item.primary_supplier_name}
-                        </div>
-                      ) : (
-                        <div className="caption" style={{ color: 'var(--text-faint)', marginTop: 2 }}>
-                          Belum ada Supplier utama
-                        </div>
+            <div className="overflow-hidden rounded-lg border border-border">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-border">
+                      {['', 'Line', 'Drawing No / Part Name', 'Counter', 'Target Shot', 'Sisa Shot', 'Estimasi PM', 'Status', ''].map(
+                        (h, i) => (
+                          <th
+                            key={i}
+                            className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
+                          >
+                            {h}
+                          </th>
+                        )
                       )}
-                    </td>
-                    <td className="mono">{item.counter.toLocaleString('id-ID')}</td>
-                    <td className="mono">{item.target_shot.toLocaleString('id-ID')}</td>
-                    <td className="mono">{item.remaining_shot.toLocaleString('id-ID')}</td>
-                    <td className="mono">{item.estimated_pm_date || '-'}</td>
-                    <td>
-                      <StatusBadge status={item.status} />
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ padding: '4px 12px', fontSize: 12 }}
-                        onClick={() => setGantiPartItem(item)}
-                      >
-                        Ganti Part
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.items.map((item) => (
+                      <tr key={item.part_id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                        <td className="px-3 py-3">
+                          <WearRing percentage={item.wear_percentage} status={item.status} />
+                        </td>
+                        <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{item.line_name}</td>
+                        <td className="px-3 py-3">
+                          <div className="text-[13px]">{item.part_name}</div>
+                          <div className="font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
+                            {item.drawing_no} <span className="text-[var(--text-faint)]">({item.jig_name})</span>
+                          </div>
+                          {item.primary_supplier_name ? (
+                            <div className="mt-0.5 flex items-center gap-1 text-xs text-[var(--text-dim)]">
+                              <Truck size={11} /> {item.primary_supplier_name}
+                            </div>
+                          ) : (
+                            <div className="mt-0.5 text-xs text-[var(--text-faint)]">Belum ada Supplier utama</div>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right font-[var(--font-mono)] text-[13px]">
+                          {item.counter.toLocaleString('id-ID')}
+                        </td>
+                        <td className="px-3 py-3 text-right font-[var(--font-mono)] text-[13px]">
+                          {item.target_shot.toLocaleString('id-ID')}
+                        </td>
+                        <td className="px-3 py-3 text-right font-[var(--font-mono)] text-[13px]">
+                          {item.remaining_shot.toLocaleString('id-ID')}
+                        </td>
+                        <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{item.estimated_pm_date || '-'}</td>
+                        <td className="px-3 py-3">
+                          <StatusBadge status={item.status} />
+                        </td>
+                        <td className="px-3 py-3">
+                          <Button type="button" size="sm" variant="outline" onClick={() => setGantiPartItem(item)}>
+                            Ganti Part
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
             <Pagination page={data.page} limit={data.limit} total={data.total} onPageChange={setPage} />
           </>
@@ -212,22 +237,11 @@ function PmPartMonitoringPage() {
       )}
 
       {stockNotice && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: '10px 14px',
-            borderRadius: 8,
-            background: 'var(--warning-dim, var(--accent-dim))',
-            border: '1px solid var(--warning, var(--accent))',
-            fontSize: 13,
-          }}
-        >
-          <span style={{ flex: 1 }}>{stockNotice}</span>
-          <button type="button" className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setStockNotice(null)}>
-            Tutup
-          </button>
+        <div className="flex items-center gap-2.5 rounded-lg border border-warn bg-warn-dim px-3.5 py-2.5 text-[13px]">
+          <span className="flex-1">{stockNotice}</span>
+          <Button type="button" size="sm" variant="outline" onClick={() => setStockNotice(null)}>
+            <X size={13} /> Tutup
+          </Button>
         </div>
       )}
     </div>

@@ -1,4 +1,10 @@
 // src/pages/PmLineStatusPage.jsx
+// Reskin (checklist §3 item 6 "PM pages", batch 2/N): `.panel`/`.data-table`/
+// `.error-state`/`.empty-state`/`.caption`/`.btn`/`.mono` lama dilepas
+// total, diganti Tailwind + shadcn ui (Button), ngikutin pola tabel Master
+// Data (rounded-lg border border-border, thead uppercase text-[var(--text-
+// faint)]). Data/logic (query, target input modal) TIDAK berubah sama
+// sekali.
 import { useState } from 'react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { usePmLineStatus } from '../hooks/usePmLineStatus';
@@ -6,6 +12,7 @@ import StatusBadge from '../components/StatusBadge';
 import Banner from '../components/Banner';
 import Modal from '../components/Modal';
 import PmLineHistoryForm from '../components/PmLineHistoryForm';
+import { Button } from '../components/ui/button';
 
 function formatKetepatan(percentage) {
   return percentage === null || percentage === undefined ? 'belum ada data' : `Ketepatan ${percentage}%`;
@@ -18,9 +25,7 @@ function StatusWithKetepatan({ status, percentage }) {
   return (
     <div>
       <StatusBadge status={status} />
-      <div className="caption" style={{ marginTop: 4 }}>
-        {formatKetepatan(percentage)}
-      </div>
+      <div className="mt-1 text-xs text-muted-foreground">{formatKetepatan(percentage)}</div>
     </div>
   );
 }
@@ -32,73 +37,87 @@ function PmLineStatusPage() {
   const [inputTarget, setInputTarget] = useState(null); // { line, jenisPm }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="flex flex-col gap-4">
       <Banner>
         Status Monthly dihitung dari akumulasi poin (cap 30), status Weekly murni hitung mundur kalender 7 hari.
-        Reset Monthly bisa ikut nge-reset Weekly tergantung setting <code className="mono">auto_reset_weekly_on_monthly</code>.
-        Angka <strong>Ketepatan</strong> di bawah status menunjukkan persentase PM yang dilakukan sebelum/tepat waktu
-        sejak awal tahun ini.
+        Reset Monthly bisa ikut nge-reset Weekly tergantung setting{' '}
+        <code className="font-[var(--font-mono)]">auto_reset_weekly_on_monthly</code>. Angka{' '}
+        <strong>Ketepatan</strong> di bawah status menunjukkan persentase PM yang dilakukan sebelum/tepat waktu sejak
+        awal tahun ini.
       </Banner>
 
-      <div className="panel">
-        {isError && <div className="error-state">Gagal memuat status Line. Coba lagi.</div>}
-        {isLoading && <div className="empty-state">Memuat data...</div>}
-        {data && data.length === 0 && <div className="empty-state">Belum ada Line aktif.</div>}
+      <div className="rounded-lg border border-border bg-card p-4.5">
+        {isError && (
+          <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
+            Gagal memuat status Line. Coba lagi.
+          </div>
+        )}
+        {isLoading && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
+        {data && data.length === 0 && (
+          <div className="py-8 text-center text-sm text-[var(--text-faint)]">Belum ada Line aktif.</div>
+        )}
 
         {data && data.length > 0 && (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Line</th>
-                <th className="mono">Tgl Monthly Terakhir</th>
-                <th className="mono">Poin</th>
-                <th className="mono">Sisa Hari Monthly</th>
-                <th>Status Monthly</th>
-                <th className="mono">Tgl Weekly Terakhir</th>
-                <th className="mono">Sisa Hari Weekly</th>
-                <th>Status Weekly</th>
-                <th style={{ width: 200 }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((line) => (
-                <tr key={line.line_id}>
-                  <td className="mono">{line.line_name}</td>
-                  <td className="mono">{line.tgl_pm_monthly_terakhir || '-'}</td>
-                  <td className="mono">{line.akumulasi_poin_monthly}</td>
-                  <td className="mono">{line.sisa_hari_monthly ?? '-'}</td>
-                  <td>
-                    <StatusWithKetepatan status={line.status_monthly} percentage={line.ketepatan_monthly_percentage} />
-                  </td>
-                  <td className="mono">{line.tgl_pm_weekly_terakhir || '-'}</td>
-                  <td className="mono">{line.sisa_hari_weekly ?? '-'}</td>
-                  <td>
-                    <StatusWithKetepatan status={line.status_weekly} percentage={line.ketepatan_weekly_percentage} />
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ padding: '4px 10px', fontSize: 12 }}
-                        onClick={() => setInputTarget({ line, jenisPm: 'MONTHLY' })}
+          <div className="overflow-hidden rounded-lg border border-border">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-border">
+                    {[
+                      'Line',
+                      'Tgl Monthly Terakhir',
+                      'Poin',
+                      'Sisa Hari Monthly',
+                      'Status Monthly',
+                      'Tgl Weekly Terakhir',
+                      'Sisa Hari Weekly',
+                      'Status Weekly',
+                      '',
+                    ].map((h, i) => (
+                      <th
+                        key={i}
+                        className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
                       >
-                        Input Monthly
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ padding: '4px 10px', fontSize: 12 }}
-                        onClick={() => setInputTarget({ line, jenisPm: 'WEEKLY' })}
-                      >
-                        Input Weekly
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((line) => (
+                    <tr key={line.line_id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{line.line_name}</td>
+                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">
+                        {line.tgl_pm_monthly_terakhir || '-'}
+                      </td>
+                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{line.akumulasi_poin_monthly}</td>
+                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{line.sisa_hari_monthly ?? '-'}</td>
+                      <td className="px-3 py-3">
+                        <StatusWithKetepatan status={line.status_monthly} percentage={line.ketepatan_monthly_percentage} />
+                      </td>
+                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">
+                        {line.tgl_pm_weekly_terakhir || '-'}
+                      </td>
+                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{line.sisa_hari_weekly ?? '-'}</td>
+                      <td className="px-3 py-3">
+                        <StatusWithKetepatan status={line.status_weekly} percentage={line.ketepatan_weekly_percentage} />
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex gap-1.5">
+                          <Button type="button" size="sm" variant="outline" onClick={() => setInputTarget({ line, jenisPm: 'MONTHLY' })}>
+                            Input Monthly
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" onClick={() => setInputTarget({ line, jenisPm: 'WEEKLY' })}>
+                            Input Weekly
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
       </div>
 

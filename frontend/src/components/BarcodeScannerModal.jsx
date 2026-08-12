@@ -10,10 +10,16 @@
 // (barcode linear umum buat label part industrial) - decoder default
 // BrowserMultiFormatReader sudah cover semua format 1D umum tanpa perlu
 // konfigurasi tambahan, jadi gak perlu di-pin ke 1 format spesifik.
+//
+// Reskin (checklist §3 item 6 "PM pages", batch 5/N): `.error-state`/
+// `.caption`/`.btn`/inline style lama dilepas total, diganti Tailwind.
+// Scan logic (BrowserMultiFormatReader lifecycle, error handling,
+// cleanup) TIDAK berubah sama sekali - cuma markup.
 import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Camera, X } from 'lucide-react';
+import { Button } from './ui/button';
 
 function BarcodeScannerModal({ open, onClose, onDetected }) {
   const videoRef = useRef(null);
@@ -74,51 +80,33 @@ function BarcodeScannerModal({ open, onClose, onDetected }) {
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="w-[calc(100%-2rem)]" style={{ maxWidth: 420 }}>
+      <DialogContent className="w-[calc(100%-2rem)] max-w-[420px]">
         <DialogHeader>
-          <DialogTitle style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <DialogTitle className="flex items-center gap-2">
             <Camera size={18} />
             Scan Barcode Drawing No
           </DialogTitle>
         </DialogHeader>
 
         {error ? (
-          <div className="error-state" style={{ padding: 14, fontSize: 13 }}>
+          <div className="rounded-lg bg-[var(--danger-dim)] px-3.5 py-3.5 text-[13px] text-[var(--danger)]">
             {error}
           </div>
         ) : (
-          <div
-            style={{
-              position: 'relative',
-              width: '100%',
-              aspectRatio: '4 / 3',
-              background: '#000',
-              borderRadius: 8,
-              overflow: 'hidden',
-            }}
-          >
-            <video ref={videoRef} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
-            <div
-              style={{
-                position: 'absolute',
-                inset: '20% 12%',
-                border: '2px solid var(--accent)',
-                borderRadius: 6,
-                boxShadow: '0 0 0 9999px rgba(0,0,0,0.35)',
-                pointerEvents: 'none',
-              }}
-            />
+          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-black">
+            <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
+            <div className="pointer-events-none absolute inset-[20%_12%] rounded-md border-2 border-primary shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
           </div>
         )}
 
-        <span className="caption" style={{ textAlign: 'center' }}>
+        <span className="text-center text-xs text-muted-foreground">
           Arahkan kamera ke label barcode Drawing No pada part.
         </span>
 
-        <button type="button" className="btn btn-secondary" onClick={onClose} style={{ marginTop: 4 }}>
-          <X size={14} style={{ marginRight: 6 }} />
+        <Button type="button" variant="outline" onClick={onClose} className="mt-1">
+          <X size={14} />
           Batal
-        </button>
+        </Button>
       </DialogContent>
     </Dialog>
   );

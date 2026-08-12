@@ -46,13 +46,24 @@ import { useSidebar } from '../contexts/SidebarContext';
 // History PM Line) SENGAJA gak disentuh - itu masih render `.btn`/
 // `.btn-primary` dari page masing-masing, di luar scope Topbar, nanti
 // kebagian pas reskin halaman itu sendiri (§3 item 4-6).
+// Sticky topbar (feedback via chat, 12 Agustus): sebelumnya `<header>` ini
+// cuma flex item biasa di dalam `.main-column` (lihat MainLayout.jsx) tanpa
+// `position: sticky`, jadi dia ikut ke-scroll ke atas & hilang pas konten
+// halaman lebih panjang dari viewport - beda sama Sidebar.jsx yang emang
+// udah `position: sticky; top: 0` dari awal (lihat `.sidebar` di
+// global.css). Fix: `sticky top-0 z-40 bg-background` - `bg-background`
+// (token `--bg`, PERSIS sama warna body) WAJIB ada, bukan opsional,
+// soalnya tanpa background solid, konten yang discroll di baliknya bakal
+// "nembus" transparan pas topbar nempel di atas. z-40 dipilih di bawah
+// Radix Dialog punya Modal.jsx (dia portal ke document.body + urutan DOM
+// paling akhir, jadi otomatis di atas tanpa perlu z-index ekstrem di sini).
 function Topbar() {
   const { title, actions } = useCurrentPageHeader();
   const { collapsed, toggleCollapsed } = useSidebar();
 
   return (
     <header
-      className="flex h-[60px] shrink-0 items-center justify-between border-b border-border pr-8"
+      className="sticky top-0 z-40 flex h-[60px] shrink-0 items-center justify-between border-b border-border bg-background pr-8"
       style={{ paddingLeft: collapsed ? '16px' : '32px', transition: 'padding-left 250ms ease-in-out' }}
     >
       <div className="flex items-center gap-3.5">

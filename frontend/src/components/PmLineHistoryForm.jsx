@@ -1,7 +1,22 @@
 // src/components/PmLineHistoryForm.jsx
+// Reskin (checklist §3 item 6 "PM pages", batch 2/N): `.panel`/
+// `.panel-header`/`.panel-title`/`.form-label`/`.form-select`/`.form-input`/
+// `.error-state`/`.caption`/`.btn`/inline style lama dilepas total, diganti
+// Tailwind + shadcn ui (Select/Input/Textarea/Label/Button). Dua mode
+// render TETAP SAMA: dipanggil bare di dalam Modal (isPrefilled=true, dari
+// PmLineStatusPage - Modal/DialogContent udah kasih padding sendiri) VS
+// dipanggil standalone di PmLineHistoryPage (isPrefilled=false, butuh
+// panel-nya sendiri: rounded-lg border-border bg-card p-4.5, ngikutin
+// pola Master Data/Dashboard). Logic create/preset/reset-hint TIDAK
+// berubah sama sekali.
 import { useState } from 'react';
 import { useLines } from '../hooks/useLines';
 import { useCreatePmLineHistory } from '../hooks/usePmLineHistory';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -62,101 +77,89 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className={isPrefilled ? undefined : 'panel'}>
+    <form onSubmit={handleSubmit} className={isPrefilled ? undefined : 'rounded-lg border border-border bg-card p-4.5'}>
       {!isPrefilled && (
-        <div className="panel-header">
-          <h2 className="panel-title">Input PM Monthly / Weekly</h2>
+        <div className="mb-4">
+          <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Input PM Monthly / Weekly</h2>
         </div>
       )}
 
       <ResetHint jenisPm={form.jenis_pm} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
+      <div className="mt-3.5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         <div>
-          <label className="form-label">Line</label>
-          <select
-            className="form-select"
-            style={{ width: '100%' }}
-            value={form.line_id}
-            disabled={isPrefilled}
-            onChange={(e) => update('line_id', e.target.value)}
-          >
-            <option value="">Pilih Line</option>
-            {lines.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.line_name}
-              </option>
-            ))}
-          </select>
-          {errors.line_id && <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.line_id}</span>}
+          <Label className="mb-1.5">Line</Label>
+          <Select value={form.line_id} onValueChange={(v) => update('line_id', v)} disabled={isPrefilled}>
+            <SelectTrigger>
+              <SelectValue placeholder="Pilih Line" />
+            </SelectTrigger>
+            <SelectContent>
+              {lines.map((l) => (
+                <SelectItem key={l.id} value={String(l.id)}>
+                  {l.line_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.line_id && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.line_id}</p>}
         </div>
 
         <div>
-          <label className="form-label">Jenis PM</label>
-          <select
-            className="form-select"
-            style={{ width: '100%' }}
-            value={form.jenis_pm}
-            disabled={isPrefilled}
-            onChange={(e) => update('jenis_pm', e.target.value)}
-          >
-            <option value="MONTHLY">Monthly</option>
-            <option value="WEEKLY">Weekly</option>
-          </select>
+          <Label className="mb-1.5">Jenis PM</Label>
+          <Select value={form.jenis_pm} onValueChange={(v) => update('jenis_pm', v)} disabled={isPrefilled}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="MONTHLY">Monthly</SelectItem>
+              <SelectItem value="WEEKLY">Weekly</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div>
-          <label className="form-label">Tanggal Input</label>
-          <input
+          <Label className="mb-1.5">Tanggal Input</Label>
+          <Input
             type="date"
-            className="form-input"
-            style={{ width: '100%' }}
             value={form.tgl_input}
             max={todayStr()}
             onChange={(e) => update('tgl_input', e.target.value)}
             required
           />
-          {errors.tgl_input && <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.tgl_input}</span>}
+          {errors.tgl_input && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.tgl_input}</p>}
         </div>
 
         <div>
-          <label className="form-label">PIC</label>
-          <input
-            className="form-input"
-            style={{ width: '100%' }}
+          <Label className="mb-1.5">PIC</Label>
+          <Input
             value={form.pic_name}
             onChange={(e) => update('pic_name', e.target.value)}
             placeholder="Nama yang mengerjakan"
             required
           />
-          {errors.pic_name && <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.pic_name}</span>}
+          {errors.pic_name && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.pic_name}</p>}
         </div>
 
-        <div style={{ gridColumn: '1 / -1' }}>
-          <label className="form-label">Keterangan (opsional)</label>
-          <textarea
-            className="form-input"
-            style={{ width: '100%', minHeight: 60, resize: 'vertical' }}
-            value={form.keterangan}
-            onChange={(e) => update('keterangan', e.target.value)}
-          />
+        <div className="sm:col-span-2">
+          <Label className="mb-1.5">Keterangan (opsional)</Label>
+          <Textarea className="min-h-[60px]" value={form.keterangan} onChange={(e) => update('keterangan', e.target.value)} />
         </div>
       </div>
 
       {errors._general && (
-        <div className="error-state" style={{ marginTop: 12, padding: 10, fontSize: 13, textAlign: 'left' }}>
+        <div className="mt-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
           {errors._general}
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-        <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>
+      <div className="mt-4 flex gap-2.5">
+        <Button type="submit" disabled={createMutation.isPending}>
           {createMutation.isPending ? 'Menyimpan...' : 'Simpan'}
-        </button>
+        </Button>
         {onCancel && (
-          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={createMutation.isPending}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={createMutation.isPending}>
             Batal
-          </button>
+          </Button>
         )}
       </div>
     </form>
@@ -167,15 +170,16 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm }) {
 function ResetHint({ jenisPm }) {
   if (jenisPm !== 'MONTHLY') {
     return (
-      <div className="caption" style={{ padding: '8px 0' }}>
-        Submit <strong>Weekly</strong> cuma reset Tgl PM Weekly Terakhir untuk Line ini.
+      <div className="py-2 text-xs text-muted-foreground">
+        Submit <strong className="text-foreground">Weekly</strong> cuma reset Tgl PM Weekly Terakhir untuk Line ini.
       </div>
     );
   }
   return (
-    <div className="caption" style={{ padding: '8px 0' }}>
-      Submit <strong>Monthly</strong> reset Tgl PM Monthly Terakhir. Tgl PM Weekly Terakhir ikut ke-reset kalau Line
-      ini pakai auto-reset (cek override per-Line di Master Data, atau default global di Settings).
+    <div className="py-2 text-xs text-muted-foreground">
+      Submit <strong className="text-foreground">Monthly</strong> reset Tgl PM Monthly Terakhir. Tgl PM Weekly
+      Terakhir ikut ke-reset kalau Line ini pakai auto-reset (cek override per-Line di Master Data, atau default
+      global di Settings).
     </div>
   );
 }

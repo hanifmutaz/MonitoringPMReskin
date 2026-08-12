@@ -1,14 +1,22 @@
 // src/components/StatusFilterPills.jsx
+// Reskin (checklist §3 item 6 "PM pages", batch 1/N - shared component
+// duluan karena dipakai di banyak PM page): `.btn` + inline style lama
+// dilepas total, diganti Tailwind - visual & pola className PERSIS
+// NGIKUTIN filter pill Aktif/Nonaktif di LinesTab.jsx/SuppliersTab.jsx
+// (termasuk fix cursor-pointer yang sempet ketinggalan di situ), BUKAN
+// gaya baru. Props (value, onChange) & daftar opsi TIDAK berubah.
+import { cn } from '../lib/utils';
+
 const OPTIONS = [
   { value: '', label: 'Semua' },
-  { value: 'OK', label: 'OK', color: 'ok' },
-  { value: 'WARNING', label: 'Warning', color: 'warn' },
-  { value: 'DANGER', label: 'Danger', color: 'danger' },
+  { value: 'OK', label: 'OK', dotClass: 'bg-ok' },
+  { value: 'WARNING', label: 'Warning', dotClass: 'bg-warn' },
+  { value: 'DANGER', label: 'Danger', dotClass: 'bg-danger' },
 ];
 
 function StatusFilterPills({ value, onChange }) {
   return (
-    <div style={{ display: 'flex', gap: 8 }}>
+    <div className="flex gap-2">
       {OPTIONS.map((opt) => {
         const active = value === opt.value;
         return (
@@ -16,23 +24,14 @@ function StatusFilterPills({ value, onChange }) {
             key={opt.value || 'ALL'}
             type="button"
             onClick={() => onChange(opt.value)}
-            className="btn"
-            style={{
-              padding: '6px 14px',
-              fontSize: 12,
-              background: active ? 'var(--accent-dim)' : 'var(--panel-2)',
-              color: active ? 'var(--accent)' : 'var(--text-dim)',
-              border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            {opt.color && (
-              <span
-                style={{ width: 6, height: 6, borderRadius: '50%', background: `var(--${opt.color})` }}
-              />
+            className={cn(
+              'flex cursor-pointer items-center gap-1.5 rounded-md border px-3.5 py-1.5 text-xs font-medium transition-colors',
+              active
+                ? 'border-primary bg-[var(--accent-dim)] text-primary'
+                : 'border-border bg-[var(--panel-2)] text-[var(--text-dim)] hover:bg-secondary'
             )}
+          >
+            {opt.dotClass && <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', opt.dotClass)} />}
             {opt.label}
           </button>
         );
@@ -42,3 +41,4 @@ function StatusFilterPills({ value, onChange }) {
 }
 
 export default StatusFilterPills;
+ 

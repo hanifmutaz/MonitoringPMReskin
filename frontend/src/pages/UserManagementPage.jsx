@@ -1,4 +1,16 @@
 // src/pages/UserManagementPage.jsx
+// Reskin (checklist §3 item 5 "admin pages", batch terakhir): `.panel`/
+// `.panel-header`/`.panel-title`/`.data-table`/`.form-input`/`.form-select`/
+// `.form-label`/`.btn`/`.btn-primary`/`.btn-secondary`/`.error-state`/
+// `.empty-state`/`.caption`/inline style lama dilepas TOTAL, diganti
+// Tailwind + shadcn ui murni, ngikutin pola yang udah dipakai di Master
+// Data (PartsTab dkk) & Dashboard (rounded-lg border-border bg-card p-4.5).
+// `ToggleSwitch.jsx` SENGAJA TIDAK diikutkan reskin ini - dia komponen
+// shared yang juga dipakai SettingsPage.jsx (di luar cakupan Master
+// Data/PM/admin pages), dan secara fungsional udah aman (ada cursor
+// pointer/not-allowed inline eksplisit), jadi bukan prioritas.
+// Data/logic (hook, mutation, permission checkbox, approve/reject flow)
+// TIDAK berubah sama sekali.
 import { useState } from 'react';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
@@ -7,6 +19,10 @@ import { useRoles, usePermissionCatalog, useRoleMutations } from '../hooks/useRo
 import { useConfirm } from '../contexts/ConfirmDialogContext';
 import Modal from '../components/Modal';
 import ToggleSwitch from '../components/ToggleSwitch';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 const emptyForm = { username: '', email: '', password: '', full_name: '', role_id: '' };
 
@@ -14,7 +30,7 @@ function UserFormModal({ initial, onClose }) {
   const isEdit = !!initial;
   const [form, setForm] = useState(
     isEdit
-      ? { username: initial.username, email: initial.email || '', full_name: initial.full_name, password: '' }
+      ? { username: initial.username, email: initial.email || '', full_name: initial.full_name, password: '', role_id: '' }
       : emptyForm
   );
   const [errors, setErrors] = useState({});
@@ -46,78 +62,68 @@ function UserFormModal({ initial, onClose }) {
   }
 
   return (
-    <Modal title={isEdit ? 'Edit User' : 'Tambah User'} onClose={onClose}>
-      <form onSubmit={handleSubmit}>
-        <label className="form-label">Username</label>
-        <input
-          className="form-input"
-          style={{ width: '100%', marginBottom: 14 }}
-          value={form.username}
-          onChange={(e) => setForm({ ...form, username: e.target.value })}
-          required
-        />
-        {errors.username && <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.username}</span>}
+    <Modal title={isEdit ? 'Edit User' : 'Tambah User'} onClose={onClose} width={480}>
+      <form onSubmit={handleSubmit} className="space-y-3.5">
+        <div>
+          <Label className="mb-1.5">Username</Label>
+          <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required />
+          {errors.username && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.username}</p>}
+        </div>
 
-        <label className="form-label">Full Name</label>
-        <input
-          className="form-input"
-          style={{ width: '100%', marginBottom: 14 }}
-          value={form.full_name}
-          onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-          required
-        />
+        <div>
+          <Label className="mb-1.5">Full Name</Label>
+          <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required />
+        </div>
 
-        <label className="form-label">Email (untuk notifikasi)</label>
-        <input
-          type="email"
-          className="form-input"
-          style={{ width: '100%', marginBottom: 14 }}
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-          placeholder="opsional, tapi wajib diisi kalau mau terima notifikasi email"
-        />
-        {errors.email && <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.email}</span>}
+        <div>
+          <Label className="mb-1.5">Email (untuk notifikasi)</Label>
+          <Input
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            placeholder="opsional, tapi wajib diisi kalau mau terima notifikasi email"
+          />
+          {errors.email && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.email}</p>}
+        </div>
 
-        <label className="form-label">{isEdit ? 'Password Baru (kosongkan kalau tidak ganti)' : 'Password'}</label>
-        <input
-          type="password"
-          className="form-input"
-          style={{ width: '100%', marginBottom: 14 }}
-          value={form.password}
-          onChange={(e) => setForm({ ...form, password: e.target.value })}
-          required={!isEdit}
-        />
-        {errors.password && <span style={{ color: 'var(--danger)', fontSize: 11 }}>{errors.password}</span>}
+        <div>
+          <Label className="mb-1.5">{isEdit ? 'Password Baru (kosongkan kalau tidak ganti)' : 'Password'}</Label>
+          <Input
+            type="password"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            required={!isEdit}
+          />
+          {errors.password && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.password}</p>}
+        </div>
 
         {!isEdit && (
-          <>
-            <label className="form-label">Role</label>
-            <select
-              className="form-select"
-              style={{ width: '100%', marginBottom: 14 }}
-              value={form.role_id}
-              onChange={(e) => setForm({ ...form, role_id: e.target.value })}
-              required
-            >
-              <option value="">Pilih Role</option>
-              {roles.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-          </>
+          <div>
+            <Label className="mb-1.5">Role</Label>
+            <Select value={form.role_id} onValueChange={(v) => setForm({ ...form, role_id: v })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih Role" />
+              </SelectTrigger>
+              <SelectContent>
+                {roles.map((r) => (
+                  <SelectItem key={r.id} value={String(r.id)}>
+                    {r.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         )}
 
         {errors._general && (
-          <div className="error-state" style={{ marginBottom: 12, padding: 8, fontSize: 12 }}>
+          <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
             {errors._general}
           </div>
         )}
 
-        <button type="submit" className="btn btn-primary" disabled={pending}>
+        <Button type="submit" disabled={pending}>
           {pending ? 'Menyimpan...' : 'Simpan'}
-        </button>
+        </Button>
       </form>
     </Modal>
   );
@@ -159,75 +165,81 @@ function PendingApprovalSection() {
   if (pendingUsers.length === 0) return null;
 
   return (
-    <div className="panel" style={{ marginBottom: 16 }}>
-      <div className="panel-header">
-        <h2 className="panel-title">
-          Menunggu Persetujuan <span className="caption">({pendingUsers.length})</span>
+    <div className="mb-4 rounded-lg border border-border bg-card p-4.5">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">
+          Menunggu Persetujuan{' '}
+          <span className="text-xs font-normal text-muted-foreground">({pendingUsers.length})</span>
         </h2>
       </div>
 
       {error && (
-        <div className="error-state" style={{ marginBottom: 12, padding: 8, fontSize: 12 }}>
-          {error}
-        </div>
+        <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{error}</div>
       )}
 
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>Username</th>
-            <th>Full Name</th>
-            <th>Email</th>
-            <th>Daftar Sejak</th>
-            <th>Assign Role</th>
-            <th style={{ width: 160 }}>Aksi</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pendingUsers.map((u) => (
-            <tr key={u.id}>
-              <td className="mono">{u.username}</td>
-              <td>{u.full_name}</td>
-              <td className="caption">{u.email || '-'}</td>
-              <td className="mono caption">{new Date(u.created_at).toLocaleString('id-ID')}</td>
-              <td>
-                <select
-                  className="form-select"
-                  value={roleSelections[u.id] || ''}
-                  onChange={(e) => setRoleSelections({ ...roleSelections, [u.id]: e.target.value })}
-                >
-                  <option value="">Pilih Role</option>
-                  {roles.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  style={{ padding: '6px 10px', marginRight: 6, fontSize: 12 }}
-                  onClick={() => handleApprove(u)}
-                  disabled={approve.isPending}
-                >
-                  Approve
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary btn"
-                  style={{ padding: '6px 10px', fontSize: 12 }}
-                  onClick={() => handleReject(u)}
-                  disabled={reject.isPending}
-                >
-                  Tolak
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="overflow-hidden rounded-lg border border-border">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-border">
+                {['Username', 'Full Name', 'Email', 'Daftar Sejak', 'Assign Role', 'Aksi'].map((h) => (
+                  <th
+                    key={h}
+                    className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {pendingUsers.map((u) => (
+                <tr key={u.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                  <td className="px-3 py-2.5 font-[var(--font-mono)] text-[13px]">{u.username}</td>
+                  <td className="px-3 py-2.5 text-[13px]">{u.full_name}</td>
+                  <td className="px-3 py-2.5 text-xs text-[var(--text-dim)]">{u.email || '-'}</td>
+                  <td className="px-3 py-2.5 font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
+                    {new Date(u.created_at).toLocaleString('id-ID')}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <Select
+                      value={roleSelections[u.id] || ''}
+                      onValueChange={(v) => setRoleSelections({ ...roleSelections, [u.id]: v })}
+                    >
+                      <SelectTrigger className="h-8 w-[160px]">
+                        <SelectValue placeholder="Pilih Role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {roles.map((r) => (
+                          <SelectItem key={r.id} value={String(r.id)}>
+                            {r.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex gap-1.5">
+                      <Button type="button" size="sm" onClick={() => handleApprove(u)} disabled={approve.isPending}>
+                        Approve
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleReject(u)}
+                        disabled={reject.isPending}
+                      >
+                        Tolak
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
@@ -286,131 +298,138 @@ function RoleManagementSection() {
   }
 
   return (
-    <div className="panel" style={{ marginBottom: 16 }}>
-      <div className="panel-header">
-        <h2 className="panel-title">Role & Permission</h2>
+    <div className="mb-4 rounded-lg border border-border bg-card p-4.5">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Role & Permission</h2>
       </div>
 
       {error && (
-        <div className="error-state" style={{ marginBottom: 12, padding: 8, fontSize: 12 }}>
-          {error}
-        </div>
+        <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{error}</div>
       )}
 
-      {isLoading && <div className="empty-state">Memuat data...</div>}
+      {isLoading && <div className="py-6 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
 
       {!isLoading && (
-        <table className="data-table" style={{ marginBottom: 16 }}>
-          <thead>
-            <tr>
-              <th>Nama Role</th>
-              <th className="mono">User</th>
-              <th>Permission</th>
-              <th style={{ width: 140 }}>Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {roles.map((role) => (
-              <tr key={role.id}>
-                <td>
-                  {role.name} {role.is_system && <span className="caption">(bawaan)</span>}
-                </td>
-                <td className="mono">{role.user_count}</td>
-                <td>
-                  {expandedRoleId === role.id ? (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {permissionCatalog.map((p) => (
-                        <label key={p.key} className="caption" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                          <input
-                            type="checkbox"
-                            checked={(draftPerms[role.id] || []).includes(p.key)}
-                            onChange={() =>
-                              togglePerm(p.key, draftPerms[role.id] || [], (v) =>
-                                setDraftPerms({ ...draftPerms, [role.id]: v })
-                              )
-                            }
-                          />
-                          {p.label}
-                        </label>
-                      ))}
-                    </div>
-                  ) : role.name === 'Admin' ? (
-                    <span className="caption">Semua akses (superuser)</span>
-                  ) : (
-                    <span className="caption">
-                      {role.permissions.length > 0
-                        ? role.permissions
-                            .map((k) => permissionCatalog.find((p) => p.key === k)?.label || k)
-                            .join(', ')
-                        : 'Tidak ada akses khusus'}
-                    </span>
-                  )}
-                </td>
-                <td>
-                  {role.name === 'Admin' ? (
-                    '-'
-                  ) : expandedRoleId === role.id ? (
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      style={{ padding: '4px 8px', fontSize: 12 }}
-                      onClick={() => saveDraftPermissions(role)}
-                      disabled={updatePermissions.isPending}
+        <div className="mb-4 overflow-hidden rounded-lg border border-border">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-border">
+                  {['Nama Role', 'User', 'Permission', 'Aksi'].map((h) => (
+                    <th
+                      key={h}
+                      className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
                     >
-                      Simpan
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        className="btn-secondary btn"
-                        style={{ padding: 6, marginRight: 4 }}
-                        onClick={() => startEditPermissions(role)}
-                      >
-                        <Pencil size={13} />
-                      </button>
-                      {!role.is_system && (
-                        <button
-                          type="button"
-                          className="btn-secondary btn"
-                          style={{ padding: 6 }}
-                          onClick={() => handleDelete(role)}
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {roles.map((role) => (
+                  <tr key={role.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                    <td className="px-3 py-2.5 text-[13px]">
+                      {role.name}{' '}
+                      {role.is_system && <span className="text-xs text-muted-foreground">(bawaan)</span>}
+                    </td>
+                    <td className="px-3 py-2.5 font-[var(--font-mono)] text-[13px]">{role.user_count}</td>
+                    <td className="px-3 py-2.5">
+                      {expandedRoleId === role.id ? (
+                        <div className="flex flex-wrap gap-2">
+                          {permissionCatalog.map((p) => (
+                            <label key={p.key} className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                              <input
+                                type="checkbox"
+                                checked={(draftPerms[role.id] || []).includes(p.key)}
+                                onChange={() =>
+                                  togglePerm(p.key, draftPerms[role.id] || [], (v) =>
+                                    setDraftPerms({ ...draftPerms, [role.id]: v })
+                                  )
+                                }
+                                className="h-3.5 w-3.5 accent-[var(--accent)]"
+                              />
+                              {p.label}
+                            </label>
+                          ))}
+                        </div>
+                      ) : role.name === 'Admin' ? (
+                        <span className="text-xs text-muted-foreground">Semua akses (superuser)</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          {role.permissions.length > 0
+                            ? role.permissions
+                                .map((k) => permissionCatalog.find((p) => p.key === k)?.label || k)
+                                .join(', ')
+                            : 'Tidak ada akses khusus'}
+                        </span>
                       )}
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {role.name === 'Admin' ? (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      ) : expandedRoleId === role.id ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => saveDraftPermissions(role)}
+                          disabled={updatePermissions.isPending}
+                        >
+                          Simpan
+                        </Button>
+                      ) : (
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => startEditPermissions(role)}
+                          >
+                            <Pencil size={13} />
+                          </Button>
+                          {!role.is_system && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleDelete(role)}
+                            >
+                              <Trash2 size={13} />
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       <form onSubmit={handleCreate}>
-        <div className="caption" style={{ marginBottom: 6 }}>
-          Buat role baru
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-          <input
-            className="form-input"
-            style={{ flex: 1 }}
+        <div className="mb-1.5 text-xs text-muted-foreground">Buat role baru</div>
+        <div className="mb-2 flex gap-2">
+          <Input
+            className="flex-1"
             placeholder="mis. Purchasing"
             value={newRoleName}
             onChange={(e) => setNewRoleName(e.target.value)}
           />
-          <button type="submit" className="btn btn-primary" disabled={create.isPending}>
+          <Button type="submit" disabled={create.isPending}>
             {create.isPending ? 'Menyimpan...' : 'Buat Role'}
-          </button>
+          </Button>
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <div className="flex flex-wrap gap-2">
           {permissionCatalog.map((p) => (
-            <label key={p.key} className="caption" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <label key={p.key} className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
               <input
                 type="checkbox"
                 checked={newRolePerms.includes(p.key)}
                 onChange={() => togglePerm(p.key, newRolePerms, setNewRolePerms)}
+                className="h-3.5 w-3.5 accent-[var(--accent)]"
               />
               {p.label}
             </label>
@@ -422,9 +441,7 @@ function RoleManagementSection() {
 }
 
 function UserManagementPage() {
-  usePageHeader({
-    title: 'User Management',
-  });
+  usePageHeader({ title: 'User Management' });
 
   const { data: users = [], isLoading, isError } = useUsers({});
   const { update } = useUserMutations();
@@ -437,73 +454,80 @@ function UserManagementPage() {
       <RoleManagementSection />
       <PendingApprovalSection />
 
-      <div className="panel">
-        <div className="panel-header">
-          <h2 className="panel-title">Daftar User</h2>
-          <button type="button" className="btn btn-primary" onClick={() => setModalState({ mode: 'create' })}>
-            <Plus size={14} style={{ verticalAlign: -2, marginRight: 4 }} /> Tambah User
-          </button>
+      <div className="rounded-lg border border-border bg-card p-4.5">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Daftar User</h2>
+          <Button type="button" onClick={() => setModalState({ mode: 'create' })}>
+            <Plus size={14} /> Tambah User
+          </Button>
         </div>
 
-        {isError && <div className="error-state">Gagal memuat daftar user.</div>}
-        {isLoading && <div className="empty-state">Memuat data...</div>}
+        {isError && (
+          <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
+            Gagal memuat daftar user.
+          </div>
+        )}
+        {isLoading && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
 
         {!isLoading && (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Username</th>
-                <th>Full Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Aktif</th>
-                <th className="mono">Last Login</th>
-                <th style={{ width: 80 }}>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {nonPendingUsers.map((u) => (
-                <tr key={u.id}>
-                  <td className="mono">{u.username}</td>
-                  <td>{u.full_name}</td>
-                  <td className="caption">{u.email || '-'}</td>
-                  <td>
-                    {u.role || '-'}
-                    {u.status === 'REJECTED' && (
-                      <span className="caption" style={{ color: 'var(--danger)', marginLeft: 6 }}>
-                        (Ditolak)
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    <ToggleSwitch
-                      checked={u.is_active}
-                      onChange={(next) => update.mutate({ id: u.id, payload: { is_active: next } })}
-                    />
-                  </td>
-                  <td className="mono caption">{u.last_login ? new Date(u.last_login).toLocaleString('id-ID') : '-'}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn-secondary btn"
-                      style={{ padding: 6 }}
-                      onClick={() => setModalState({ mode: 'edit', user: u })}
-                    >
-                      <Pencil size={13} />
-                    </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+          <div className="overflow-hidden rounded-lg border border-border">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-border">
+                    {['Username', 'Full Name', 'Email', 'Role', 'Aktif', 'Last Login', 'Aksi'].map((h) => (
+                      <th
+                        key={h}
+                        className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {nonPendingUsers.map((u) => (
+                    <tr key={u.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{u.username}</td>
+                      <td className="px-3 py-3 text-[13px]">{u.full_name}</td>
+                      <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{u.email || '-'}</td>
+                      <td className="px-3 py-3 text-[13px]">
+                        {u.role || '-'}
+                        {u.status === 'REJECTED' && (
+                          <span className="ml-1.5 text-xs text-[var(--danger)]">(Ditolak)</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3">
+                        <ToggleSwitch
+                          checked={u.is_active}
+                          onChange={(next) => update.mutate({ id: u.id, payload: { is_active: next } })}
+                        />
+                      </td>
+                      <td className="px-3 py-3 font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
+                        {u.last_login ? new Date(u.last_login).toLocaleString('id-ID') : '-'}
+                      </td>
+                      <td className="px-3 py-3">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => setModalState({ mode: 'edit', user: u })}
+                        >
+                          <Pencil size={13} />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {modalState && (
-        <UserFormModal
-          initial={modalState.mode === 'edit' ? modalState.user : null}
-          onClose={() => setModalState(null)}
-        />
+        <UserFormModal initial={modalState.mode === 'edit' ? modalState.user : null} onClose={() => setModalState(null)} />
       )}
     </div>
   );
