@@ -30,6 +30,8 @@ import SearchBar from '../SearchBar';
 import Pagination from '../Pagination';
 import PageSizeSelector from '../PageSizeSelector';
 import BulkDeleteBar from '../BulkDeleteBar';
+import SelectAllAcrossPagesBar from '../SelectAllAcrossPagesBar';
+import { fetchParts } from '../../api/partsApi';
 import ClMappingModal from './ClMappingModal';
 import PartSupplierModal from './PartSupplierModal';
 import { Button } from '../ui/button';
@@ -290,6 +292,21 @@ function PartsTab() {
   const bulkDelete = useBulkDeleteMutation('parts');
   const [bulkError, setBulkError] = useState('');
 
+  // "Pilih semua N Part yang cocok filter" - beda dari toggleAllOnPage
+  // (cuma nyakup halaman aktif) karena Parts paginasinya SERVER-SIDE.
+  // Nembak ulang endpoint yang sama pakai limit = total, ambil id-nya
+  // doang, lalu union ke selection yang udah ada (bukan replace - row
+  // yang sempat di-uncheck manual di halaman lain tetap ke-uncheck).
+  async function handleSelectAllMatching() {
+    const all = await fetchParts({
+      lineId: lineId === 'all' ? undefined : lineId,
+      search: search || undefined,
+      page: 1,
+      limit: data.total,
+    });
+    selection.selectIds(all.items.map((p) => p.id));
+  }
+
   async function handleDelete(part) {
     if (!(await confirm(`Hapus Part "${part.drawing_no}" (Jig: ${part.jig_name})?`))) return;
     setDeleteError('');
@@ -379,6 +396,15 @@ function PartsTab() {
         pending={bulkDelete.isPending}
         label="Part"
       />
+
+      {data && selection.allOnPageSelected && (
+        <SelectAllAcrossPagesBar
+          pageCount={pageIds.length}
+          total={data.total}
+          alreadySelectedAll={selection.selectedCount >= data.total}
+          onSelectAll={handleSelectAllMatching}
+        />
+      )}
 
       {isLoading && !data && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
       {data && data.items.length === 0 && (

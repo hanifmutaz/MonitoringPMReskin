@@ -158,13 +158,18 @@ function LinesTab() {
   }, [lines, filter, search, sort]);
 
   const paged = useMemo(() => filtered.slice((page - 1) * limit, page * limit), [filtered, page, limit]);
-  const pageIds = useMemo(() => paged.map((l) => l.id), [paged]);
-  const selection = useRowSelection(pageIds);
+  // Client-side pagination (semua data Line udah kebaca di memori) - jadi
+  // "select all" bisa langsung nyakup SEMUA row yang cocok filter
+  // (`filtered`), bukan cuma `paged` (halaman aktif doang). Beda dari
+  // Parts/Inventory yang server-side, butuh fetch tambahan buat ini
+  // (lihat handleSelectAllMatching di PartsTab.jsx/InventoryTab.jsx).
+  const filteredIds = useMemo(() => filtered.map((l) => l.id), [filtered]);
+  const selection = useRowSelection(filteredIds);
   const bulkDelete = useBulkDeleteMutation('lines');
   const [bulkError, setBulkError] = useState('');
 
   async function handleBulkDelete() {
-    if (!(await confirm(`Hapus ${selection.selectedCount} Line terpilih? Bisa direstore lewat Recycle Bin.`))) return;
+    if (!(await confirm(`Hapus ${selection.selectedCount} Line terpilih (dari semua data, bukan cuma halaman ini)? Bisa direstore lewat Recycle Bin.`))) return;
     setBulkError('');
     try {
       await bulkDelete.mutateAsync(selection.selectedIds);

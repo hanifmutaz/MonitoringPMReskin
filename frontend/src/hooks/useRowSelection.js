@@ -2,8 +2,12 @@
 // Hook GENERIK buat state checkbox multi-select di tabel - dipakai sama
 // persis di LinesTab/PartsTab/SuppliersTab/InventoryTab/RolesTab/dst,
 // biar gak reimplement Set-toggle-logic 7 kali. `pageIds` = id yang lagi
-// tampil di halaman/tab saat ini (buat "select all" scoped ke situ aja,
-// bukan seluruh dataset yang mungkin ke-filter/paginated).
+// tampil di halaman/tab saat ini (buat checkbox header "select all
+// HALAMAN INI"). Buat tabel dengan pagination SERVER-SIDE (PartsTab,
+// InventoryTab) yang butuh "pilih SEMUA data yang cocok filter" (bukan
+// cuma halaman ini) - dipakai `selectIds()` di bawah buat nambahin id dari
+// halaman lain yang belum sempat di-render (lihat handleSelectAllMatching
+// di PartsTab.jsx/InventoryTab.jsx).
 import { useMemo, useState } from 'react';
 
 export function useRowSelection(pageIds = []) {
@@ -33,6 +37,16 @@ export function useRowSelection(pageIds = []) {
     });
   }
 
+  // Union - nambahin banyak id sekaligus (dari luar halaman yang lagi
+  // tampil) TANPA ngilangin id yang udah ke-checklist sebelumnya.
+  function selectIds(ids) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.add(id));
+      return next;
+    });
+  }
+
   function clear() {
     setSelected(new Set());
   }
@@ -45,6 +59,7 @@ export function useRowSelection(pageIds = []) {
     isSelected: (id) => selected.has(id),
     toggle,
     toggleAllOnPage,
+    selectIds,
     allOnPageSelected,
     someOnPageSelected,
     clear,

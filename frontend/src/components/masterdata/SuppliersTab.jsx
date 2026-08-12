@@ -187,8 +187,11 @@ function SuppliersTab() {
     [suppliers, sort]
   );
   const paged = useMemo(() => sorted.slice((page - 1) * limit, page * limit), [sorted, page, limit]);
-  const pageIds = useMemo(() => paged.map((s) => s.id), [paged]);
-  const selection = useRowSelection(pageIds);
+  // Client-side pagination - "select all" nyakup SEMUA row yang cocok
+  // filter (`sorted`), bukan cuma halaman aktif. Lihat komentar sama di
+  // LinesTab.jsx.
+  const filteredIds = useMemo(() => sorted.map((s) => s.id), [sorted]);
+  const selection = useRowSelection(filteredIds);
   const bulkDelete = useBulkDeleteMutation('suppliers');
 
   function handleFilterChange(key) {
@@ -207,7 +210,7 @@ function SuppliersTab() {
   }
 
   async function handleBulkDelete() {
-    if (!(await confirm(`Hapus ${selection.selectedCount} Supplier terpilih? Bisa direstore lewat Recycle Bin.`)))
+    if (!(await confirm(`Hapus ${selection.selectedCount} Supplier terpilih (dari semua data, bukan cuma halaman ini)? Bisa direstore lewat Recycle Bin.`)))
       return;
     setBulkError('');
     try {

@@ -28,6 +28,8 @@ import SearchBar from '../SearchBar';
 import Pagination from '../Pagination';
 import PageSizeSelector from '../PageSizeSelector';
 import BulkDeleteBar from '../BulkDeleteBar';
+import SelectAllAcrossPagesBar from '../SelectAllAcrossPagesBar';
+import { fetchInventoryItems } from '../../api/inventoryApi';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -390,6 +392,13 @@ function InventoryTab() {
   const bulkDelete = useBulkDeleteMutation('inventory-items');
   const [bulkError, setBulkError] = useState('');
 
+  // "Pilih semua N Inventory Item yang cocok filter" - lihat komentar sama
+  // di PartsTab.jsx (handleSelectAllMatching), pola identik.
+  async function handleSelectAllMatching() {
+    const all = await fetchInventoryItems({ search: search || undefined, page: 1, limit: data.total });
+    selection.selectIds(all.items.map((i) => i.id));
+  }
+
   const ropById = useMemo(() => new Map((ropData || []).map((r) => [r.id, r])), [ropData]);
 
   const ropCounts = useMemo(() => {
@@ -483,6 +492,15 @@ function InventoryTab() {
         pending={bulkDelete.isPending}
         label="Inventory Item"
       />
+
+      {data && selection.allOnPageSelected && (
+        <SelectAllAcrossPagesBar
+          pageCount={pageIds.length}
+          total={data.total}
+          alreadySelectedAll={selection.selectedCount >= data.total}
+          onSelectAll={handleSelectAllMatching}
+        />
+      )}
 
       {isLoading && !data && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
       {data && data.items.length === 0 && (
