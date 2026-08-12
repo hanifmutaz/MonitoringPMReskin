@@ -6,6 +6,7 @@ const partSupplierController = require('../controllers/partSupplierController');
 const requireAuth = require('../middlewares/authMiddleware');
 const requireRole = require('../middlewares/roleMiddleware');
 const requireMasterDataEditAccess = require('../middlewares/masterDataAccess');
+const { requireLicensePackage } = require('../middlewares/licenseMiddleware');
 
 const router = express.Router();
 
@@ -32,10 +33,22 @@ router.get('/:partId/cl-mapping', requireRole('Admin', 'Operator'), clMappingCon
 router.post('/:partId/cl-mapping', requireMasterDataEditAccess, clMappingController.create);
 
 // Part-Supplier (nested) - daftar supplier per Part, "pesen kemana buat
-// part ini" - akses sama persis dengan cl-mapping di atas (master data
-// relasi, bukan transaksi).
-router.get('/:partId/suppliers', requireRole('Admin', 'Operator'), partSupplierController.list);
-router.post('/:partId/suppliers', requireMasterDataEditAccess, partSupplierController.create);
+// part ini" - fitur Paket B (sama alasan dengan supplierRoutes.js), beda
+// dari cl-mapping di atas yang tetap Paket A. requireLicensePackage('B')
+// dicek SEBELUM role/permission, gantiin akses "sama persis dengan
+// cl-mapping" yang lama.
+router.get(
+  '/:partId/suppliers',
+  requireLicensePackage('B'),
+  requireRole('Admin', 'Operator'),
+  partSupplierController.list
+);
+router.post(
+  '/:partId/suppliers',
+  requireLicensePackage('B'),
+  requireMasterDataEditAccess,
+  partSupplierController.create
+);
 
 // Link/unlink Part ke Inventory Item - dianggap Master Data (konfigurasi
 // relasi, bukan transaksi stok) - sama akses dengan edit Part.

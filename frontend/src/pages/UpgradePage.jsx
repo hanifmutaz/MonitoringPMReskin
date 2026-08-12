@@ -7,6 +7,13 @@
 // Isi (icon/badge/list fitur) dipindah ke PackageLockedNotice.jsx (shared -
 // dipakai juga inline di tab Suppliers/PartSupplierModal, lihat komentar
 // di file itu), UpgradePage sekarang cuma bungkus mode "compact=false".
+//
+// BUGFIX: UpgradePage gantiin halaman aslinya (mis. InventoryHistoryPage)
+// via PackageRoute.jsx, jadi usePageHeader() punya halaman asli itu gak
+// pernah ke-trigger - Topbar nyangkut nampilin title HALAMAN SEBELUMNYA
+// yang terakhir manggil usePageHeader(). UpgradePage HARUS manggil sendiri
+// biar Topbar sinkron sama menu Sidebar yang lagi aktif/diklik.
+import { usePageHeader } from '../contexts/PageHeaderContext';
 import PackageLockedNotice from '../components/PackageLockedNotice';
 
 const PAKET_B_FEATURES = {
@@ -24,6 +31,8 @@ const PAKET_B_FEATURES = {
 };
 
 function UpgradePage({ featureName = 'Inventory Integration' }) {
+  usePageHeader({ title: featureName });
+
   return <PackageLockedNotice featureName={featureName} features={PAKET_B_FEATURES[featureName]} />;
 }
 
