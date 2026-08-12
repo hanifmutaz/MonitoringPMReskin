@@ -9,8 +9,11 @@ import { usePartSuppliers, usePartSupplierMutations } from '../../hooks/usePartS
 import { useSuppliers } from '../../hooks/useSuppliers';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useRowSelection } from '../../hooks/useRowSelection';
+import { useBulkDeleteMutation } from '../../hooks/useRecycleBin';
 import { cn } from '../../lib/utils';
 import Modal from '../Modal';
+import BulkDeleteBar from '../BulkDeleteBar';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -33,6 +36,8 @@ function PartSupplierModal({ part, onClose }) {
   const confirm = useConfirm();
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
+  const selection = useRowSelection(links.map((l) => l.id));
+  const bulkDelete = useBulkDeleteMutation('part-suppliers');
 
   // Supplier yang udah terhubung ke Part ini gak muncul lagi di dropdown -
   // constraint uq_part_suppliers (1 part + 1 supplier cuma boleh 1 baris)
@@ -56,6 +61,18 @@ function PartSupplierModal({ part, onClose }) {
     await remove.mutateAsync(id);
   }
 
+  async function handleBulkDelete() {
+    if (!(await confirm(`Lepas ${selection.selectedCount} Supplier terpilih dari Part ini? Bisa direstore lewat Recycle Bin.`)))
+      return;
+    setError('');
+    try {
+      await bulkDelete.mutateAsync(selection.selectedIds);
+      selection.clear();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal melepas Supplier terpilih');
+    }
+  }
+
   function handleTogglePrimary(link) {
     // Klik bintang yang UDAH utama -> lepas status utama. Klik yang belum
     // utama -> jadi utama (yang lama otomatis ke-unset, lihat
@@ -73,10 +90,29 @@ function PartSupplierModal({ part, onClose }) {
       {isLoading ? (
         <div className="py-6 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>
       ) : (
-        <div className="mb-4 overflow-hidden rounded-lg border border-border">
+        <div className="mb-4">
+          <BulkDeleteBar
+            count={selection.selectedCount}
+            onDelete={handleBulkDelete}
+            onClear={selection.clear}
+            pending={bulkDelete.isPending}
+            label="Supplier link"
+          />
+          <div className="overflow-hidden rounded-lg border border-border">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-border">
+                <th className="w-[36px] px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={selection.allOnPageSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
+                    }}
+                    onChange={selection.toggleAllOnPage}
+                    className="h-3.5 w-3.5 accent-[var(--accent)]"
+                  />
+                </th>
                 <th className="w-[38px] px-3 py-2" />
                 <th className="px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
                   Supplier
@@ -100,6 +136,14 @@ function PartSupplierModal({ part, onClose }) {
               )}
               {links.map((l) => (
                 <tr key={l.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                  <td className="px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      checked={selection.isSelected(l.id)}
+                      onChange={() => selection.toggle(l.id)}
+                      className="h-3.5 w-3.5 accent-[var(--accent)]"
+                    />
+                  </td>
                   <td className="px-3 py-2.5">
                     <button
                       type="button"
@@ -140,6 +184,7 @@ function PartSupplierModal({ part, onClose }) {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

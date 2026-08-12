@@ -19,6 +19,7 @@ import InventoryPage from './pages/InventoryPage';
 import InventoryHistoryPage from './pages/InventoryHistoryPage';
 import SettingsPage from './pages/SettingsPage';
 import UserManagementPage from './pages/UserManagementPage';
+import RecycleBinPage from './pages/RecycleBinPage';
 import ProfilePage from './pages/ProfilePage';
 import NotFoundPage from './pages/NotFoundPage';
 
@@ -72,6 +73,7 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/users" element={<UserManagementPage />} />
+            <Route path="/recycle-bin" element={<RecycleBinPage />} />
           </Route>
         </Route>
       </Route>

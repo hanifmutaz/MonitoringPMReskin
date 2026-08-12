@@ -15,6 +15,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, ListChecks, CheckCircle2, XCircle } from 'lucide-react';
 import { fetchLines } from '../../api/linesApi';
 import { useLineMutations } from '../../hooks/useLineMutations';
+import { useRowSelection } from '../../hooks/useRowSelection';
+import { useBulkDeleteMutation } from '../../hooks/useRecycleBin';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
 import { cn } from '../../lib/utils';
 import Modal from '../Modal';
@@ -22,6 +24,7 @@ import KpiCard from '../KpiCard';
 import SearchBar from '../SearchBar';
 import Pagination from '../Pagination';
 import PageSizeSelector from '../PageSizeSelector';
+import BulkDeleteBar from '../BulkDeleteBar';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -155,6 +158,21 @@ function LinesTab() {
   }, [lines, filter, search, sort]);
 
   const paged = useMemo(() => filtered.slice((page - 1) * limit, page * limit), [filtered, page, limit]);
+  const pageIds = useMemo(() => paged.map((l) => l.id), [paged]);
+  const selection = useRowSelection(pageIds);
+  const bulkDelete = useBulkDeleteMutation('lines');
+  const [bulkError, setBulkError] = useState('');
+
+  async function handleBulkDelete() {
+    if (!(await confirm(`Hapus ${selection.selectedCount} Line terpilih? Bisa direstore lewat Recycle Bin.`))) return;
+    setBulkError('');
+    try {
+      await bulkDelete.mutateAsync(selection.selectedIds);
+      selection.clear();
+    } catch (err) {
+      setBulkError(err.response?.data?.message || 'Gagal menghapus Line terpilih');
+    }
+  }
 
   function handleFilterChange(key) {
     setFilter(key);
@@ -233,6 +251,20 @@ function LinesTab() {
         </div>
       )}
 
+      {bulkError && (
+        <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
+          {bulkError}
+        </div>
+      )}
+
+      <BulkDeleteBar
+        count={selection.selectedCount}
+        onDelete={handleBulkDelete}
+        onClear={selection.clear}
+        pending={bulkDelete.isPending}
+        label="Line"
+      />
+
       {isLoading && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
 
       {!isLoading && paged.length === 0 && (
@@ -244,6 +276,17 @@ function LinesTab() {
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-border">
+                <th className="w-[36px] px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={selection.allOnPageSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
+                    }}
+                    onChange={selection.toggleAllOnPage}
+                    className="h-3.5 w-3.5 accent-[var(--accent)]"
+                  />
+                </th>
                 <th className="px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
                   Nama Line
                 </th>
@@ -261,6 +304,14 @@ function LinesTab() {
             <tbody>
               {paged.map((line) => (
                 <tr key={line.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                  <td className="px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selection.isSelected(line.id)}
+                      onChange={() => selection.toggle(line.id)}
+                      className="h-3.5 w-3.5 accent-[var(--accent)]"
+                    />
+                  </td>
                   <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{line.line_name}</td>
                   <td className="px-3 py-3">
                     <label className="flex cursor-pointer items-center gap-2 text-[13px]">

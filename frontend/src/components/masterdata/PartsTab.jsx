@@ -21,12 +21,15 @@ import { useLines } from '../../hooks/useLines';
 import { useInventoryItems } from '../../hooks/useInventoryItems';
 import { useInventoryMutations } from '../../hooks/useInventoryMutations';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useRowSelection } from '../../hooks/useRowSelection';
+import { useBulkDeleteMutation } from '../../hooks/useRecycleBin';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
 import Modal from '../Modal';
 import KpiCard from '../KpiCard';
 import SearchBar from '../SearchBar';
 import Pagination from '../Pagination';
 import PageSizeSelector from '../PageSizeSelector';
+import BulkDeleteBar from '../BulkDeleteBar';
 import ClMappingModal from './ClMappingModal';
 import PartSupplierModal from './PartSupplierModal';
 import { Button } from '../ui/button';
@@ -282,6 +285,10 @@ function PartsTab() {
   });
   const { remove } = usePartMutations();
   const confirm = useConfirm();
+  const pageIds = data?.items?.map((p) => p.id) ?? [];
+  const selection = useRowSelection(pageIds);
+  const bulkDelete = useBulkDeleteMutation('parts');
+  const [bulkError, setBulkError] = useState('');
 
   async function handleDelete(part) {
     if (!(await confirm(`Hapus Part "${part.drawing_no}" (Jig: ${part.jig_name})?`))) return;
@@ -290,6 +297,17 @@ function PartsTab() {
       await remove.mutateAsync(part.id);
     } catch (err) {
       setDeleteError(err.response?.data?.message || 'Gagal menghapus Part');
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (!(await confirm(`Hapus ${selection.selectedCount} Part terpilih? Bisa direstore lewat Recycle Bin.`))) return;
+    setBulkError('');
+    try {
+      await bulkDelete.mutateAsync(selection.selectedIds);
+      selection.clear();
+    } catch (err) {
+      setBulkError(err.response?.data?.message || 'Gagal menghapus Part terpilih');
     }
   }
 
@@ -348,6 +366,20 @@ function PartsTab() {
         </div>
       )}
 
+      {bulkError && (
+        <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
+          {bulkError}
+        </div>
+      )}
+
+      <BulkDeleteBar
+        count={selection.selectedCount}
+        onDelete={handleBulkDelete}
+        onClear={selection.clear}
+        pending={bulkDelete.isPending}
+        label="Part"
+      />
+
       {isLoading && !data && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
       {data && data.items.length === 0 && (
         <div className="py-8 text-center text-sm text-[var(--text-faint)]">Belum ada part yang cocok.</div>
@@ -360,6 +392,17 @@ function PartsTab() {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-border">
+                    <th className="w-[36px] px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={selection.allOnPageSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
+                        }}
+                        onChange={selection.toggleAllOnPage}
+                        className="h-3.5 w-3.5 accent-[var(--accent)]"
+                      />
+                    </th>
                     {['Line', 'Jig', 'Drawing No / Part Name', 'Target Shot', 'CL', 'Supplier', 'Status', 'Aksi'].map(
                       (h) => (
                         <th
@@ -375,6 +418,14 @@ function PartsTab() {
                 <tbody>
                   {data.items.map((part) => (
                     <tr key={part.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                      <td className="px-3 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selection.isSelected(part.id)}
+                          onChange={() => selection.toggle(part.id)}
+                          className="h-3.5 w-3.5 accent-[var(--accent)]"
+                        />
+                      </td>
                       <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{part.line_name}</td>
                       <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{part.jig_name}</td>
                       <td className="px-3 py-3">

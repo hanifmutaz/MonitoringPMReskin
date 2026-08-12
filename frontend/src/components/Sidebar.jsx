@@ -123,6 +123,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/settings', label: 'Settings' },
       { to: '/users', label: 'User Management' },
+      { to: '/recycle-bin', label: 'Recycle Bin' },
     ],
   },
 ];
