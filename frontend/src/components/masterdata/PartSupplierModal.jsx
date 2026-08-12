@@ -8,18 +8,27 @@ import { Plus, Trash2, Star } from 'lucide-react';
 import { usePartSuppliers, usePartSupplierMutations } from '../../hooks/usePartSuppliers';
 import { useSuppliers } from '../../hooks/useSuppliers';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 import Modal from '../Modal';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import PackageLockedNotice from '../PackageLockedNotice';
 
 const emptyForm = { supplier_id: '', notes: '' };
 
 function PartSupplierModal({ part, onClose }) {
-  const { data: links = [], isLoading } = usePartSuppliers(part.id);
-  const { data: allSuppliers = [] } = useSuppliers({ isActive: true });
+  const { hasPackage } = useAuth();
+  // Fitur Paket B - dicek PALING ATAS, SEBELUM hooks data fetching di bawah
+  // dipanggil dengan enabled:false biar gak nembak API yang bakal ke-block
+  // backend juga (licenseMiddleware.js). Modal tetap kebuka (tombol
+  // "Supplier" di PartsTab TETAP bisa diklik) - cuma isinya locked notice.
+  const locked = !hasPackage('B');
+
+  const { data: links = [], isLoading } = usePartSuppliers(part.id, { enabled: !locked });
+  const { data: allSuppliers = [] } = useSuppliers({ isActive: true, enabled: !locked });
   const { create, setPrimary, remove } = usePartSupplierMutations(part.id);
   const confirm = useConfirm();
   const [form, setForm] = useState(emptyForm);
