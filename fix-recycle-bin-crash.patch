@@ -1,0 +1,720 @@
+From 18cb155ce7d424055596b2244a75bc45e5952d02 Mon Sep 17 00:00:00 2001
+From: hanif <hanifmutaz@gmail.com>
+Date: Wed, 12 Aug 2026 22:07:09 +0000
+Subject: [PATCH] fix: recycle bin - registry hilang & partQueries kepakai
+ konten service
+
+Backend crash total pas startup - recycleBinRegistry.js gak ke-push
+padahal recycleBinService.js require file itu (app.js -> routes/index.js
+-> recycleBinRoutes -> recycleBinController -> recycleBinService, semua
+di-require eager di top-level app.js).
+
+partQueries.js juga ketimpa isi partService.js (duplikat listParts/
+createPart/updatePart/deletePart) - fungsi query-layer asli (findAll,
+findById, create, update, remove, dst) hilang, bikin seluruh modul Parts
+(list/create/edit/delete + lookup barcode PM Part) error.
+
+lineQueries.js/supplierQueries.js/roleQueries.js/clMappingQueries.js/
+partSupplierQueries.js belum ke-update ke soft-delete (remove(id,
+runner) versi lama, hard DELETE, tanpa filter deleted_at) padahal
+service masing-masing sudah manggil remove(id, userId, client) 3
+argumen - bikin tombol Hapus di Lines/Suppliers/Roles/CL-Mapping/
+Part-Supplier link crash (userId kepasang jadi runner).
+---
+ backend/src/config/recycleBinRegistry.js | 105 +++++++++
+ backend/src/sql/clMappingQueries.js      |  19 +-
+ backend/src/sql/lineQueries.js           |  23 +-
+ backend/src/sql/partQueries.js           | 260 ++++++++++++-----------
+ backend/src/sql/partSupplierQueries.js   |  31 +--
+ backend/src/sql/roleQueries.js           |  20 +-
+ backend/src/sql/supplierQueries.js       |  24 ++-
+ 7 files changed, 314 insertions(+), 168 deletions(-)
+ create mode 100644 backend/src/config/recycleBinRegistry.js
+
+diff --git a/backend/src/config/recycleBinRegistry.js b/backend/src/config/recycleBinRegistry.js
+new file mode 100644
+index 0000000..373ed78
+--- /dev/null
++++ b/backend/src/config/recycleBinRegistry.js
+@@ -0,0 +1,105 @@
++// src/config/recycleBinRegistry.js
++//
++// Whitelist ENTITY -> tabel fisik + SQL listing, dipakai recycleBinService.
++// SENGAJA whitelist ketat (bukan terima nama tabel dari request langsung) -
++// entity key di URL (req.params.entity) divalidasi lewat getEntityConfig()
++// sebelum table name dipakai di query string manapun, supaya gak ada celah
++// SQL injection lewat parameter URL.
++//
++// `protectColumn` (opsional) - kolom boolean yang HARUS false/null supaya
++// row boleh ikut bulk-delete generik (recycleBinService.bulkSoftDelete).
++// Dipakai untuk roles.is_system - Admin/Operator gak boleh ke-checklist dan
++// terhapus lewat aksi massal, meski jalur single-delete (roleManagementService)
++// sudah blokir ini juga di layer lain.
++
++const REGISTRY = {
++  lines: {
++    table: 'lines',
++    label: 'Lines',
++    listSql: `
++      SELECT l.id, l.line_name AS label, NULL AS context, l.deleted_at, u.full_name AS deleted_by_name
++      FROM lines l
++      LEFT JOIN users u ON u.id = l.deleted_by
++      WHERE l.deleted_at IS NOT NULL
++      ORDER BY l.deleted_at DESC
++    `,
++  },
++  parts: {
++    table: 'parts',
++    label: 'Parts',
++    listSql: `
++      SELECT p.id, (p.jig_name || ' - ' || p.drawing_no) AS label, l.line_name AS context,
++             p.deleted_at, u.full_name AS deleted_by_name
++      FROM parts p
++      JOIN lines l ON l.id = p.line_id
++      LEFT JOIN users u ON u.id = p.deleted_by
++      WHERE p.deleted_at IS NOT NULL
++      ORDER BY p.deleted_at DESC
++    `,
++  },
++  suppliers: {
++    table: 'suppliers',
++    label: 'Suppliers',
++    listSql: `
++      SELECT s.id, s.supplier_name AS label, NULL AS context, s.deleted_at, u.full_name AS deleted_by_name
++      FROM suppliers s
++      LEFT JOIN users u ON u.id = s.deleted_by
++      WHERE s.deleted_at IS NOT NULL
++      ORDER BY s.deleted_at DESC
++    `,
++  },
++  'inventory-items': {
++    table: 'inventory_items',
++    label: 'Inventory Items',
++    listSql: `
++      SELECT i.id, i.spare_part_number AS label, i.part_name AS context, i.deleted_at, u.full_name AS deleted_by_name
++      FROM inventory_items i
++      LEFT JOIN users u ON u.id = i.deleted_by
++      WHERE i.deleted_at IS NOT NULL
++      ORDER BY i.deleted_at DESC
++    `,
++  },
++  roles: {
++    table: 'roles',
++    label: 'Roles',
++    protectColumn: 'is_system',
++    listSql: `
++      SELECT r.id, r.name AS label, NULL AS context, r.deleted_at, u.full_name AS deleted_by_name
++      FROM roles r
++      LEFT JOIN users u ON u.id = r.deleted_by
++      WHERE r.deleted_at IS NOT NULL
++      ORDER BY r.deleted_at DESC
++    `,
++  },
++  'cl-mapping': {
++    table: 'part_cl_mapping',
++    label: 'Part-CL Mapping',
++    listSql: `
++      SELECT m.id, m.cl_no AS label, p.drawing_no AS context, m.deleted_at, u.full_name AS deleted_by_name
++      FROM part_cl_mapping m
++      JOIN parts p ON p.id = m.part_id
++      LEFT JOIN users u ON u.id = m.deleted_by
++      WHERE m.deleted_at IS NOT NULL
++      ORDER BY m.deleted_at DESC
++    `,
++  },
++  'part-suppliers': {
++    table: 'part_suppliers',
++    label: 'Part-Supplier Links',
++    listSql: `
++      SELECT ps.id, s.supplier_name AS label, p.drawing_no AS context, ps.deleted_at, u.full_name AS deleted_by_name
++      FROM part_suppliers ps
++      JOIN suppliers s ON s.id = ps.supplier_id
++      JOIN parts p ON p.id = ps.part_id
++      LEFT JOIN users u ON u.id = ps.deleted_by
++      WHERE ps.deleted_at IS NOT NULL
++      ORDER BY ps.deleted_at DESC
++    `,
++  },
++};
++
++function getEntityConfig(entityKey) {
++  return REGISTRY[entityKey] || null;
++}
++
++module.exports = { REGISTRY, getEntityConfig };
+diff --git a/backend/src/sql/clMappingQueries.js b/backend/src/sql/clMappingQueries.js
+index ad00a8e..8c3f984 100644
+--- a/backend/src/sql/clMappingQueries.js
++++ b/backend/src/sql/clMappingQueries.js
+@@ -3,7 +3,7 @@ const db = require('../config/db');
+ 
+ async function findByPartId(partId, runner = db) {
+   const result = await runner.query(
+-    `SELECT id, cl_no, product_name, jig_name FROM part_cl_mapping WHERE part_id = $1 ORDER BY cl_no ASC`,
++    `SELECT id, cl_no, product_name, jig_name FROM part_cl_mapping WHERE part_id = $1 AND deleted_at IS NULL ORDER BY cl_no ASC`,
+     [partId]
+   );
+   return result.rows;
+@@ -14,16 +14,18 @@ async function findById(id, runner = db) {
+   return result.rows[0] || null;
+ }
+ 
++// Uniqueness check - filter deleted_at IS NULL (CL No yang di-trash bisa
++// dipetakan ulang, lihat migration 1700000017000).
+ async function findByPartAndClNo(partId, clNo, runner = db) {
+-  const result = await runner.query(`SELECT id FROM part_cl_mapping WHERE part_id = $1 AND cl_no = $2`, [
+-    partId,
+-    clNo,
+-  ]);
++  const result = await runner.query(
++    `SELECT id FROM part_cl_mapping WHERE part_id = $1 AND cl_no = $2 AND deleted_at IS NULL`,
++    [partId, clNo]
++  );
+   return result.rows[0] || null;
+ }
+ 
+ async function partExists(partId, runner = db) {
+-  const result = await runner.query(`SELECT id FROM parts WHERE id = $1`, [partId]);
++  const result = await runner.query(`SELECT id FROM parts WHERE id = $1 AND deleted_at IS NULL`, [partId]);
+   return !!result.rows[0];
+ }
+ 
+@@ -37,8 +39,9 @@ async function create({ part_id, cl_no, product_name, jig_name }, runner = db) {
+   return result.rows[0];
+ }
+ 
+-async function remove(id, runner = db) {
+-  await runner.query(`DELETE FROM part_cl_mapping WHERE id = $1`, [id]);
++// SOFT DELETE (Recycle Bin) - lihat catatan yang sama di lineQueries.js.
++async function remove(id, userId, runner = db) {
++  await runner.query(`UPDATE part_cl_mapping SET deleted_at = now(), deleted_by = $1 WHERE id = $2`, [userId, id]);
+ }
+ 
+ module.exports = { findByPartId, findById, findByPartAndClNo, partExists, create, remove };
+diff --git a/backend/src/sql/lineQueries.js b/backend/src/sql/lineQueries.js
+index 9d5f58b..0ee6e33 100644
+--- a/backend/src/sql/lineQueries.js
++++ b/backend/src/sql/lineQueries.js
+@@ -7,7 +7,7 @@ const BASE_SELECT = `
+ `;
+ 
+ async function findAll({ isActive } = {}, runner = db) {
+-  const conditions = [];
++  const conditions = ['deleted_at IS NULL'];
+   const params = [];
+ 
+   if (isActive !== undefined) {
+@@ -15,18 +15,21 @@ async function findAll({ isActive } = {}, runner = db) {
+     conditions.push(`is_active = $${params.length}`);
+   }
+ 
+-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
++  const where = `WHERE ${conditions.join(' AND ')}`;
+   const result = await runner.query(`${BASE_SELECT} ${where} ORDER BY line_name ASC`, params);
+   return result.rows;
+ }
+ 
+ async function findById(id, runner = db) {
+-  const result = await runner.query(`${BASE_SELECT} WHERE id = $1`, [id]);
++  const result = await runner.query(`${BASE_SELECT} WHERE id = $1 AND deleted_at IS NULL`, [id]);
+   return result.rows[0] || null;
+ }
+ 
++// Dipakai buat cek keunikan line_name (create/update) - filter deleted_at
++// IS NULL supaya nama Line yang sudah di-Recycle Bin bisa dipakai ulang
++// (lihat migration 1700000017000, partial unique index uq_lines_line_name_active).
+ async function findByName(lineName, runner = db) {
+-  const result = await runner.query(`SELECT id FROM lines WHERE line_name = $1`, [lineName]);
++  const result = await runner.query(`SELECT id FROM lines WHERE line_name = $1 AND deleted_at IS NULL`, [lineName]);
+   return result.rows[0] || null;
+ }
+ 
+@@ -58,12 +61,18 @@ async function update(id, fields, runner = db) {
+   return result.rows[0] || null;
+ }
+ 
+-async function remove(id, runner = db) {
+-  await runner.query(`DELETE FROM lines WHERE id = $1`, [id]);
++// SOFT DELETE (checklist Recycle Bin) - GANTI dari hard DELETE. Row tetap
++// ada secara fisik (deleted_at diisi), muncul di Recycle Bin, bisa
++// direstore. Hard delete permanen cuma lewat recycleBinService.permanentDelete().
++async function remove(id, userId, runner = db) {
++  await runner.query(`UPDATE lines SET deleted_at = now(), deleted_by = $1 WHERE id = $2`, [userId, id]);
+ }
+ 
+ async function countPartsByLine(id, runner = db) {
+-  const result = await runner.query(`SELECT COUNT(*)::int AS count FROM parts WHERE line_id = $1`, [id]);
++  const result = await runner.query(
++    `SELECT COUNT(*)::int AS count FROM parts WHERE line_id = $1 AND deleted_at IS NULL`,
++    [id]
++  );
+   return result.rows[0].count;
+ }
+ 
+diff --git a/backend/src/sql/partQueries.js b/backend/src/sql/partQueries.js
+index c8df717..7478150 100644
+--- a/backend/src/sql/partQueries.js
++++ b/backend/src/sql/partQueries.js
+@@ -1,145 +1,151 @@
+-// src/services/partService.js
++// src/sql/partQueries.js
+ const db = require('../config/db');
+-const partQueries = require('../sql/partQueries');
+-const { recordAudit } = require('../utils/auditLog');
+-const AppError = require('../utils/AppError');
+-
+-async function listParts({ lineId, search, page, limit }) {
+-  const pageNum = Number(page) > 0 ? Number(page) : 1;
+-  const limitNum = Number(limit) > 0 ? Number(limit) : 20;
+-  return partQueries.findAll({ lineId, search, page: pageNum, limit: limitNum });
+-}
+ 
+-// Dipakai Form PM Part pas operator scan barcode Drawing No pakai kamera
+-// iPad. AppError.badRequest kalau drawing_no kosong - biar konsisten sama
+-// pola validasi endpoint lain (dicek di controller sebelum masuk service
+-// sebenarnya lebih lazim, tapi lookup ini query tunggal simpel jadi cukup
+-// di sini tanpa validator file terpisah).
+-async function lookupPartsByDrawingNo(drawingNo) {
+-  if (!drawingNo || typeof drawingNo !== 'string' || !drawingNo.trim()) {
+-    throw AppError.badRequest('Validasi gagal', { drawing_no: 'Drawing No wajib diisi' });
++const LIST_SELECT = `
++  SELECT
++    p.id, p.line_id, l.line_name, p.jig_name, p.drawing_no, p.part_name, p.target_shot,
++    p.spare_part_number, p.spare_part_qty, p.spare_part_location, p.spare_part_note,
++    p.inventory_item_id, inv.spare_part_number AS inv_spare_part_number, inv.current_stock AS inv_current_stock,
++    p.is_active,
++    (SELECT COUNT(*)::int FROM part_cl_mapping m WHERE m.part_id = p.id) AS cl_count,
++    (SELECT COUNT(*)::int FROM part_suppliers ps WHERE ps.part_id = p.id) AS supplier_count
++  FROM parts p
++  JOIN lines l ON l.id = p.line_id
++  LEFT JOIN inventory_items inv ON inv.id = p.inventory_item_id
++`;
++
++async function findAll({ lineId, search, page = 1, limit = 20 } = {}, runner = db) {
++  const conditions = ['p.deleted_at IS NULL'];
++  const params = [];
++
++  if (lineId) {
++    params.push(lineId);
++    conditions.push(`p.line_id = $${params.length}`);
++  }
++  if (search) {
++    params.push(`%${search}%`);
++    conditions.push(
++      `(p.part_name ILIKE $${params.length} OR p.drawing_no ILIKE $${params.length} OR p.jig_name ILIKE $${params.length})`
++    );
+   }
+-  return partQueries.findByDrawingNoExact(drawingNo.trim());
+-}
+ 
+-async function createPart(data, userId) {
+-  const client = await db.getClient();
+-  try {
+-    await client.query('BEGIN');
++  const where = `WHERE ${conditions.join(' AND ')}`;
++  const offset = (page - 1) * limit;
+ 
+-    const lineOk = await partQueries.lineExists(data.line_id, client);
+-    if (!lineOk) {
+-      throw AppError.badRequest('Validasi gagal', { line_id: 'Line tidak ditemukan' });
+-    }
++  const itemsResult = await runner.query(
++    `${LIST_SELECT} ${where} ORDER BY l.line_name ASC, p.drawing_no ASC LIMIT $${params.length + 1} OFFSET $${
++      params.length + 2
++    }`,
++    [...params, limit, offset]
++  );
+ 
+-    const existing = await partQueries.findByLineJigAndDrawing(data.line_id, data.jig_name, data.drawing_no, client);
+-    if (existing) {
+-      throw AppError.badRequest('Validasi gagal', {
+-        drawing_no: 'Kombinasi Line + Jig + Drawing No ini sudah terdaftar',
+-      });
+-    }
++  const countResult = await runner.query(
++    `SELECT COUNT(*)::int AS total FROM parts p JOIN lines l ON l.id = p.line_id ${where}`,
++    params
++  );
+ 
+-    const created = await partQueries.create(data, client);
++  return { items: itemsResult.rows, total: countResult.rows[0].total, page, limit };
++}
+ 
+-    await recordAudit(
+-      { tableName: 'parts', recordId: created.id, action: 'CREATE', oldValue: null, newValue: created, userId },
+-      client
+-    );
++async function findById(id, runner = db) {
++  const result = await runner.query(`${LIST_SELECT} WHERE p.id = $1 AND p.deleted_at IS NULL`, [id]);
++  return result.rows[0] || null;
++}
+ 
+-    await client.query('COMMIT');
+-    return created;
+-  } catch (err) {
+-    await client.query('ROLLBACK');
+-    throw err;
+-  } finally {
+-    client.release();
+-  }
++// Uniqueness check (Line+Jig+Drawing No) - filter deleted_at IS NULL supaya
++// kombinasi ini bisa dipakai ulang kalau Part lama sudah masuk Recycle Bin
++// (lihat migration 1700000017000, uq_parts_line_jig_drawing_active).
++async function findByLineJigAndDrawing(lineId, jigName, drawingNo, runner = db) {
++  const result = await runner.query(
++    `SELECT id FROM parts WHERE line_id = $1 AND jig_name = $2 AND drawing_no = $3 AND deleted_at IS NULL`,
++    [lineId, jigName, drawingNo]
++  );
++  return result.rows[0] || null;
+ }
+ 
+-async function updatePart(id, fields, userId) {
+-  const client = await db.getClient();
+-  try {
+-    await client.query('BEGIN');
+-
+-    const before = await partQueries.findRawById(id, client);
+-    if (!before) {
+-      throw AppError.notFound('Part tidak ditemukan');
+-    }
+-
+-    const targetLineId = fields.line_id !== undefined ? fields.line_id : before.line_id;
+-    const targetJigName = fields.jig_name !== undefined ? fields.jig_name : before.jig_name;
+-    const targetDrawingNo = fields.drawing_no !== undefined ? fields.drawing_no : before.drawing_no;
+-
+-    if (fields.line_id !== undefined) {
+-      const lineOk = await partQueries.lineExists(fields.line_id, client);
+-      if (!lineOk) {
+-        throw AppError.badRequest('Validasi gagal', { line_id: 'Line tidak ditemukan' });
+-      }
+-    }
+-
+-    if (fields.line_id !== undefined || fields.jig_name !== undefined || fields.drawing_no !== undefined) {
+-      const existing = await partQueries.findByLineJigAndDrawing(targetLineId, targetJigName, targetDrawingNo, client);
+-      if (existing && existing.id !== id) {
+-        throw AppError.badRequest('Validasi gagal', {
+-          drawing_no: 'Kombinasi Line + Jig + Drawing No ini sudah terdaftar',
+-        });
+-      }
+-    }
+-
+-    const updated = await partQueries.update(id, fields, client);
+-
+-    await recordAudit(
+-      { tableName: 'parts', recordId: id, action: 'UPDATE', oldValue: before, newValue: updated, userId },
+-      client
+-    );
++// Dipakai buat lookup hasil SCAN BARCODE (drawing_no dari kamera iPad) di
++// Form PM Part. EXACT match (bukan ILIKE %term% seperti findAll/search) -
++// barcode fisik harus match persis, gak boleh partial match yang salah part.
++// Bisa balikin >1 row karena drawing_no HANYA unik per (line_id, jig_name) -
++// part desain sama bisa kepasang di beberapa jig/line berbeda (lihat
++// migration 1700000006000). Frontend yang nentuin: 1 hasil -> auto-pick,
++// >1 hasil -> operator pilih Line/Jig mana yang dimaksud.
++async function findByDrawingNoExact(drawingNo, runner = db) {
++  const result = await runner.query(
++    `${LIST_SELECT} WHERE p.drawing_no = $1 AND p.is_active = TRUE AND p.deleted_at IS NULL`,
++    [drawingNo]
++  );
++  return result.rows;
++}
+ 
+-    await client.query('COMMIT');
+-    return updated;
+-  } catch (err) {
+-    await client.query('ROLLBACK');
+-    throw err;
+-  } finally {
+-    client.release();
+-  }
++async function lineExists(lineId, runner = db) {
++  const result = await runner.query(`SELECT id FROM lines WHERE id = $1`, [lineId]);
++  return !!result.rows[0];
+ }
+ 
+-async function deletePart(id, userId) {
+-  const client = await db.getClient();
+-  try {
+-    await client.query('BEGIN');
+-
+-    const before = await partQueries.findRawById(id, client);
+-    if (!before) {
+-      throw AppError.notFound('Part tidak ditemukan');
+-    }
+-
+-    const historyCount = await partQueries.countHistoryByPart(id, client);
+-    if (historyCount > 0) {
+-      throw AppError.conflict('Part masih memiliki riwayat penggantian, tidak bisa dihapus');
+-    }
+-
+-    await partQueries.remove(id, userId, client);
+-
+-    await recordAudit(
+-      {
+-        tableName: 'parts',
+-        recordId: id,
+-        action: 'DELETE',
+-        oldValue: before,
+-        newValue: null,
+-        userId,
+-        actionDetail: 'Soft delete - bisa direstore lewat Recycle Bin',
+-      },
+-      client
+-    );
++async function create(data, runner = db) {
++  const result = await runner.query(
++    `INSERT INTO parts (line_id, jig_name, drawing_no, part_name, target_shot, spare_part_number, spare_part_qty, spare_part_location, spare_part_note)
++     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
++     RETURNING id, line_id, jig_name, drawing_no, part_name, target_shot, spare_part_number, spare_part_qty, spare_part_location, spare_part_note, is_active, created_at`,
++    [
++      data.line_id,
++      data.jig_name,
++      data.drawing_no,
++      data.part_name,
++      data.target_shot,
++      data.spare_part_number ?? null,
++      data.spare_part_qty ?? null,
++      data.spare_part_location ?? null,
++      data.spare_part_note ?? null,
++    ]
++  );
++  return result.rows[0];
++}
+ 
+-    await client.query('COMMIT');
+-  } catch (err) {
+-    await client.query('ROLLBACK');
+-    throw err;
+-  } finally {
+-    client.release();
++async function update(id, fields, runner = db) {
++  const setClauses = [];
++  const params = [];
++
++  for (const [key, value] of Object.entries(fields)) {
++    params.push(value);
++    setClauses.push(`${key} = $${params.length}`);
+   }
++  setClauses.push(`updated_at = now()`);
++  params.push(id);
++
++  const result = await runner.query(
++    `UPDATE parts SET ${setClauses.join(', ')} WHERE id = $${params.length}
++     RETURNING id, line_id, jig_name, drawing_no, part_name, target_shot, spare_part_number, spare_part_qty, spare_part_location, spare_part_note, is_active, updated_at`,
++    params
++  );
++  return result.rows[0] || null;
++}
++
++// SOFT DELETE (Recycle Bin) - lihat catatan yang sama di lineQueries.js.
++async function remove(id, userId, runner = db) {
++  await runner.query(`UPDATE parts SET deleted_at = now(), deleted_by = $1 WHERE id = $2`, [userId, id]);
++}
++
++async function countHistoryByPart(id, runner = db) {
++  const result = await runner.query(`SELECT COUNT(*)::int AS count FROM pm_part_history WHERE part_id = $1`, [id]);
++  return result.rows[0].count;
++}
++
++async function findRawById(id, runner = db) {
++  const result = await runner.query(`SELECT * FROM parts WHERE id = $1`, [id]);
++  return result.rows[0] || null;
+ }
+ 
+-module.exports = { listParts, lookupPartsByDrawingNo, createPart, updatePart, deletePart };
+\ No newline at end of file
++module.exports = {
++  findAll,
++  findById,
++  findByLineJigAndDrawing,
++  findByDrawingNoExact,
++  lineExists,
++  create,
++  update,
++  remove,
++  countHistoryByPart,
++  findRawById,
++};
+diff --git a/backend/src/sql/partSupplierQueries.js b/backend/src/sql/partSupplierQueries.js
+index c8ee0ba..1d5463e 100644
+--- a/backend/src/sql/partSupplierQueries.js
++++ b/backend/src/sql/partSupplierQueries.js
+@@ -13,27 +13,29 @@ const BASE_SELECT = `
+ 
+ async function findByPartId(partId, runner = db) {
+   const result = await runner.query(
+-    `${BASE_SELECT} WHERE ps.part_id = $1 ORDER BY ps.is_primary DESC, s.supplier_name ASC`,
++    `${BASE_SELECT} WHERE ps.part_id = $1 AND ps.deleted_at IS NULL ORDER BY ps.is_primary DESC, s.supplier_name ASC`,
+     [partId]
+   );
+   return result.rows;
+ }
+ 
+ async function findById(id, runner = db) {
+-  const result = await runner.query(`${BASE_SELECT} WHERE ps.id = $1`, [id]);
++  const result = await runner.query(`${BASE_SELECT} WHERE ps.id = $1 AND ps.deleted_at IS NULL`, [id]);
+   return result.rows[0] || null;
+ }
+ 
++// Uniqueness check - filter deleted_at IS NULL (link Part-Supplier yang
++// di-trash bisa dibuat ulang, lihat migration 1700000017000).
+ async function findByPartAndSupplier(partId, supplierId, runner = db) {
+-  const result = await runner.query(`SELECT id FROM part_suppliers WHERE part_id = $1 AND supplier_id = $2`, [
+-    partId,
+-    supplierId,
+-  ]);
++  const result = await runner.query(
++    `SELECT id FROM part_suppliers WHERE part_id = $1 AND supplier_id = $2 AND deleted_at IS NULL`,
++    [partId, supplierId]
++  );
+   return result.rows[0] || null;
+ }
+ 
+ async function partExists(partId, runner = db) {
+-  const result = await runner.query(`SELECT id FROM parts WHERE id = $1`, [partId]);
++  const result = await runner.query(`SELECT id FROM parts WHERE id = $1 AND deleted_at IS NULL`, [partId]);
+   return !!result.rows[0];
+ }
+ 
+@@ -57,11 +59,13 @@ async function updateNotes(id, notes, runner = db) {
+ 
+ // Dipanggil DALAM transaction yang sama dengan setPrimary() di bawah - unset
+ // dulu row lama (kalau ada) sebelum set row baru, supaya gak nabrak partial
+-// unique index uq_part_suppliers_one_primary (migration 1700000014000).
++// unique index uq_part_suppliers_one_primary (migration 1700000014000, jadi
++// juga filter deleted_at IS NULL sejak 1700000017000).
+ async function unsetPrimaryForPart(partId, runner = db) {
+-  await runner.query(`UPDATE part_suppliers SET is_primary = FALSE WHERE part_id = $1 AND is_primary = TRUE`, [
+-    partId,
+-  ]);
++  await runner.query(
++    `UPDATE part_suppliers SET is_primary = FALSE WHERE part_id = $1 AND is_primary = TRUE AND deleted_at IS NULL`,
++    [partId]
++  );
+ }
+ 
+ async function setPrimary(id, isPrimary, runner = db) {
+@@ -72,8 +76,9 @@ async function setPrimary(id, isPrimary, runner = db) {
+   return result.rows[0] || null;
+ }
+ 
+-async function remove(id, runner = db) {
+-  await runner.query(`DELETE FROM part_suppliers WHERE id = $1`, [id]);
++// SOFT DELETE (Recycle Bin) - lihat catatan yang sama di lineQueries.js.
++async function remove(id, userId, runner = db) {
++  await runner.query(`UPDATE part_suppliers SET deleted_at = now(), deleted_by = $1 WHERE id = $2`, [userId, id]);
+ }
+ 
+ module.exports = {
+diff --git a/backend/src/sql/roleQueries.js b/backend/src/sql/roleQueries.js
+index 514f86b..8ec3c0f 100644
+--- a/backend/src/sql/roleQueries.js
++++ b/backend/src/sql/roleQueries.js
+@@ -6,18 +6,25 @@ async function findAll(runner = db) {
+     `SELECT r.id, r.name, r.is_system,
+             (SELECT COUNT(*)::int FROM users u WHERE u.role_id = r.id) AS user_count
+      FROM roles r
++     WHERE r.deleted_at IS NULL
+      ORDER BY r.is_system DESC, r.name ASC`
+   );
+   return result.rows;
+ }
+ 
+ async function findById(id, runner = db) {
+-  const result = await runner.query(`SELECT id, name, is_system FROM roles WHERE id = $1`, [id]);
++  const result = await runner.query(`SELECT id, name, is_system FROM roles WHERE id = $1 AND deleted_at IS NULL`, [
++    id,
++  ]);
+   return result.rows[0] || null;
+ }
+ 
++// Uniqueness check - filter deleted_at IS NULL (nama role di Recycle Bin
++// bisa dipakai ulang, lihat migration 1700000017000).
+ async function findByName(name, runner = db) {
+-  const result = await runner.query(`SELECT id, name, is_system FROM roles WHERE name = $1`, [name]);
++  const result = await runner.query(`SELECT id, name, is_system FROM roles WHERE name = $1 AND deleted_at IS NULL`, [
++    name,
++  ]);
+   return result.rows[0] || null;
+ }
+ 
+@@ -37,8 +44,13 @@ async function update(id, name, runner = db) {
+   return result.rows[0] || null;
+ }
+ 
+-async function remove(id, runner = db) {
+-  await runner.query(`DELETE FROM roles WHERE id = $1`, [id]);
++// SOFT DELETE (Recycle Bin) - lihat catatan yang sama di lineQueries.js.
++// Role bawaan (is_system) sudah diblokir di roleManagementService.deleteRole
++// SEBELUM sampai sini, jadi remove() ini gak perlu re-cek is_system lagi -
++// beda dengan bulk-delete generik (recycleBinService) yang emang harus
++// re-cek karena bypass service ini.
++async function remove(id, userId, runner = db) {
++  await runner.query(`UPDATE roles SET deleted_at = now(), deleted_by = $1 WHERE id = $2`, [userId, id]);
+ }
+ 
+ async function countUsersByRole(id, runner = db) {
+diff --git a/backend/src/sql/supplierQueries.js b/backend/src/sql/supplierQueries.js
+index ffe1b99..2ce2f0e 100644
+--- a/backend/src/sql/supplierQueries.js
++++ b/backend/src/sql/supplierQueries.js
+@@ -7,7 +7,7 @@ const BASE_SELECT = `
+ `;
+ 
+ async function findAll({ isActive, search } = {}, runner = db) {
+-  const conditions = [];
++  const conditions = ['deleted_at IS NULL'];
+   const params = [];
+ 
+   if (isActive !== undefined) {
+@@ -19,18 +19,22 @@ async function findAll({ isActive, search } = {}, runner = db) {
+     conditions.push(`(supplier_name ILIKE $${params.length} OR contact_person ILIKE $${params.length})`);
+   }
+ 
+-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
++  const where = `WHERE ${conditions.join(' AND ')}`;
+   const result = await runner.query(`${BASE_SELECT} ${where} ORDER BY supplier_name ASC`, params);
+   return result.rows;
+ }
+ 
+ async function findById(id, runner = db) {
+-  const result = await runner.query(`${BASE_SELECT} WHERE id = $1`, [id]);
++  const result = await runner.query(`${BASE_SELECT} WHERE id = $1 AND deleted_at IS NULL`, [id]);
+   return result.rows[0] || null;
+ }
+ 
++// Uniqueness check - filter deleted_at IS NULL (nama Supplier di Recycle
++// Bin bisa dipakai ulang, lihat migration 1700000017000).
+ async function findByName(supplierName, runner = db) {
+-  const result = await runner.query(`SELECT id FROM suppliers WHERE supplier_name = $1`, [supplierName]);
++  const result = await runner.query(`SELECT id FROM suppliers WHERE supplier_name = $1 AND deleted_at IS NULL`, [
++    supplierName,
++  ]);
+   return result.rows[0] || null;
+ }
+ 
+@@ -64,14 +68,16 @@ async function update(id, fields, runner = db) {
+   return result.rows[0] || null;
+ }
+ 
+-async function remove(id, runner = db) {
+-  await runner.query(`DELETE FROM suppliers WHERE id = $1`, [id]);
++// SOFT DELETE (Recycle Bin) - lihat catatan yang sama di lineQueries.js.
++async function remove(id, userId, runner = db) {
++  await runner.query(`UPDATE suppliers SET deleted_at = now(), deleted_by = $1 WHERE id = $2`, [userId, id]);
+ }
+ 
+ async function countPartLinksBySupplier(id, runner = db) {
+-  const result = await runner.query(`SELECT COUNT(*)::int AS count FROM part_suppliers WHERE supplier_id = $1`, [
+-    id,
+-  ]);
++  const result = await runner.query(
++    `SELECT COUNT(*)::int AS count FROM part_suppliers WHERE supplier_id = $1 AND deleted_at IS NULL`,
++    [id]
++  );
+   return result.rows[0].count;
+ }
+ 
+-- 
+2.43.0
+

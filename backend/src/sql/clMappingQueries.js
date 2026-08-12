@@ -3,7 +3,7 @@ const db = require('../config/db');
 
 async function findByPartId(partId, runner = db) {
   const result = await runner.query(
-    `SELECT id, cl_no, product_name, jig_name FROM part_cl_mapping WHERE part_id = $1 ORDER BY cl_no ASC`,
+    `SELECT id, cl_no, product_name, jig_name FROM part_cl_mapping WHERE part_id = $1 AND deleted_at IS NULL ORDER BY cl_no ASC`,
     [partId]
   );
   return result.rows;
@@ -14,16 +14,18 @@ async function findById(id, runner = db) {
   return result.rows[0] || null;
 }
 
+// Uniqueness check - filter deleted_at IS NULL (CL No yang di-trash bisa
+// dipetakan ulang, lihat migration 1700000017000).
 async function findByPartAndClNo(partId, clNo, runner = db) {
-  const result = await runner.query(`SELECT id FROM part_cl_mapping WHERE part_id = $1 AND cl_no = $2`, [
-    partId,
-    clNo,
-  ]);
+  const result = await runner.query(
+    `SELECT id FROM part_cl_mapping WHERE part_id = $1 AND cl_no = $2 AND deleted_at IS NULL`,
+    [partId, clNo]
+  );
   return result.rows[0] || null;
 }
 
 async function partExists(partId, runner = db) {
-  const result = await runner.query(`SELECT id FROM parts WHERE id = $1`, [partId]);
+  const result = await runner.query(`SELECT id FROM parts WHERE id = $1 AND deleted_at IS NULL`, [partId]);
   return !!result.rows[0];
 }
 
@@ -37,8 +39,9 @@ async function create({ part_id, cl_no, product_name, jig_name }, runner = db) {
   return result.rows[0];
 }
 
-async function remove(id, runner = db) {
-  await runner.query(`DELETE FROM part_cl_mapping WHERE id = $1`, [id]);
+// SOFT DELETE (Recycle Bin) - lihat catatan yang sama di lineQueries.js.
+async function remove(id, userId, runner = db) {
+  await runner.query(`UPDATE part_cl_mapping SET deleted_at = now(), deleted_by = $1 WHERE id = $2`, [userId, id]);
 }
 
 module.exports = { findByPartId, findById, findByPartAndClNo, partExists, create, remove };

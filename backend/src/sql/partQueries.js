@@ -1,145 +1,151 @@
-// src/services/partService.js
+// src/sql/partQueries.js
 const db = require('../config/db');
-const partQueries = require('../sql/partQueries');
-const { recordAudit } = require('../utils/auditLog');
-const AppError = require('../utils/AppError');
 
-async function listParts({ lineId, search, page, limit }) {
-  const pageNum = Number(page) > 0 ? Number(page) : 1;
-  const limitNum = Number(limit) > 0 ? Number(limit) : 20;
-  return partQueries.findAll({ lineId, search, page: pageNum, limit: limitNum });
-}
+const LIST_SELECT = `
+  SELECT
+    p.id, p.line_id, l.line_name, p.jig_name, p.drawing_no, p.part_name, p.target_shot,
+    p.spare_part_number, p.spare_part_qty, p.spare_part_location, p.spare_part_note,
+    p.inventory_item_id, inv.spare_part_number AS inv_spare_part_number, inv.current_stock AS inv_current_stock,
+    p.is_active,
+    (SELECT COUNT(*)::int FROM part_cl_mapping m WHERE m.part_id = p.id) AS cl_count,
+    (SELECT COUNT(*)::int FROM part_suppliers ps WHERE ps.part_id = p.id) AS supplier_count
+  FROM parts p
+  JOIN lines l ON l.id = p.line_id
+  LEFT JOIN inventory_items inv ON inv.id = p.inventory_item_id
+`;
 
-// Dipakai Form PM Part pas operator scan barcode Drawing No pakai kamera
-// iPad. AppError.badRequest kalau drawing_no kosong - biar konsisten sama
-// pola validasi endpoint lain (dicek di controller sebelum masuk service
-// sebenarnya lebih lazim, tapi lookup ini query tunggal simpel jadi cukup
-// di sini tanpa validator file terpisah).
-async function lookupPartsByDrawingNo(drawingNo) {
-  if (!drawingNo || typeof drawingNo !== 'string' || !drawingNo.trim()) {
-    throw AppError.badRequest('Validasi gagal', { drawing_no: 'Drawing No wajib diisi' });
+async function findAll({ lineId, search, page = 1, limit = 20 } = {}, runner = db) {
+  const conditions = ['p.deleted_at IS NULL'];
+  const params = [];
+
+  if (lineId) {
+    params.push(lineId);
+    conditions.push(`p.line_id = $${params.length}`);
   }
-  return partQueries.findByDrawingNoExact(drawingNo.trim());
-}
-
-async function createPart(data, userId) {
-  const client = await db.getClient();
-  try {
-    await client.query('BEGIN');
-
-    const lineOk = await partQueries.lineExists(data.line_id, client);
-    if (!lineOk) {
-      throw AppError.badRequest('Validasi gagal', { line_id: 'Line tidak ditemukan' });
-    }
-
-    const existing = await partQueries.findByLineJigAndDrawing(data.line_id, data.jig_name, data.drawing_no, client);
-    if (existing) {
-      throw AppError.badRequest('Validasi gagal', {
-        drawing_no: 'Kombinasi Line + Jig + Drawing No ini sudah terdaftar',
-      });
-    }
-
-    const created = await partQueries.create(data, client);
-
-    await recordAudit(
-      { tableName: 'parts', recordId: created.id, action: 'CREATE', oldValue: null, newValue: created, userId },
-      client
+  if (search) {
+    params.push(`%${search}%`);
+    conditions.push(
+      `(p.part_name ILIKE $${params.length} OR p.drawing_no ILIKE $${params.length} OR p.jig_name ILIKE $${params.length})`
     );
-
-    await client.query('COMMIT');
-    return created;
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
   }
+
+  const where = `WHERE ${conditions.join(' AND ')}`;
+  const offset = (page - 1) * limit;
+
+  const itemsResult = await runner.query(
+    `${LIST_SELECT} ${where} ORDER BY l.line_name ASC, p.drawing_no ASC LIMIT $${params.length + 1} OFFSET $${
+      params.length + 2
+    }`,
+    [...params, limit, offset]
+  );
+
+  const countResult = await runner.query(
+    `SELECT COUNT(*)::int AS total FROM parts p JOIN lines l ON l.id = p.line_id ${where}`,
+    params
+  );
+
+  return { items: itemsResult.rows, total: countResult.rows[0].total, page, limit };
 }
 
-async function updatePart(id, fields, userId) {
-  const client = await db.getClient();
-  try {
-    await client.query('BEGIN');
-
-    const before = await partQueries.findRawById(id, client);
-    if (!before) {
-      throw AppError.notFound('Part tidak ditemukan');
-    }
-
-    const targetLineId = fields.line_id !== undefined ? fields.line_id : before.line_id;
-    const targetJigName = fields.jig_name !== undefined ? fields.jig_name : before.jig_name;
-    const targetDrawingNo = fields.drawing_no !== undefined ? fields.drawing_no : before.drawing_no;
-
-    if (fields.line_id !== undefined) {
-      const lineOk = await partQueries.lineExists(fields.line_id, client);
-      if (!lineOk) {
-        throw AppError.badRequest('Validasi gagal', { line_id: 'Line tidak ditemukan' });
-      }
-    }
-
-    if (fields.line_id !== undefined || fields.jig_name !== undefined || fields.drawing_no !== undefined) {
-      const existing = await partQueries.findByLineJigAndDrawing(targetLineId, targetJigName, targetDrawingNo, client);
-      if (existing && existing.id !== id) {
-        throw AppError.badRequest('Validasi gagal', {
-          drawing_no: 'Kombinasi Line + Jig + Drawing No ini sudah terdaftar',
-        });
-      }
-    }
-
-    const updated = await partQueries.update(id, fields, client);
-
-    await recordAudit(
-      { tableName: 'parts', recordId: id, action: 'UPDATE', oldValue: before, newValue: updated, userId },
-      client
-    );
-
-    await client.query('COMMIT');
-    return updated;
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+async function findById(id, runner = db) {
+  const result = await runner.query(`${LIST_SELECT} WHERE p.id = $1 AND p.deleted_at IS NULL`, [id]);
+  return result.rows[0] || null;
 }
 
-async function deletePart(id, userId) {
-  const client = await db.getClient();
-  try {
-    await client.query('BEGIN');
-
-    const before = await partQueries.findRawById(id, client);
-    if (!before) {
-      throw AppError.notFound('Part tidak ditemukan');
-    }
-
-    const historyCount = await partQueries.countHistoryByPart(id, client);
-    if (historyCount > 0) {
-      throw AppError.conflict('Part masih memiliki riwayat penggantian, tidak bisa dihapus');
-    }
-
-    await partQueries.remove(id, userId, client);
-
-    await recordAudit(
-      {
-        tableName: 'parts',
-        recordId: id,
-        action: 'DELETE',
-        oldValue: before,
-        newValue: null,
-        userId,
-        actionDetail: 'Soft delete - bisa direstore lewat Recycle Bin',
-      },
-      client
-    );
-
-    await client.query('COMMIT');
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+// Uniqueness check (Line+Jig+Drawing No) - filter deleted_at IS NULL supaya
+// kombinasi ini bisa dipakai ulang kalau Part lama sudah masuk Recycle Bin
+// (lihat migration 1700000017000, uq_parts_line_jig_drawing_active).
+async function findByLineJigAndDrawing(lineId, jigName, drawingNo, runner = db) {
+  const result = await runner.query(
+    `SELECT id FROM parts WHERE line_id = $1 AND jig_name = $2 AND drawing_no = $3 AND deleted_at IS NULL`,
+    [lineId, jigName, drawingNo]
+  );
+  return result.rows[0] || null;
 }
 
-module.exports = { listParts, lookupPartsByDrawingNo, createPart, updatePart, deletePart };
+// Dipakai buat lookup hasil SCAN BARCODE (drawing_no dari kamera iPad) di
+// Form PM Part. EXACT match (bukan ILIKE %term% seperti findAll/search) -
+// barcode fisik harus match persis, gak boleh partial match yang salah part.
+// Bisa balikin >1 row karena drawing_no HANYA unik per (line_id, jig_name) -
+// part desain sama bisa kepasang di beberapa jig/line berbeda (lihat
+// migration 1700000006000). Frontend yang nentuin: 1 hasil -> auto-pick,
+// >1 hasil -> operator pilih Line/Jig mana yang dimaksud.
+async function findByDrawingNoExact(drawingNo, runner = db) {
+  const result = await runner.query(
+    `${LIST_SELECT} WHERE p.drawing_no = $1 AND p.is_active = TRUE AND p.deleted_at IS NULL`,
+    [drawingNo]
+  );
+  return result.rows;
+}
+
+async function lineExists(lineId, runner = db) {
+  const result = await runner.query(`SELECT id FROM lines WHERE id = $1`, [lineId]);
+  return !!result.rows[0];
+}
+
+async function create(data, runner = db) {
+  const result = await runner.query(
+    `INSERT INTO parts (line_id, jig_name, drawing_no, part_name, target_shot, spare_part_number, spare_part_qty, spare_part_location, spare_part_note)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     RETURNING id, line_id, jig_name, drawing_no, part_name, target_shot, spare_part_number, spare_part_qty, spare_part_location, spare_part_note, is_active, created_at`,
+    [
+      data.line_id,
+      data.jig_name,
+      data.drawing_no,
+      data.part_name,
+      data.target_shot,
+      data.spare_part_number ?? null,
+      data.spare_part_qty ?? null,
+      data.spare_part_location ?? null,
+      data.spare_part_note ?? null,
+    ]
+  );
+  return result.rows[0];
+}
+
+async function update(id, fields, runner = db) {
+  const setClauses = [];
+  const params = [];
+
+  for (const [key, value] of Object.entries(fields)) {
+    params.push(value);
+    setClauses.push(`${key} = $${params.length}`);
+  }
+  setClauses.push(`updated_at = now()`);
+  params.push(id);
+
+  const result = await runner.query(
+    `UPDATE parts SET ${setClauses.join(', ')} WHERE id = $${params.length}
+     RETURNING id, line_id, jig_name, drawing_no, part_name, target_shot, spare_part_number, spare_part_qty, spare_part_location, spare_part_note, is_active, updated_at`,
+    params
+  );
+  return result.rows[0] || null;
+}
+
+// SOFT DELETE (Recycle Bin) - lihat catatan yang sama di lineQueries.js.
+async function remove(id, userId, runner = db) {
+  await runner.query(`UPDATE parts SET deleted_at = now(), deleted_by = $1 WHERE id = $2`, [userId, id]);
+}
+
+async function countHistoryByPart(id, runner = db) {
+  const result = await runner.query(`SELECT COUNT(*)::int AS count FROM pm_part_history WHERE part_id = $1`, [id]);
+  return result.rows[0].count;
+}
+
+async function findRawById(id, runner = db) {
+  const result = await runner.query(`SELECT * FROM parts WHERE id = $1`, [id]);
+  return result.rows[0] || null;
+}
+
+module.exports = {
+  findAll,
+  findById,
+  findByLineJigAndDrawing,
+  findByDrawingNoExact,
+  lineExists,
+  create,
+  update,
+  remove,
+  countHistoryByPart,
+  findRawById,
+};

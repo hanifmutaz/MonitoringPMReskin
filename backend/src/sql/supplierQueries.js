@@ -7,7 +7,7 @@ const BASE_SELECT = `
 `;
 
 async function findAll({ isActive, search } = {}, runner = db) {
-  const conditions = [];
+  const conditions = ['deleted_at IS NULL'];
   const params = [];
 
   if (isActive !== undefined) {
@@ -19,18 +19,22 @@ async function findAll({ isActive, search } = {}, runner = db) {
     conditions.push(`(supplier_name ILIKE $${params.length} OR contact_person ILIKE $${params.length})`);
   }
 
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const where = `WHERE ${conditions.join(' AND ')}`;
   const result = await runner.query(`${BASE_SELECT} ${where} ORDER BY supplier_name ASC`, params);
   return result.rows;
 }
 
 async function findById(id, runner = db) {
-  const result = await runner.query(`${BASE_SELECT} WHERE id = $1`, [id]);
+  const result = await runner.query(`${BASE_SELECT} WHERE id = $1 AND deleted_at IS NULL`, [id]);
   return result.rows[0] || null;
 }
 
+// Uniqueness check - filter deleted_at IS NULL (nama Supplier di Recycle
+// Bin bisa dipakai ulang, lihat migration 1700000017000).
 async function findByName(supplierName, runner = db) {
-  const result = await runner.query(`SELECT id FROM suppliers WHERE supplier_name = $1`, [supplierName]);
+  const result = await runner.query(`SELECT id FROM suppliers WHERE supplier_name = $1 AND deleted_at IS NULL`, [
+    supplierName,
+  ]);
   return result.rows[0] || null;
 }
 
@@ -64,14 +68,16 @@ async function update(id, fields, runner = db) {
   return result.rows[0] || null;
 }
 
-async function remove(id, runner = db) {
-  await runner.query(`DELETE FROM suppliers WHERE id = $1`, [id]);
+// SOFT DELETE (Recycle Bin) - lihat catatan yang sama di lineQueries.js.
+async function remove(id, userId, runner = db) {
+  await runner.query(`UPDATE suppliers SET deleted_at = now(), deleted_by = $1 WHERE id = $2`, [userId, id]);
 }
 
 async function countPartLinksBySupplier(id, runner = db) {
-  const result = await runner.query(`SELECT COUNT(*)::int AS count FROM part_suppliers WHERE supplier_id = $1`, [
-    id,
-  ]);
+  const result = await runner.query(
+    `SELECT COUNT(*)::int AS count FROM part_suppliers WHERE supplier_id = $1 AND deleted_at IS NULL`,
+    [id]
+  );
   return result.rows[0].count;
 }
 
