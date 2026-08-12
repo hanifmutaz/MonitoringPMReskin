@@ -1,9 +1,17 @@
 // src/pages/PmPartFormPage.jsx
+// Reskin (checklist §3 item 5 "PM Part & PM Monthly/Weekly", batch susulan -
+// menyusul PmLineFormPage.jsx yang jadi pattern acuan): inline style lama
+// dilepas total, diganti Tailwind + shadcn ui (Button). Notice box pakai
+// warna warning (accent-dim/accent) yang sama persis kayak sebelumnya, cuma
+// dipetakan ke token yang beneran ada di tokens.css (bukan var(--warning)
+// yang gak pernah didefinisikan). Data/logic (handleSuccess, kondisi stock
+// gak kepotong) TIDAK berubah sama sekali.
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import PmPartHistoryForm from '../components/PmPartHistoryForm';
 import Banner from '../components/Banner';
+import { Button } from '../components/ui/button';
 
 function PmPartFormPage() {
     const navigate = useNavigate();
@@ -25,27 +33,19 @@ function PmPartFormPage() {
     }
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="flex flex-col gap-4">
             <Banner>
                 Input penggantian part di sini akan otomatis mereset counter shot dan tercatat di History PM Part.
             </Banner>
 
             {notice ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <div
-                        style={{
-                            padding: '10px 14px',
-                            borderRadius: 8,
-                            background: 'var(--warning-dim, var(--accent-dim))',
-                            border: '1px solid var(--warning, var(--accent))',
-                            fontSize: 13,
-                        }}
-                    >
+                <div className="flex flex-col gap-3">
+                    <div className="rounded-lg border border-primary bg-[var(--accent-dim)] px-3.5 py-2.5 text-[13px] text-foreground">
                         {notice}
                     </div>
-                    <button type="button" className="btn btn-primary" style={{ alignSelf: 'flex-start' }} onClick={() => navigate('/pm-part/history')}>
+                    <Button type="button" className="self-start" onClick={() => navigate('/pm-part/history')}>
                         Lanjut ke History
-                    </button>
+                    </Button>
                 </div>
             ) : (
                 <PmPartHistoryForm onSuccess={handleSuccess} />
