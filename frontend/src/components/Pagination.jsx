@@ -44,10 +44,18 @@ function PageButton({ children, active, disabled, onClick }) {
       onClick={onClick}
       className={cn(
         'flex h-[26px] w-[26px] items-center justify-center rounded-md border font-[var(--font-mono)] text-xs transition-colors',
+        // Cursor dipisah dari logic warna/border di bawah (bukan digabung
+        // jadi 1 string kayak sebelumnya) - biar cursor-pointer &
+        // cursor-not-allowed gak PERNAH ke-attach bareng ke elemen yang
+        // sama. Kalau digabung, dua utility class cursor itu punya
+        // specificity SAMA (sama-sama 1 class selector), jadi yang menang
+        // gantung urutan Tailwind nge-generate CSS-nya - bukan urutan di
+        // source, gampang salah tanpa kelihatan.
+        disabled ? 'cursor-not-allowed' : 'cursor-pointer',
         active
           ? 'border-primary bg-[var(--accent-dim)] text-primary'
           : disabled
-            ? 'cursor-not-allowed border-border text-[var(--text-faint)]'
+            ? 'border-border text-[var(--text-faint)]'
             : 'border-border text-[var(--text-dim)] hover:bg-secondary'
       )}
     >

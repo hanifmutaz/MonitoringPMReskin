@@ -18,6 +18,7 @@ const roleManagementRoutes = require('./roleManagementRoutes');
 const reportingRoutes = require('./reportingRoutes');
 const supplierRoutes = require('./supplierRoutes');
 const partSupplierRoutes = require('./partSupplierRoutes');
+const notificationRoutes = require('./notificationRoutes');
 
 const router = express.Router();
 
@@ -39,5 +40,6 @@ router.use('/roles', roleManagementRoutes);
 router.use('/reporting', reportingRoutes);
 router.use('/suppliers', supplierRoutes);
 router.use('/part-suppliers', partSupplierRoutes);
+router.use('/notifications', notificationRoutes);
 
 module.exports = router;

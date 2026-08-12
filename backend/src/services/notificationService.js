@@ -20,6 +20,8 @@ const pmPartService = require('./pmPartService');
 const inventoryService = require('./inventoryService');
 const userQueries = require('../sql/userQueries');
 const notificationQueries = require('../sql/notificationQueries');
+const partQueries = require('../sql/partQueries');
+const inventoryQueries = require('../sql/inventoryQueries');
 const mailer = require('../utils/mailer');
 const logger = require('../utils/logger');
 
@@ -204,4 +206,65 @@ async function checkAndSendInventoryOrderNotifications() {
   return { enabled: true, checked: orderItems.length, sent: sentCount, skipped_no_recipient: skippedNoRecipient };
 }
 
-module.exports = { checkAndSendPmPartNotifications, checkAndSendInventoryOrderNotifications };
+/**
+ * Ambil notifikasi terbaru buat dropdown bell icon di Topbar (frontend
+ * baru, sebelumnya data ini cuma kekirim lewat email, gak ke-expose ke
+ * UI). Gabungin log mentah (notification_log) sama data part/item TERKINI
+ * (JOIN saat baca, bukan simpen ulang teks email lama) - kalau part/item-
+ * nya udah kehapus dari saat notifikasi dikirim, tetep ditampilin tapi
+ * dikasih fallback text ("Part sudah dihapus"), bukan bikin request
+ * gagal cuma gara-gara 1 baris histori nyangkut ke data yang udah gak ada.
+ *
+ * `recent_24h_count` DIITUNG TERPISAH pakai query COUNT sendiri (bukan
+ * cuma ngitung dari `items` yang dibalikin) - biar akurat walau `limit`
+ * lebih kecil dari jumlah notifikasi 24 jam terakhir. Dilabeli "N jam
+ * terakhir" di frontend, BUKAN "belum dibaca" - lihat catatan di
+ * notificationQueries.countRecentSince kenapa.
+ */
+async function getRecentNotifications({ limit = 20 } = {}) {
+  const [logs, recent24hCount] = await Promise.all([
+    notificationQueries.findRecent(limit),
+    notificationQueries.countRecentSince(24),
+  ]);
+
+  const items = await Promise.all(
+    logs.map(async (log) => {
+      if (log.notification_type === 'PM_PART_DANGER') {
+        const part = await partQueries.findById(log.ref_id);
+        return {
+          id: log.id,
+          type: log.notification_type,
+          sent_at: log.sent_at,
+          title: part ? `Part perlu diganti - ${part.drawing_no}` : 'Part perlu diganti (data sudah dihapus)',
+          detail: part ? `${part.line_name} • ${part.jig_name} • ${part.part_name}` : null,
+          link: '/pm-part',
+        };
+      }
+      if (log.notification_type === 'INVENTORY_ORDER') {
+        const item = await inventoryQueries.findItemById(log.ref_id);
+        return {
+          id: log.id,
+          type: log.notification_type,
+          sent_at: log.sent_at,
+          title: item ? `Stok perlu di-order - ${item.spare_part_number}` : 'Stok perlu di-order (data sudah dihapus)',
+          detail: item ? item.part_name : null,
+          link: '/inventory',
+        };
+      }
+      // Fallback generik - jaga-jaga notification_type baru ditambah di
+      // migration tapi kode dropdown ini belum diupdate, daripada crash.
+      return {
+        id: log.id,
+        type: log.notification_type,
+        sent_at: log.sent_at,
+        title: log.notification_type,
+        detail: null,
+        link: null,
+      };
+    })
+  );
+
+  return { items, recent_24h_count: recent24hCount };
+}
+
+module.exports = { checkAndSendPmPartNotifications, checkAndSendInventoryOrderNotifications, getRecentNotifications };

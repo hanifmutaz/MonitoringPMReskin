@@ -2,6 +2,7 @@
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useCurrentPageHeader } from '../contexts/PageHeaderContext';
 import { useSidebar } from '../contexts/SidebarContext';
+import NotificationBell from './NotificationBell';
 
 // Tombol toggle sidebar pindah ke sini dari Sidebar.jsx (feedback via chat +
 // referensi Mantis - hamburger-nya emang di topbar). Style-nya beda dari
@@ -88,7 +89,13 @@ function Topbar() {
         </button>
         <h1 className="m-0 [font-family:var(--font-display)] text-[22px] font-semibold">{title}</h1>
       </div>
-      {actions && <div>{actions}</div>}
+      {/* Bell notifikasi (checklist §7, fitur baru) SELALU tampil (beda
+          dari `actions` yang page-specific) - ditaro bareng actions dalam
+          1 wrapper flex kanan, bukan gantiin. */}
+      <div className="flex items-center gap-2">
+        {actions}
+        <NotificationBell />
+      </div>
     </header>
   );
 }
