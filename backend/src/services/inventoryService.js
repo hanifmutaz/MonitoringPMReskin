@@ -288,10 +288,18 @@ async function deleteItem(id, userId) {
       throw AppError.conflict('Inventory Item sudah punya histori mutasi stok, tidak bisa dihapus (arsipkan/nonaktifkan saja)');
     }
 
-    await inventoryQueries.removeItem(id, client);
+    await inventoryQueries.removeItem(id, userId, client);
 
     await recordAudit(
-      { tableName: 'inventory_items', recordId: id, action: 'DELETE', oldValue: before, newValue: null, userId },
+      {
+        tableName: 'inventory_items',
+        recordId: id,
+        action: 'DELETE',
+        oldValue: before,
+        newValue: null,
+        userId,
+        actionDetail: 'Soft delete - bisa direstore lewat Recycle Bin',
+      },
       client
     );
 

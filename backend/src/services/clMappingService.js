@@ -61,10 +61,18 @@ async function deleteMapping(id, userId) {
       throw AppError.notFound('Mapping tidak ditemukan');
     }
 
-    await clMappingQueries.remove(id, client);
+    await clMappingQueries.remove(id, userId, client);
 
     await recordAudit(
-      { tableName: 'part_cl_mapping', recordId: id, action: 'DELETE', oldValue: before, newValue: null, userId },
+      {
+        tableName: 'part_cl_mapping',
+        recordId: id,
+        action: 'DELETE',
+        oldValue: before,
+        newValue: null,
+        userId,
+        actionDetail: 'Soft delete - bisa direstore lewat Recycle Bin',
+      },
       client
     );
 

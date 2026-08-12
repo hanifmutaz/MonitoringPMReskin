@@ -105,7 +105,7 @@ async function deleteLine(id, userId) {
       throw AppError.conflict('Line masih memiliki Part terkait, tidak bisa dihapus');
     }
 
-    await lineQueries.remove(id, client);
+    await lineQueries.remove(id, userId, client);
 
     await recordAudit(
       {
@@ -115,6 +115,7 @@ async function deleteLine(id, userId) {
         oldValue: before,
         newValue: null,
         userId,
+        actionDetail: 'Soft delete - bisa direstore lewat Recycle Bin',
       },
       client
     );

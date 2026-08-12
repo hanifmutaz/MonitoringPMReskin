@@ -133,10 +133,18 @@ async function deleteLink(id, userId) {
       throw AppError.notFound('Relasi Part-Supplier tidak ditemukan');
     }
 
-    await partSupplierQueries.remove(id, client);
+    await partSupplierQueries.remove(id, userId, client);
 
     await recordAudit(
-      { tableName: 'part_suppliers', recordId: id, action: 'DELETE', oldValue: before, newValue: null, userId },
+      {
+        tableName: 'part_suppliers',
+        recordId: id,
+        action: 'DELETE',
+        oldValue: before,
+        newValue: null,
+        userId,
+        actionDetail: 'Soft delete - bisa direstore lewat Recycle Bin',
+      },
       client
     );
 

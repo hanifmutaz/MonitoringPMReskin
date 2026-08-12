@@ -24,7 +24,7 @@ const STATUS_SELECT = `
 `;
 
 async function findAllStatus({ lineId } = {}, runner = db) {
-  const conditions = ['l.is_active = TRUE'];
+  const conditions = ['l.is_active = TRUE', 'l.deleted_at IS NULL'];
   const params = [];
   if (lineId) {
     params.push(lineId);
@@ -37,7 +37,7 @@ async function findAllStatus({ lineId } = {}, runner = db) {
 
 async function findLineById(lineId, runner = db) {
   const result = await runner.query(
-    `SELECT id, line_name, is_active, auto_reset_weekly_on_monthly FROM lines WHERE id = $1`,
+    `SELECT id, line_name, is_active, auto_reset_weekly_on_monthly FROM lines WHERE id = $1 AND deleted_at IS NULL`,
     [lineId]
   );
   return result.rows[0] || null;

@@ -165,10 +165,18 @@ async function deleteRole(id, userId) {
       throw AppError.conflict(`Role ini masih dipakai ${userCount} user, pindahkan dulu user-nya ke role lain sebelum dihapus`);
     }
 
-    await roleQueries.remove(id, client);
+    await roleQueries.remove(id, userId, client);
 
     await recordAudit(
-      { tableName: 'roles', recordId: id, action: 'DELETE', oldValue: before, newValue: null, userId },
+      {
+        tableName: 'roles',
+        recordId: id,
+        action: 'DELETE',
+        oldValue: before,
+        newValue: null,
+        userId,
+        actionDetail: 'Soft delete - bisa direstore lewat Recycle Bin',
+      },
       client
     );
 

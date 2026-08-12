@@ -10,7 +10,7 @@ const ITEM_SELECT = `
 `;
 
 async function findAllItems({ search, page = 1, limit = 20 } = {}, runner = db) {
-  const conditions = [];
+  const conditions = ['i.deleted_at IS NULL'];
   const params = [];
 
   if (search) {
@@ -18,7 +18,7 @@ async function findAllItems({ search, page = 1, limit = 20 } = {}, runner = db) 
     conditions.push(`(i.spare_part_number ILIKE $${params.length} OR i.part_name ILIKE $${params.length})`);
   }
 
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const where = `WHERE ${conditions.join(' AND ')}`;
   const offset = (Number(page) - 1) * Number(limit);
 
   const countResult = await runner.query(`SELECT COUNT(*)::int AS total FROM inventory_items i ${where}`, params);
@@ -32,7 +32,7 @@ async function findAllItems({ search, page = 1, limit = 20 } = {}, runner = db) 
 }
 
 async function findItemById(id, runner = db) {
-  const result = await runner.query(`${ITEM_SELECT} WHERE i.id = $1`, [id]);
+  const result = await runner.query(`${ITEM_SELECT} WHERE i.id = $1 AND i.deleted_at IS NULL`, [id]);
   return result.rows[0] || null;
 }
 
@@ -41,8 +41,13 @@ async function findRawItemById(id, runner = db) {
   return result.rows[0] || null;
 }
 
+// Uniqueness check - filter deleted_at IS NULL (Spare Part Number di
+// Recycle Bin bisa dipakai ulang, lihat migration 1700000017000).
 async function findItemBySparePartNumber(sparePartNumber, runner = db) {
-  const result = await runner.query(`SELECT id FROM inventory_items WHERE spare_part_number = $1`, [sparePartNumber]);
+  const result = await runner.query(
+    `SELECT id FROM inventory_items WHERE spare_part_number = $1 AND deleted_at IS NULL`,
+    [sparePartNumber]
+  );
   return result.rows[0] || null;
 }
 
@@ -85,12 +90,16 @@ async function adjustCurrentStock(id, delta, runner = db) {
   return result.rows[0] || null;
 }
 
-async function removeItem(id, runner = db) {
-  await runner.query(`DELETE FROM inventory_items WHERE id = $1`, [id]);
+// SOFT DELETE (Recycle Bin) - lihat catatan yang sama di lineQueries.js.
+async function removeItem(id, userId, runner = db) {
+  await runner.query(`UPDATE inventory_items SET deleted_at = now(), deleted_by = $1 WHERE id = $2`, [userId, id]);
 }
 
 async function countLinkedParts(id, runner = db) {
-  const result = await runner.query(`SELECT COUNT(*)::int AS count FROM parts WHERE inventory_item_id = $1`, [id]);
+  const result = await runner.query(
+    `SELECT COUNT(*)::int AS count FROM parts WHERE inventory_item_id = $1 AND deleted_at IS NULL`,
+    [id]
+  );
   return result.rows[0].count;
 }
 

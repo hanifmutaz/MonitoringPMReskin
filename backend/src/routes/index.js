@@ -19,6 +19,7 @@ const reportingRoutes = require('./reportingRoutes');
 const supplierRoutes = require('./supplierRoutes');
 const partSupplierRoutes = require('./partSupplierRoutes');
 const notificationRoutes = require('./notificationRoutes');
+const recycleBinRoutes = require('./recycleBinRoutes');
 
 const router = express.Router();
 
@@ -41,5 +42,6 @@ router.use('/reporting', reportingRoutes);
 router.use('/suppliers', supplierRoutes);
 router.use('/part-suppliers', partSupplierRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/recycle-bin', recycleBinRoutes);
 
 module.exports = router;

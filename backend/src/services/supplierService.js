@@ -93,10 +93,18 @@ async function deleteSupplier(id, userId) {
       throw AppError.conflict('Supplier masih terhubung ke Part, lepas relasinya dulu sebelum menghapus');
     }
 
-    await supplierQueries.remove(id, client);
+    await supplierQueries.remove(id, userId, client);
 
     await recordAudit(
-      { tableName: 'suppliers', recordId: id, action: 'DELETE', oldValue: before, newValue: null, userId },
+      {
+        tableName: 'suppliers',
+        recordId: id,
+        action: 'DELETE',
+        oldValue: before,
+        newValue: null,
+        userId,
+        actionDetail: 'Soft delete - bisa direstore lewat Recycle Bin',
+      },
       client
     );
 

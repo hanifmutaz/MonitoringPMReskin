@@ -118,10 +118,18 @@ async function deletePart(id, userId) {
       throw AppError.conflict('Part masih memiliki riwayat penggantian, tidak bisa dihapus');
     }
 
-    await partQueries.remove(id, client);
+    await partQueries.remove(id, userId, client);
 
     await recordAudit(
-      { tableName: 'parts', recordId: id, action: 'DELETE', oldValue: before, newValue: null, userId },
+      {
+        tableName: 'parts',
+        recordId: id,
+        action: 'DELETE',
+        oldValue: before,
+        newValue: null,
+        userId,
+        actionDetail: 'Soft delete - bisa direstore lewat Recycle Bin',
+      },
       client
     );
 

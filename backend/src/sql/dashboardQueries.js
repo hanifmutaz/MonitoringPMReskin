@@ -2,12 +2,14 @@
 const db = require('../config/db');
 
 async function countAllParts(runner = db) {
-  const result = await runner.query(`SELECT COUNT(*)::int AS count FROM parts`);
+  const result = await runner.query(`SELECT COUNT(*)::int AS count FROM parts WHERE deleted_at IS NULL`);
   return result.rows[0].count;
 }
 
 async function countActiveLines(runner = db) {
-  const result = await runner.query(`SELECT COUNT(*)::int AS count FROM lines WHERE is_active = TRUE`);
+  const result = await runner.query(
+    `SELECT COUNT(*)::int AS count FROM lines WHERE is_active = TRUE AND deleted_at IS NULL`
+  );
   return result.rows[0].count;
 }
 
