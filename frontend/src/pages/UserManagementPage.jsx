@@ -17,7 +17,10 @@ import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useUsers, useUserMutations } from '../hooks/useUsers';
 import { useRoles, usePermissionCatalog, useRoleMutations } from '../hooks/useRoles';
 import { useConfirm } from '../contexts/ConfirmDialogContext';
+import { useRowSelection } from '../hooks/useRowSelection';
+import { useBulkDeleteMutation } from '../hooks/useRecycleBin';
 import Modal from '../components/Modal';
+import BulkDeleteBar from '../components/BulkDeleteBar';
 import ToggleSwitch from '../components/ToggleSwitch';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -254,6 +257,12 @@ function RoleManagementSection() {
   const [error, setError] = useState('');
   const [expandedRoleId, setExpandedRoleId] = useState(null);
   const [draftPerms, setDraftPerms] = useState({});
+  // Role bawaan (is_system) gak bisa di-checklist/dihapus - sama seperti
+  // tombol Trash2 per-baris yang juga disembunyikan buat role.is_system.
+  const selectableIds = roles.filter((r) => !r.is_system).map((r) => r.id);
+  const selection = useRowSelection(selectableIds);
+  const bulkDelete = useBulkDeleteMutation('roles');
+  const [bulkError, setBulkError] = useState('');
 
   function togglePerm(key, currentList, setter) {
     setter(currentList.includes(key) ? currentList.filter((k) => k !== key) : [...currentList, key]);
@@ -297,6 +306,18 @@ function RoleManagementSection() {
     }
   }
 
+  async function handleBulkDelete() {
+    if (!(await confirm(`Hapus ${selection.selectedCount} Role terpilih? Bisa direstore lewat Recycle Bin.`)))
+      return;
+    setBulkError('');
+    try {
+      await bulkDelete.mutateAsync(selection.selectedIds);
+      selection.clear();
+    } catch (err) {
+      setBulkError(err.response?.data?.message || 'Gagal menghapus Role terpilih');
+    }
+  }
+
   return (
     <div className="mb-4 rounded-lg border border-border bg-card p-4.5">
       <div className="mb-4 flex items-center justify-between">
@@ -307,6 +328,20 @@ function RoleManagementSection() {
         <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{error}</div>
       )}
 
+      {bulkError && (
+        <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
+          {bulkError}
+        </div>
+      )}
+
+      <BulkDeleteBar
+        count={selection.selectedCount}
+        onDelete={handleBulkDelete}
+        onClear={selection.clear}
+        pending={bulkDelete.isPending}
+        label="Role"
+      />
+
       {isLoading && <div className="py-6 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
 
       {!isLoading && (
@@ -315,6 +350,17 @@ function RoleManagementSection() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-border">
+                  <th className="w-[36px] px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={selection.allOnPageSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
+                      }}
+                      onChange={selection.toggleAllOnPage}
+                      className="h-3.5 w-3.5 accent-[var(--accent)]"
+                    />
+                  </th>
                   {['Nama Role', 'User', 'Permission', 'Aksi'].map((h) => (
                     <th
                       key={h}
@@ -328,6 +374,16 @@ function RoleManagementSection() {
               <tbody>
                 {roles.map((role) => (
                   <tr key={role.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                    <td className="px-3 py-2.5">
+                      {!role.is_system && (
+                        <input
+                          type="checkbox"
+                          checked={selection.isSelected(role.id)}
+                          onChange={() => selection.toggle(role.id)}
+                          className="h-3.5 w-3.5 accent-[var(--accent)]"
+                        />
+                      )}
+                    </td>
                     <td className="px-3 py-2.5 text-[13px]">
                       {role.name}{' '}
                       {role.is_system && <span className="text-xs text-muted-foreground">(bawaan)</span>}
