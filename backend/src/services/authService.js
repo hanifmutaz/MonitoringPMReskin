@@ -1,6 +1,7 @@
 // src/services/authService.js
 const bcrypt = require('bcrypt');
 const db = require('../config/db');
+const config = require('../config/env');
 const userQueries = require('../sql/userQueries');
 const permissionQueries = require('../sql/permissionQueries');
 const loginAuditQueries = require('../sql/loginAuditQueries');
@@ -85,7 +86,11 @@ async function login(username, password, context = {}) {
 
   const token = signToken(userPayload);
 
-  return { token, user: { ...userPayload, permissions } };
+  // license_package ('A'/'B') SENGAJA gak masuk JWT claims (sama alasan
+  // kayak permissions - biar kalau Admin ganti LICENSE_PACKAGE env terus
+  // restart server, user gak perlu re-login buat lihat perubahan gating).
+  // Cuma ada di body response, dibaca AuthContext.jsx buat hasPackage().
+  return { token, user: { ...userPayload, permissions, license_package: config.licensePackage } };
 }
 
 /**
@@ -158,6 +163,7 @@ async function getMe(userId) {
     avatar_url: user.avatar_url,
     role: user.role_name,
     permissions,
+    license_package: config.licensePackage,
   };
 }
 

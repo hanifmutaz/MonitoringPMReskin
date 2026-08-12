@@ -1,6 +1,7 @@
 // src/App.jsx
 import { Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './routes/ProtectedRoute';
+import PackageRoute from './routes/PackageRoute';
 import MainLayout from './layouts/MainLayout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -42,8 +43,26 @@ function App() {
           <Route path="/pm-line/history" element={<PmLineHistoryPage />} />
 
           <Route path="/master-data" element={<MasterDataPage />} />
-          <Route path="/inventory" element={<InventoryPage />} />
-          <Route path="/inventory/history" element={<InventoryHistoryPage />} />
+          {/* Inventory = fitur Paket B (lihat diagram "Satu Sistem, Dua
+              Paket") - instance Paket A tetap sampai ke halaman ini kalau
+              klik menu Sidebar (yang grayed-out + badge "Paket B"), tapi
+              PackageRoute render UpgradePage di tempat, bukan redirect. */}
+          <Route
+            path="/inventory"
+            element={
+              <PackageRoute requiredPackage="B" featureName="Inventory Integration">
+                <InventoryPage />
+              </PackageRoute>
+            }
+          />
+          <Route
+            path="/inventory/history"
+            element={
+              <PackageRoute requiredPackage="B" featureName="History Inventory">
+                <InventoryHistoryPage />
+              </PackageRoute>
+            }
+          />
 
           {/* Di luar ProtectedRoute allowedRoles - SEMUA role yang login
               boleh akses profil sendiri, gak digating per-role kayak

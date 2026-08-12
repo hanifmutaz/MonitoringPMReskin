@@ -89,6 +89,19 @@ module.exports = {
   // 1-arah di doc/Architecture.md).
   siteId: process.env.SITE_ID || 'internal',
 
+  // Paket lisensi instance ini - 'A' (PM Monitoring standalone) atau 'B'
+  // (PM Monitoring + Inventory Integration). Beda dari role/permission:
+  // ini boundary PRODUK/KONTRAK (dijual terpisah ke client), bukan hak
+  // akses per-user. Default 'B' (full) kalau env kosong ATAU nilainya
+  // gak dikenali - sengaja FAIL OPEN biar deployment lama yang belum
+  // sempat di-set env-nya gak tiba-tiba kehilangan akses Inventory.
+  // Cek requireLicensePackage() di licenseMiddleware.js (backend enforcement)
+  // dan AuthContext.jsx/hasPackage() (frontend gating: sidebar grayed-out +
+  // UpgradePage) buat pemakaiannya.
+  licensePackage: ['A', 'B'].includes((process.env.LICENSE_PACKAGE || '').toUpperCase())
+    ? process.env.LICENSE_PACKAGE.toUpperCase()
+    : 'B',
+
   reporting: {
     // API key milik instance ini SENDIRI - dipakai buat verifikasi request
     // masuk ke GET /api/reporting/site-summary (service-to-service, bukan

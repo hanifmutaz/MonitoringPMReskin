@@ -1,7 +1,7 @@
 // src/components/Sidebar.jsx
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Wrench, ClipboardList, Database, ShieldCheck, ChevronDown, LogOut } from 'lucide-react';
+import { LayoutDashboard, Wrench, ClipboardList, Database, ShieldCheck, ChevronDown, LogOut, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboardSummary } from '../hooks/useDashboardSummary';
 import { useSidebar } from '../contexts/SidebarContext';
@@ -107,8 +107,12 @@ const NAV_GROUPS = [
     icon: Database,
     items: [
       { to: '/master-data', label: 'Master Data Part' },
-      { to: '/inventory', label: 'Inventory' },
-      { to: '/inventory/history', label: 'History Inventory' },
+      // packageRequired: fitur Paket B - kalau instance ini Paket A, item
+      // ini di-render grayed-out + badge "Paket B" (bukan disembunyikan,
+      // lihat SubNavItem di bawah) TAPI TETAP bisa diklik/navigable - route
+      // di App.jsx yang render UpgradePage, bukan Sidebar yang nge-block.
+      { to: '/inventory', label: 'Inventory', packageRequired: 'B' },
+      { to: '/inventory/history', label: 'History Inventory', packageRequired: 'B' },
     ],
   },
   {
@@ -123,27 +127,46 @@ const NAV_GROUPS = [
   },
 ];
 
-function SubNavItem({ to, children, badgeCount }) {
+// `locked` = item butuh paket yang gak dimiliki instance ini (lihat
+// packageRequired di NAV_GROUPS + hasPackage() di AuthContext). SENGAJA
+// TETAP <NavLink> yang navigable (bukan <span>/disabled button) - klik
+// harus tetap jalan ke route-nya, App.jsx yang render UpgradePage di sana
+// (opsi 3 dari diskusi: grayed-out + badge, tapi klik -> halaman upgrade,
+// bukan halaman kosong/dead-end).
+function SubNavItem({ to, children, badgeCount, locked }) {
   return (
     <NavLink
       to={to}
       end
       className={({ isActive }) =>
         `group relative flex items-center gap-2 rounded-lg py-2.5 pl-5 pr-3 text-[13.5px] no-underline transition-colors ${
-          isActive
-            ? 'bg-[var(--accent-dim)] font-medium text-primary'
-            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+          locked
+            ? isActive
+              ? 'bg-[var(--accent-dim)] text-[var(--text-faint)]'
+              : 'text-[var(--text-faint)] hover:bg-accent'
+            : isActive
+              ? 'bg-[var(--accent-dim)] font-medium text-primary'
+              : 'text-muted-foreground hover:bg-accent hover:text-foreground'
         }`
       }
     >
       {({ isActive }) => (
         <>
-          {isActive && <span className="absolute inset-y-1 left-0 w-[3px] rounded-r-full bg-primary" />}
+          {isActive && (
+            <span className={`absolute inset-y-1 left-0 w-[3px] rounded-r-full ${locked ? 'bg-[var(--text-faint)]' : 'bg-primary'}`} />
+          )}
           <span className="flex-1">{children}</span>
-          {badgeCount > 0 && (
-            <span className="rounded-full bg-danger px-[7px] py-px font-[var(--font-mono)] text-[10px] font-bold text-white">
-              {badgeCount}
+          {locked ? (
+            <span className="flex items-center gap-1 rounded-full border border-border px-[7px] py-px font-[var(--font-mono)] text-[10px] font-semibold uppercase tracking-[0.3px] text-[var(--text-faint)]">
+              <Lock size={9} strokeWidth={2.2} />
+              Paket B
             </span>
+          ) : (
+            badgeCount > 0 && (
+              <span className="rounded-full bg-danger px-[7px] py-px font-[var(--font-mono)] text-[10px] font-bold text-white">
+                {badgeCount}
+              </span>
+            )
           )}
         </>
       )}
@@ -151,7 +174,7 @@ function SubNavItem({ to, children, badgeCount }) {
   );
 }
 
-function NavGroup({ group, isOpen, onToggle, isGroupActive, summary, collapsed }) {
+function NavGroup({ group, isOpen, onToggle, isGroupActive, summary, collapsed, hasPackage }) {
   const Icon = group.icon;
   const expandedOpen = isOpen && !collapsed;
 
@@ -229,7 +252,12 @@ function NavGroup({ group, isOpen, onToggle, isGroupActive, summary, collapsed }
       >
         <div className="min-h-0 space-y-1 pt-1">
           {group.items.map((item) => (
-            <SubNavItem key={item.to} to={item.to} badgeCount={item.badgeKey ? summary?.[item.badgeKey] : undefined}>
+            <SubNavItem
+              key={item.to}
+              to={item.to}
+              badgeCount={item.badgeKey ? summary?.[item.badgeKey] : undefined}
+              locked={item.packageRequired ? !hasPackage(item.packageRequired) : false}
+            >
               {item.label}
             </SubNavItem>
           ))}
@@ -240,7 +268,7 @@ function NavGroup({ group, isOpen, onToggle, isGroupActive, summary, collapsed }
 }
 
 function Sidebar() {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, hasPackage } = useAuth();
   const { data: summary } = useDashboardSummary();
   const location = useLocation();
 
@@ -343,6 +371,7 @@ function Sidebar() {
                 isGroupActive={group.key === activeGroupKey}
                 summary={summary}
                 collapsed={collapsed}
+                hasPackage={hasPackage}
               />
             ))}
           </div>

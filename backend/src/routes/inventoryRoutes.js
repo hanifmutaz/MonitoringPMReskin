@@ -3,9 +3,16 @@ const express = require('express');
 const inventoryController = require('../controllers/inventoryController');
 const requireAuth = require('../middlewares/authMiddleware');
 const requirePermission = require('../middlewares/permissionMiddleware');
+const { requireLicensePackage } = require('../middlewares/licenseMiddleware');
 
 const router = express.Router();
 router.use(requireAuth);
+// Inventory itu fitur Paket B (lihat diagram "Satu Sistem, Dua Paket") -
+// dicek SETELAH auth (butuh tau siapa yang minta buat logging error yang
+// jelas) tapi SEBELUM permission granular (paket adalah boundary produk,
+// lebih besar dari role - kalau instance-nya Paket A, gak ada role/user
+// manapun termasuk Admin yang boleh lewat).
+router.use(requireLicensePackage('B'));
 
 // GET - view-only, dibuka untuk semua role yang login
 router.get('/', inventoryController.list);

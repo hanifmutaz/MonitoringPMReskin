@@ -54,6 +54,18 @@ export function AuthProvider({ children }) {
       const permissions = user?.permissions || [];
       return permissions.includes('*') || permissions.includes(key);
     },
+    // Paket lisensi instance ini ('A'/'B', dari LICENSE_PACKAGE env backend -
+    // lihat authService.getMe()/login()). BEDA dari hasPermission: ini
+    // boundary produk (dijual terpisah), bukan hak akses per-role - berlaku
+    // sama ke SEMUA user termasuk Admin. 'B' otomatis lolos cek 'A' (Paket B
+    // mencakup semua fitur Paket A + Inventory, lihat diagram "Satu Sistem,
+    // Dua Paket"). Dipakai Sidebar.jsx (grayed-out + badge) & PackageRoute.jsx
+    // (render UpgradePage pas route diakses langsung).
+    licensePackage: user?.license_package || 'B',
+    hasPackage: (requiredPackage) => {
+      const licensePackage = user?.license_package || 'B';
+      return requiredPackage === 'A' || licensePackage === 'B';
+    },
     login,
     logout,
     refreshUser,
