@@ -4,6 +4,24 @@ import { Sliders, Award, CalendarClock, Repeat, RefreshCw, LayoutGrid, Users, Ma
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useSettings, useUpdateSetting } from '../hooks/useSettings';
 import ToggleSwitch from '../components/ToggleSwitch';
+import { Input } from '../components/ui/input';
+
+// Reskin (checklist §6b, halaman utama terakhir yang masih tampilan lama):
+// `.panel`/`.panel-header`/`.panel-title`/`.form-input` dilepas TOTAL
+// (§7.3), diganti Tailwind murni - style ngikutin pattern yang udah
+// established di LinesTab.jsx/DashboardPage.jsx (rounded-lg border-border
+// bg-card p-4.5, judul text-[15px] font-semibold, mb-4 antara header &
+// konten).
+//
+// ToggleSwitch.jsx SENGAJA GAK diikutkan reskin ini - dia komponen shared
+// (dipakai juga di UserManagementPage.jsx), dan sesi reskin UserManagement
+// sebelumnya udah EKSPLISIT nyatet skip komponen ini (lihat komentar di
+// UserManagementPage.jsx). Ngikutin keputusan yang sama, bukan bikin
+// keputusan baru sepihak yang malah bikin dua halaman beda konvensi.
+//
+// Logic (grouping kategori dari CATEGORY_META, cast value_type, save
+// on-blur/on-toggle, rollback tampilan pas gagal save) TIDAK berubah sama
+// sekali - cuma markup yang diganti.
 
 // Urutan & metadata 7 kategori sesuai MASTER DOCUMENT Bagian 4
 // + kategori 'notifikasi' dan 'inventory' (ditambah belakangan)
@@ -82,28 +100,15 @@ function SettingRow({ setting }) {
   }
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '12px 0',
-        borderBottom: '1px solid var(--border-soft)',
-        gap: 16,
-      }}
-    >
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 500 }}>
-          {SETTING_LABELS[setting.key] || setting.key}
-        </div>
-        {setting.description && <div className="caption">{setting.description}</div>}
-        <div className="mono" style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 2 }}>
-          {setting.key}
-        </div>
-        {error && <div style={{ color: 'var(--danger)', fontSize: 11, marginTop: 2 }}>{error}</div>}
+    <div className="flex items-center justify-between gap-4 border-b border-[var(--border-soft)] py-3 last:border-b-0">
+      <div className="min-w-0">
+        <div className="text-[13px] font-medium">{SETTING_LABELS[setting.key] || setting.key}</div>
+        {setting.description && <div className="text-xs text-muted-foreground">{setting.description}</div>}
+        <div className="mt-0.5 font-[var(--font-mono)] text-[10px] text-[var(--text-faint)]">{setting.key}</div>
+        {error && <div className="mt-0.5 text-xs text-destructive">{error}</div>}
       </div>
 
-      <div style={{ flexShrink: 0 }}>
+      <div className="shrink-0">
         {setting.value_type === 'boolean' && (
           <ToggleSwitch
             checked={localValue === 'true' || localValue === true}
@@ -115,10 +120,9 @@ function SettingRow({ setting }) {
           />
         )}
         {setting.value_type === 'number' && (
-          <input
+          <Input
             type="number"
-            className="form-input mono"
-            style={{ width: 70, textAlign: 'right' }}
+            className="w-[70px] text-right font-[var(--font-mono)]"
             value={localValue}
             disabled={updateMutation.isPending}
             onChange={(e) => setLocalValue(e.target.value)}
@@ -126,10 +130,9 @@ function SettingRow({ setting }) {
           />
         )}
         {setting.value_type === 'text' && (
-          <input
+          <Input
             type="text"
-            className="form-input"
-            style={{ width: 160 }}
+            className="w-[160px]"
             value={localValue}
             disabled={updateMutation.isPending}
             onChange={(e) => setLocalValue(e.target.value)}
@@ -145,16 +148,12 @@ function CategoryCard({ categoryKey, settings }) {
   const meta = CATEGORY_META[categoryKey] || { no: '-', title: categoryKey, icon: Sliders };
   const Icon = meta.icon;
   return (
-    <div className="panel">
-      <div className="panel-header">
-        <h2 className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Icon size={16} />
-          <span className="mono" style={{ color: 'var(--text-faint)' }}>
-            {String(meta.no).padStart(2, '0')}
-          </span>
-          {meta.title}
-        </h2>
-      </div>
+    <div className="rounded-lg border border-border bg-card p-4.5">
+      <h2 className="m-0 mb-1 flex items-center gap-2 font-[var(--font-display)] text-[15px] font-semibold">
+        <Icon size={16} />
+        <span className="font-[var(--font-mono)] text-[var(--text-faint)]">{String(meta.no).padStart(2, '0')}</span>
+        {meta.title}
+      </h2>
       {settings.map((s) => (
         <SettingRow key={s.key} setting={s} />
       ))}
@@ -167,10 +166,14 @@ function SettingsPage() {
   const { data, isLoading, isError } = useSettings();
 
   if (isError) {
-    return <div className="error-state">Gagal memuat settings. Coba lagi.</div>;
+    return (
+      <div className="rounded-lg bg-danger-dim px-4 py-5 text-center text-danger">
+        Gagal memuat settings. Coba lagi.
+      </div>
+    );
   }
   if (isLoading) {
-    return <div className="empty-state">Memuat data...</div>;
+    return <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>;
   }
 
   const grouped = {};
@@ -184,7 +187,7 @@ function SettingsPage() {
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="flex flex-col gap-4">
       {orderedCategories.map((cat) => (
         <CategoryCard key={cat} categoryKey={cat} settings={grouped[cat]} />
       ))}
