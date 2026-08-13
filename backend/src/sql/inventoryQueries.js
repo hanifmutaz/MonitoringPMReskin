@@ -104,9 +104,10 @@ async function countLinkedParts(id, runner = db) {
 }
 
 async function countMovements(id, runner = db) {
-  const result = await runner.query(`SELECT COUNT(*)::int AS count FROM inventory_stock_movements WHERE inventory_item_id = $1`, [
-    id,
-  ]);
+  const result = await runner.query(
+    `SELECT COUNT(*)::int AS count FROM inventory_stock_movements WHERE inventory_item_id = $1 AND deleted_at IS NULL`,
+    [id]
+  );
   return result.rows[0].count;
 }
 
@@ -126,7 +127,7 @@ async function insertMovement(
 async function findMovementsByItem(itemId, { page = 1, limit = 20 } = {}, runner = db) {
   const offset = (Number(page) - 1) * Number(limit);
   const countResult = await runner.query(
-    `SELECT COUNT(*)::int AS total FROM inventory_stock_movements WHERE inventory_item_id = $1`,
+    `SELECT COUNT(*)::int AS total FROM inventory_stock_movements WHERE inventory_item_id = $1 AND deleted_at IS NULL`,
     [itemId]
   );
   const dataResult = await runner.query(
@@ -134,7 +135,7 @@ async function findMovementsByItem(itemId, { page = 1, limit = 20 } = {}, runner
             m.user_id, u.full_name AS user_full_name, m.created_at
      FROM inventory_stock_movements m
      JOIN users u ON u.id = m.user_id
-     WHERE m.inventory_item_id = $1
+     WHERE m.inventory_item_id = $1 AND m.deleted_at IS NULL
      ORDER BY m.created_at DESC
      LIMIT $2 OFFSET $3`,
     [itemId, Number(limit), offset]
@@ -143,7 +144,7 @@ async function findMovementsByItem(itemId, { page = 1, limit = 20 } = {}, runner
 }
 
 async function findAllMovements({ item_id, movement_type, page = 1, limit = 20 } = {}, runner = db) {
-  const conditions = [];
+  const conditions = ['m.deleted_at IS NULL'];
   const params = [];
 
   if (item_id) {

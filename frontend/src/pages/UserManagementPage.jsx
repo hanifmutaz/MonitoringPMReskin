@@ -17,6 +17,7 @@ import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useUsers, useUserMutations } from '../hooks/useUsers';
 import { useRoles, usePermissionCatalog, useRoleMutations } from '../hooks/useRoles';
 import { useConfirm } from '../contexts/ConfirmDialogContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useRowSelection } from '../hooks/useRowSelection';
 import { useBulkDeleteMutation } from '../hooks/useRecycleBin';
 import Modal from '../components/Modal';
@@ -499,11 +500,40 @@ function RoleManagementSection() {
 function UserManagementPage() {
   usePageHeader({ title: 'User Management' });
 
+  const { user: currentUser } = useAuth();
   const { data: users = [], isLoading, isError } = useUsers({});
   const { update } = useUserMutations();
   const [modalState, setModalState] = useState(null);
+  const confirm = useConfirm();
+  const [bulkError, setBulkError] = useState('');
 
   const nonPendingUsers = users.filter((u) => u.status !== 'PENDING');
+  // Akun sendiri gak boleh ke-checklist buat bulk delete - sengaja dijegal
+  // di frontend (bukan di backend) karena bulk-delete Recycle Bin sifatnya
+  // generic power-tool buat Admin testing (lihat catatan di
+  // recycleBinService.js), jadi satu-satunya jaring pengaman praktis di
+  // sini adalah gak nawarin checkbox-nya sama sekali buat baris diri
+  // sendiri. Kalau kehapus akun lain yang lagi login, sesinya otomatis
+  // ke-invalidate di request berikutnya (findUserById filter deleted_at).
+  const selectableIds = nonPendingUsers.filter((u) => u.id !== currentUser?.id).map((u) => u.id);
+  const selection = useRowSelection(selectableIds);
+  const bulkDelete = useBulkDeleteMutation('users');
+
+  async function handleBulkDelete() {
+    if (
+      !(await confirm(
+        `Hapus ${selection.selectedCount} User terpilih? Sesi mereka yang lagi login otomatis ke-invalidate. Bisa direstore lewat Recycle Bin.`
+      ))
+    )
+      return;
+    setBulkError('');
+    try {
+      await bulkDelete.mutateAsync(selection.selectedIds);
+      selection.clear();
+    } catch (err) {
+      setBulkError(err.response?.data?.message || 'Gagal menghapus User terpilih');
+    }
+  }
 
   return (
     <div>
@@ -523,6 +553,21 @@ function UserManagementPage() {
             Gagal memuat daftar user.
           </div>
         )}
+
+        {bulkError && (
+          <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
+            {bulkError}
+          </div>
+        )}
+
+        <BulkDeleteBar
+          count={selection.selectedCount}
+          onDelete={handleBulkDelete}
+          onClear={selection.clear}
+          pending={bulkDelete.isPending}
+          label="User"
+        />
+
         {isLoading && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
 
         {!isLoading && (
@@ -531,6 +576,17 @@ function UserManagementPage() {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-border">
+                    <th className="w-[36px] px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={selection.allOnPageSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
+                        }}
+                        onChange={selection.toggleAllOnPage}
+                        className="h-3.5 w-3.5 accent-[var(--accent)]"
+                      />
+                    </th>
                     {['Username', 'Full Name', 'Email', 'Role', 'Aktif', 'Last Login', 'Aksi'].map((h) => (
                       <th
                         key={h}
@@ -544,7 +600,19 @@ function UserManagementPage() {
                 <tbody>
                   {nonPendingUsers.map((u) => (
                     <tr key={u.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{u.username}</td>
+                      <td className="px-3 py-3">
+                        {u.id !== currentUser?.id && (
+                          <input
+                            type="checkbox"
+                            checked={selection.isSelected(u.id)}
+                            onChange={() => selection.toggle(u.id)}
+                            className="h-3.5 w-3.5 accent-[var(--accent)]"
+                          />
+                        )}
+                      </td>
+                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">
+                        {u.username} {u.id === currentUser?.id && <span className="text-xs text-muted-foreground">(kamu)</span>}
+                      </td>
                       <td className="px-3 py-3 text-[13px]">{u.full_name}</td>
                       <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{u.email || '-'}</td>
                       <td className="px-3 py-3 text-[13px]">

@@ -16,7 +16,7 @@ async function findByUsernameAnyStatus(username) {
             r.id AS role_id, r.name AS role_name
      FROM users u
      LEFT JOIN roles r ON r.id = u.role_id
-     WHERE u.username = $1`,
+     WHERE u.username = $1 AND u.deleted_at IS NULL`,
     [username]
   );
   return result.rows[0] || null;
@@ -31,7 +31,7 @@ async function findActiveUserByUsername(username) {
             r.id AS role_id, r.name AS role_name
      FROM users u
      JOIN roles r ON r.id = u.role_id
-     WHERE u.username = $1 AND u.is_active = TRUE`,
+     WHERE u.username = $1 AND u.is_active = TRUE AND u.deleted_at IS NULL`,
     [username]
   );
   return result.rows[0] || null;
@@ -40,7 +40,10 @@ async function findActiveUserByUsername(username) {
 /**
  * Ambil user by id, join role_name. Menyertakan `email`/`avatar_url`
  * (ditambahkan bareng fitur self-service profile - dipakai buat prefill
- * form "Profil Saya" di frontend, GET /auth/me).
+ * form "Profil Saya" di frontend, GET /auth/me). deleted_at IS NULL - user
+ * yang sudah di-soft-delete (Recycle Bin) dianggap "tidak ada" di sini,
+ * dipakai juga oleh authMiddleware per-request (doc 002) - begitu di-trash,
+ * sesi yang lagi aktif langsung ke-invalidate di request berikutnya.
  */
 async function findUserById(id) {
   const result = await db.query(
@@ -48,7 +51,7 @@ async function findUserById(id) {
             r.id AS role_id, r.name AS role_name
      FROM users u
      LEFT JOIN roles r ON r.id = u.role_id
-     WHERE u.id = $1`,
+     WHERE u.id = $1 AND u.deleted_at IS NULL`,
     [id]
   );
   return result.rows[0] || null;
@@ -67,7 +70,7 @@ async function updateLastLogin(id) {
  * gak boleh bocor lewat endpoint manapun selain proses login internal).
  */
 async function findAll({ role, isActive, status } = {}, runner = db) {
-  const conditions = [];
+  const conditions = ['u.deleted_at IS NULL'];
   const params = [];
 
   if (role) {
@@ -111,7 +114,7 @@ async function findRawById(id, runner = db) {
 }
 
 async function usernameExists(username, runner = db) {
-  const result = await runner.query(`SELECT id FROM users WHERE username = $1`, [username]);
+  const result = await runner.query(`SELECT id FROM users WHERE username = $1 AND deleted_at IS NULL`, [username]);
   return !!result.rows[0];
 }
 
@@ -198,7 +201,7 @@ async function findActiveEmailsByRoles(roleNames, runner = db) {
     `SELECT u.email
      FROM users u
      JOIN roles r ON r.id = u.role_id
-     WHERE r.name = ANY($1) AND u.is_active = TRUE AND u.email IS NOT NULL AND u.email <> ''`,
+     WHERE r.name = ANY($1) AND u.is_active = TRUE AND u.deleted_at IS NULL AND u.email IS NOT NULL AND u.email <> ''`,
     [roleNames]
   );
   return result.rows.map((r) => r.email);

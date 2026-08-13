@@ -25,6 +25,10 @@ const ENTITY_QUERY_KEYS = {
   roles: ['roles'],
   'cl-mapping': ['cl-mapping'],
   'part-suppliers': ['part-suppliers'],
+  users: ['users'],
+  'pm-line-history': ['pm-line-history', 'pm-line', 'dashboard'],
+  'pm-part-history': ['pm-part-history', 'pm-part', 'pm-part-ketepatan-per-line', 'dashboard'],
+  'inventory-movements': ['inventory-movements-all', 'inventory-movements'],
 };
 
 function invalidateEntity(queryClient, entity) {

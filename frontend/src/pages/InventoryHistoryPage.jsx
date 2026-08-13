@@ -13,7 +13,13 @@ import { useState } from 'react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useAllInventoryMovements } from '../hooks/useInventoryItemDetail';
 import { useInventoryItems } from '../hooks/useInventoryItems';
+import { useRowSelection } from '../hooks/useRowSelection';
+import { useBulkDeleteMutation } from '../hooks/useRecycleBin';
+import { useConfirm } from '../contexts/ConfirmDialogContext';
+import { fetchAllInventoryMovements } from '../api/inventoryApi';
 import Pagination from '../components/Pagination';
+import BulkDeleteBar from '../components/BulkDeleteBar';
+import SelectAllAcrossPagesBar from '../components/SelectAllAcrossPagesBar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 const LIMIT = 20;
@@ -34,6 +40,8 @@ function InventoryHistoryPage() {
     const [itemId, setItemId] = useState('all');
     const [movementType, setMovementType] = useState('all');
     const [page, setPage] = useState(1);
+    const [bulkError, setBulkError] = useState('');
+    const confirm = useConfirm();
 
     usePageHeader({ title: 'History Inventory' });
 
@@ -42,12 +50,42 @@ function InventoryHistoryPage() {
     const { data: itemsData } = useInventoryItems({ limit: 1000 });
     const items = itemsData?.items || [];
 
-    const { data, isLoading, isError } = useAllInventoryMovements({
+    const params = {
         item_id: itemId === 'all' ? undefined : itemId,
         movement_type: movementType === 'all' ? undefined : movementType,
         page,
         limit: LIMIT,
-    });
+    };
+    const { data, isLoading, isError } = useAllInventoryMovements(params);
+    const pageIds = data?.items?.map((m) => m.id) ?? [];
+    const selection = useRowSelection(pageIds);
+    // 'inventory-movements' - murni log historis, TIDAK ngaruh ke
+    // current_stock (stok maintained sebagai running total terpisah, lihat
+    // catatan di inventoryService.js - "Jangan pernah UPDATE current_stock
+    // langsung tanpa insert movement"), jadi paling aman di antara 3 tabel
+    // history buat dibersihin.
+    const bulkDelete = useBulkDeleteMutation('inventory-movements');
+
+    async function handleSelectAllMatching() {
+        const all = await fetchAllInventoryMovements({ ...params, page: 1, limit: data.total });
+        selection.selectIds(all.items.map((m) => m.id));
+    }
+
+    async function handleBulkDelete() {
+        if (
+            !(await confirm(
+                `Hapus ${selection.selectedCount} riwayat mutasi stok terpilih? Bisa direstore lewat Recycle Bin. Stok saat ini TIDAK berubah - ini cuma catatan log historisnya.`
+            ))
+        )
+            return;
+        setBulkError('');
+        try {
+            await bulkDelete.mutateAsync(selection.selectedIds);
+            selection.clear();
+        } catch (err) {
+            setBulkError(err.response?.data?.message || 'Gagal menghapus riwayat terpilih');
+        }
+    }
 
     return (
         <div className="flex flex-col gap-4">
@@ -99,6 +137,30 @@ function InventoryHistoryPage() {
                         Gagal memuat riwayat. Coba lagi.
                     </div>
                 )}
+
+                {bulkError && (
+                    <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
+                        {bulkError}
+                    </div>
+                )}
+
+                <BulkDeleteBar
+                    count={selection.selectedCount}
+                    onDelete={handleBulkDelete}
+                    onClear={selection.clear}
+                    pending={bulkDelete.isPending}
+                    label="Riwayat"
+                />
+
+                {data && selection.allOnPageSelected && (
+                    <SelectAllAcrossPagesBar
+                        pageCount={pageIds.length}
+                        total={data.total}
+                        alreadySelectedAll={selection.selectedCount >= data.total}
+                        onSelectAll={handleSelectAllMatching}
+                    />
+                )}
+
                 {isLoading && !data && (
                     <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>
                 )}
@@ -113,6 +175,19 @@ function InventoryHistoryPage() {
                                 <table className="w-full border-collapse">
                                     <thead>
                                         <tr className="border-b border-border">
+                                            <th className="w-[36px] px-3 py-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selection.allOnPageSelected}
+                                                    ref={(el) => {
+                                                        if (el)
+                                                            el.indeterminate =
+                                                                selection.someOnPageSelected && !selection.allOnPageSelected;
+                                                    }}
+                                                    onChange={selection.toggleAllOnPage}
+                                                    className="h-3.5 w-3.5 accent-[var(--accent)]"
+                                                />
+                                            </th>
                                             {['Tanggal', 'Item', 'Jenis', 'Qty', 'Catatan', 'Oleh'].map((h) => (
                                                 <th
                                                     key={h}
@@ -126,6 +201,14 @@ function InventoryHistoryPage() {
                                     <tbody>
                                         {data.items.map((m) => (
                                             <tr key={m.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                                                <td className="px-3 py-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selection.isSelected(m.id)}
+                                                        onChange={() => selection.toggle(m.id)}
+                                                        className="h-3.5 w-3.5 accent-[var(--accent)]"
+                                                    />
+                                                </td>
                                                 <td className="px-3 py-3 font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
                                                     {new Date(m.created_at).toLocaleString('id-ID')}
                                                 </td>

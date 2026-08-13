@@ -4,6 +4,7 @@ const COUNTER_CTE = `
   WITH part_last_ganti AS (
     SELECT part_id, MAX(tgl_ganti) AS last_tgl_ganti
     FROM pm_part_history
+    WHERE deleted_at IS NULL
     GROUP BY part_id
   ),
   part_counter AS (
@@ -117,7 +118,7 @@ async function findRecentHistory(partId, limit = 5, runner = db) {
             u.full_name AS user_full_name
      FROM pm_part_history h
      JOIN users u ON u.id = h.user_id
-     WHERE h.part_id = $1
+     WHERE h.part_id = $1 AND h.deleted_at IS NULL
      ORDER BY h.tgl_ganti DESC, h.id DESC
      LIMIT $2`,
     [partId, limit]

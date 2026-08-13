@@ -10,7 +10,7 @@ const LIST_SELECT = `
 `;
 
 async function findAll({ lineId, jenis, dateFrom, dateTo, page = 1, limit = 20 } = {}, runner = db) {
-  const conditions = [];
+  const conditions = ['h.deleted_at IS NULL'];
   const params = [];
 
   if (lineId) {
@@ -65,7 +65,7 @@ async function getKetepatanOverall({ dateFrom }, runner = db) {
        COUNT(*) FILTER (WHERE on_time IS NOT NULL) AS total,
        COUNT(*) FILTER (WHERE on_time = TRUE) AS on_time_count
      FROM pm_monthly_history
-     WHERE tgl_input >= $1
+     WHERE tgl_input >= $1 AND deleted_at IS NULL
      GROUP BY jenis_pm`,
     [dateFrom]
   );
@@ -82,7 +82,7 @@ async function getKetepatanPerLine({ dateFrom }, runner = db) {
        COUNT(*) FILTER (WHERE h.on_time = TRUE) AS on_time_count
      FROM pm_monthly_history h
      JOIN lines l ON l.id = h.line_id
-     WHERE h.tgl_input >= $1
+     WHERE h.tgl_input >= $1 AND h.deleted_at IS NULL
      GROUP BY h.line_id, l.line_name, h.jenis_pm
      ORDER BY l.line_name ASC`,
     [dateFrom]

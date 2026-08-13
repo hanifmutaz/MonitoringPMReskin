@@ -128,7 +128,10 @@ async function remove(id, userId, runner = db) {
 }
 
 async function countHistoryByPart(id, runner = db) {
-  const result = await runner.query(`SELECT COUNT(*)::int AS count FROM pm_part_history WHERE part_id = $1`, [id]);
+  const result = await runner.query(
+    `SELECT COUNT(*)::int AS count FROM pm_part_history WHERE part_id = $1 AND deleted_at IS NULL`,
+    [id]
+  );
   return result.rows[0].count;
 }
 
