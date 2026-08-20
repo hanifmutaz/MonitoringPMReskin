@@ -1,10 +1,12 @@
 // src/services/pmLineService.js
 //
-// Formula MASTER DOCUMENT Bagian 2.B (Monthly) & 2.C (Weekly) — TIDAK DIUBAH:
+// Formula MASTER DOCUMENT Bagian 2.B (Monthly) — TIDAK DIUBAH. Bagian 2.C
+// (Weekly) DIUBAH sejak migration 1700000019000 (diminta eksplisit lewat
+// chat) dari "murni kalender" menjadi BERBASIS AKUMULASI POIN, pola yang
+// sama persis dengan Monthly:
 //
-//   Weekly (murni kalender):
-//     Total Hari Weekly = Hari Ini - Tgl PM Weekly Terakhir
-//     Sisa Hari Weekly  = pm_weekly_total_days - Total Hari Weekly
+//   Weekly (berbasis akumulasi poin, di-cap - SAMA POLA dengan Monthly):
+//     Sisa Hari Weekly  = pm_weekly_total_days (dipakai sebagai cap poin) - akumulasi_poin_weekly
 //     Estimasi PM Weekly = Hari Ini + Sisa Hari Weekly
 //     Status: <= pm_weekly_danger_days -> DANGER, < pm_weekly_warning_days -> WARNING, else OK
 //
@@ -13,10 +15,11 @@
 //     Estimasi PM Monthly = Hari Ini + Sisa Hari Monthly
 //     Status: <= pm_monthly_danger_days -> DANGER, < pm_monthly_warning_days -> WARNING, else OK
 //
-// CATATAN: akumulasi_poin_monthly di sini DIBACA APA ADANYA dari cache
-// pm_monthly_helper. Job harian yang MENAMBAH poin ini berdasarkan "berapa
-// kali Line running per hari" sudah dibangun di
-// services/pmMonthlyAccrualService.js, dijalankan otomatis lewat
+// CATATAN: akumulasi_poin_monthly & akumulasi_poin_weekly di sini DIBACA APA
+// ADANYA dari cache pm_monthly_helper. Job yang MENAMBAH poin keduanya
+// (berdasarkan "berapa kali Line running per hari", Line yang TIDAK RUNNING
+// di suatu hari TIDAK menambah poin - jadi TIDAK ADA pengurangan sisa hari)
+// ada di services/pmMonthlyAccrualService.js, dijalankan otomatis lewat
 // jobs/conmasSyncJob.js (cron) setelah struktur data ConMas
 // (production_cache per slot/shift) dikonfirmasi tersedia — lihat
 // PROJECT_SCOPE.md untuk riwayat status Fase 3.
@@ -54,13 +57,13 @@ function statusFromRemainingDays(remainingDays, dangerDays, warningDays) {
 }
 
 function computeLineStatus(row, thresholds) {
-  // --- Weekly ---
+  // --- Weekly (poin, SAMA POLA dengan Monthly - lihat komentar header) ---
   const weeklyLastDate = row.tgl_pm_weekly_terakhir;
+  const akumulasiPoinWeekly = Number(row.akumulasi_poin_weekly) || 0;
   let sisaHariWeekly = null;
   let statusWeekly = 'DANGER';
   if (weeklyLastDate) {
-    const totalHariWeekly = dateUtils.daysSince(weeklyLastDate);
-    sisaHariWeekly = thresholds.weeklyTotalDays - totalHariWeekly;
+    sisaHariWeekly = thresholds.weeklyTotalDays - akumulasiPoinWeekly;
     statusWeekly = statusFromRemainingDays(sisaHariWeekly, thresholds.weeklyDangerDays, thresholds.weeklyWarningDays);
   }
 
@@ -86,6 +89,7 @@ function computeLineStatus(row, thresholds) {
     sisa_hari_monthly: sisaHariMonthly,
     status_monthly: statusMonthly,
     tgl_pm_weekly_terakhir: dateUtils.formatDate(weeklyLastDate),
+    akumulasi_poin_weekly: akumulasiPoinWeekly,
     sisa_hari_weekly: sisaHariWeekly,
     status_weekly: statusWeekly,
   };

@@ -1,20 +1,25 @@
 // src/services/pmLineHistoryService.js
 //
-// Reset rule MASTER DOCUMENT Bagian 2.D — TIDAK DIUBAH:
-//   jenis_pm = MONTHLY -> update tgl_pm_monthly_terakhir, DAN (jika
-//              auto_reset_weekly_on_monthly efektif = true) update juga
-//              tgl_pm_weekly_terakhir.
-//   jenis_pm = WEEKLY  -> update tgl_pm_weekly_terakhir SAJA.
+// Reset rule MASTER DOCUMENT Bagian 2.D — struktur TIDAK DIUBAH (kolom mana
+// yang ke-reset saat MONTHLY/WEEKLY submit), TAPI sejak migration
+// 1700000019000 akumulasi_poin_weekly IKUT DIRESET setiap kali kolom
+// tgl_pm_weekly_terakhir-nya di-reset (sama alasan dengan
+// akumulasi_poin_monthly di bawah - Weekly sekarang basis poin juga):
+//   jenis_pm = MONTHLY -> update tgl_pm_monthly_terakhir + akumulasi_poin_monthly=0,
+//              DAN (jika auto_reset_weekly_on_monthly efektif = true) update
+//              juga tgl_pm_weekly_terakhir + akumulasi_poin_weekly=0.
+//   jenis_pm = WEEKLY  -> update tgl_pm_weekly_terakhir + akumulasi_poin_weekly=0.
 //
 // "auto_reset_weekly_on_monthly efektif" mengikuti deviasi terdokumentasi
 // yang sudah disetujui: override per-Line (lines.auto_reset_weekly_on_monthly)
 // kalau di-set eksplisit (bukan NULL), fallback ke setting global di
 // app_settings kalau NULL.
 //
-// akumulasi_poin_monthly di-reset ke 0 saat PM Monthly baru dieksekusi,
-// karena basis perhitungannya "akumulasi poin SEJAK Tgl PM Monthly
-// Terakhir" (Bagian 2.B) — begitu tanggal terakhir berubah ke hari ini,
-// akumulasi dari baseline baru itu otomatis mulai dari 0.
+// akumulasi_poin_monthly/akumulasi_poin_weekly di-reset ke 0 saat PM
+// Monthly/Weekly baru dieksekusi, karena basis perhitungannya "akumulasi
+// poin SEJAK Tgl PM Terakhir" (Bagian 2.B, dan 2.C sejak migration
+// 1700000019000) — begitu tanggal terakhir berubah ke hari ini, akumulasi
+// dari baseline baru itu otomatis mulai dari 0.
 
 const db = require('../config/db');
 const pmLineQueries = require('../sql/pmLineQueries');
@@ -38,7 +43,7 @@ const AppError = require('../utils/AppError');
  */
 function determineHelperUpdate(jenisPm, tglInput, lineOverride, globalDefault) {
   if (jenisPm === 'WEEKLY') {
-    return { tgl_pm_weekly_terakhir: tglInput };
+    return { tgl_pm_weekly_terakhir: tglInput, akumulasi_poin_weekly: 0 };
   }
 
   // MONTHLY
@@ -51,6 +56,7 @@ function determineHelperUpdate(jenisPm, tglInput, lineOverride, globalDefault) {
   };
   if (effectiveAutoReset) {
     fields.tgl_pm_weekly_terakhir = tglInput;
+    fields.akumulasi_poin_weekly = 0;
   }
   return fields;
 }
@@ -67,9 +73,10 @@ async function listPmLineHistory({ lineId, jenis, dateFrom, dateTo, page, limit 
  * me-reset baseline-nya). Dipisah dari submitPmLineHistory() supaya bisa
  * di-unit-test langsung, sama pola dengan determineHelperUpdate() di atas.
  *
- *   WEEKLY  -> tepat waktu jika (tgl_input - tgl_pm_weekly_terakhir lama)
- *              <= pm_weekly_total_days (siklus kalender murni, lihat
- *              Bagian 2.C - tidak di-cap, jadi bisa negatif/lewat).
+ *   WEEKLY  -> (SEJAK migration 1700000019000) tepat waktu jika
+ *              akumulasi_poin_weekly SEBELUM reset ini masih <
+ *              pm_weekly_total_days (dipakai sebagai cap poin - pola SAMA
+ *              PERSIS dengan MONTHLY di bawah, cuma beda kolom/setting).
  *   MONTHLY -> tepat waktu jika akumulasi_poin_monthly SEBELUM reset ini
  *              masih < pm_monthly_point_cap. Poin di-cap di angka itu
  *              (Bagian 2.B), jadi begitu poin mentok cap berarti Line
@@ -80,15 +87,14 @@ async function listPmLineHistory({ lineId, jenis, dateFrom, dateTo, page, limit 
  *
  * @param {'MONTHLY'|'WEEKLY'} jenisPm
  * @param {string} tglInput - 'YYYY-MM-DD'
- * @param {{tgl_pm_monthly_terakhir: string|null, tgl_pm_weekly_terakhir: string|null, akumulasi_poin_monthly: number}|null} helperBefore
+ * @param {{tgl_pm_monthly_terakhir: string|null, tgl_pm_weekly_terakhir: string|null, akumulasi_poin_monthly: number, akumulasi_poin_weekly: number}|null} helperBefore
  * @param {{monthlyCap: number, weeklyTotalDays: number}} thresholds
  * @returns {boolean}
  */
 function determineOnTime(jenisPm, tglInput, helperBefore, thresholds) {
   if (jenisPm === 'WEEKLY') {
     if (!helperBefore?.tgl_pm_weekly_terakhir) return true;
-    const totalHari = dateUtils.daysBetween(helperBefore.tgl_pm_weekly_terakhir, tglInput);
-    return totalHari <= thresholds.weeklyTotalDays;
+    return Number(helperBefore.akumulasi_poin_weekly) < thresholds.weeklyTotalDays;
   }
 
   // MONTHLY

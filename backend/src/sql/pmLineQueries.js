@@ -18,7 +18,7 @@ async function ensureHelperExists(lineId, runner = db) {
 const STATUS_SELECT = `
   SELECT
     l.id AS line_id, l.line_name, l.auto_reset_weekly_on_monthly AS line_override,
-    h.tgl_pm_monthly_terakhir, h.tgl_pm_weekly_terakhir, h.akumulasi_poin_monthly
+    h.tgl_pm_monthly_terakhir, h.tgl_pm_weekly_terakhir, h.akumulasi_poin_monthly, h.akumulasi_poin_weekly
   FROM lines l
   JOIN pm_monthly_helper h ON h.line_id = l.id
 `;

@@ -16,7 +16,7 @@
 // fallback) - diganti bg-warn-dim/border-warn yang emang ada. Data/logic
 // (query, filter, Ganti Part flow, stock notice) TIDAK berubah sama sekali.
 import { useState } from 'react';
-import { Truck, X } from 'lucide-react';
+import { Truck, X, Plus } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { usePmPartList, usePmPartKetepatanPerLine } from '../hooks/usePmPartList';
 import { useLines } from '../hooks/useLines';
@@ -85,6 +85,11 @@ function PmPartMonitoringPage() {
   const [lineId, setLineId] = useState('all');
   const [page, setPage] = useState(1);
   const [gantiPartItem, setGantiPartItem] = useState(null);
+  // Modal "Input Penggantian Part" TANPA preset - dipindah kesini dari menu
+  // Sidebar (sebelumnya halaman /pm-part/form terpisah, diminta lewat chat).
+  // Tetap komponen form yang sama (termasuk tombol scan barcode), cuma entry
+  // point-nya sekarang tombol toolbar, bukan menu.
+  const [showInputForm, setShowInputForm] = useState(false);
   // Notice kalau stock TIDAK berkurang otomatis pas submit Ganti Part
   // (part belum di-link ke Inventory Item) - lihat pmPartHistoryService.js
   // applyStockDeduction(). Persist sampai di-dismiss manual (bukan auto-
@@ -94,6 +99,7 @@ function PmPartMonitoringPage() {
 
   function handleGantiPartSuccess(result) {
     setGantiPartItem(null);
+    setShowInputForm(false);
     if (result?.stock && !result.stock.deducted) {
       setStockNotice(
         'Riwayat penggantian tersimpan, tapi stock TIDAK berkurang otomatis karena part ini belum di-link ke Inventory Item.'
@@ -141,6 +147,10 @@ function PmPartMonitoringPage() {
         </Select>
 
         <StatusFilterPills value={status} onChange={handleFilterChange(setStatus)} />
+
+        <Button type="button" size="sm" className="ml-auto" onClick={() => setShowInputForm(true)}>
+          <Plus size={14} /> Input Penggantian Part
+        </Button>
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4.5">
@@ -233,6 +243,12 @@ function PmPartMonitoringPage() {
             onCancel={() => setGantiPartItem(null)}
             onSuccess={handleGantiPartSuccess}
           />
+        </Modal>
+      )}
+
+      {showInputForm && (
+        <Modal title="Input Penggantian Part" onClose={() => setShowInputForm(false)}>
+          <PmPartHistoryForm onCancel={() => setShowInputForm(false)} onSuccess={handleGantiPartSuccess} />
         </Modal>
       )}
 

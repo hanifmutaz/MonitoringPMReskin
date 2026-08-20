@@ -86,8 +86,13 @@ const NAV_GROUPS = [
     label: 'PM Part',
     icon: Wrench,
     items: [
+      // "Input Penggantian Part" DIPINDAH dari sini (diminta lewat chat) -
+      // sekarang jadi tombol toolbar "+ Input Penggantian Part" di
+      // PmPartMonitoringPage (buka modal form yang sama, tanpa preset -
+      // sertakan tombol scan barcode). Route /pm-part/form TETAP HIDUP
+      // (App.jsx) buat kompatibilitas link lama/QR fisik, cuma gak lagi
+      // muncul di menu.
       { to: '/pm-part', label: 'Monitoring PM Part', badgeKey: 'status_danger' },
-      { to: '/pm-part/form', label: 'Input Penggantian Part' },
       { to: '/pm-part/history', label: 'History PM Part' },
     ],
   },
@@ -96,8 +101,11 @@ const NAV_GROUPS = [
     label: 'PM Monthly and Weekly',
     icon: ClipboardList,
     items: [
+      // "Input PM Monthly/Weekly" DIPINDAH dari sini (diminta lewat chat) -
+      // sekarang jadi tombol toolbar "+ Input PM" di PmLineStatusPage (buka
+      // modal form yang sama, tanpa preset - user pilih Line & jenis PM di
+      // situ). Route /pm-line/form TETAP HIDUP, cuma gak lagi muncul di menu.
       { to: '/pm-line', label: 'Monitoring PM Monthly and Weekly', badgeKey: 'lines_critical' },
-      { to: '/pm-line/form', label: 'Input PM Monthly/Weekly' },
       { to: '/pm-line/history', label: 'History PM Monthly and Weekly' },
     ],
   },

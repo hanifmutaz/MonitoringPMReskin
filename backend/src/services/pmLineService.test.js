@@ -42,8 +42,8 @@ describe('statusFromRemainingDays - fungsi threshold generik', () => {
   });
 });
 
-describe('computeLineStatus - PM Weekly (murni kalender)', () => {
-  test('Sisa Hari Weekly = pm_weekly_total_days - (hari ini - tgl terakhir)', () => {
+describe('computeLineStatus - PM Weekly (akumulasi poin, capped - sejak migration 1700000019000)', () => {
+  test('Sisa Hari Weekly = pm_weekly_total_days (cap) - akumulasi_poin_weekly', () => {
     const result = computeLineStatus(
       {
         line_id: 1,
@@ -51,10 +51,11 @@ describe('computeLineStatus - PM Weekly (murni kalender)', () => {
         tgl_pm_monthly_terakhir: daysAgo(0),
         akumulasi_poin_monthly: 0,
         tgl_pm_weekly_terakhir: daysAgo(3),
+        akumulasi_poin_weekly: 3,
       },
       THRESHOLDS
     );
-    // total hari weekly = 3, sisa = 7-3 = 4
+    // sisa = 7-3 = 4
     assert.equal(result.sisa_hari_weekly, 4);
     assert.equal(result.status_weekly, 'WARNING'); // 4 < 5 (warning) tapi > 2 (danger)
   });
@@ -67,11 +68,28 @@ describe('computeLineStatus - PM Weekly (murni kalender)', () => {
         tgl_pm_monthly_terakhir: daysAgo(0),
         akumulasi_poin_monthly: 0,
         tgl_pm_weekly_terakhir: daysAgo(6),
+        akumulasi_poin_weekly: 6,
       },
       THRESHOLDS
     );
     assert.equal(result.sisa_hari_weekly, 1); // 7-6=1
     assert.equal(result.status_weekly, 'DANGER');
+  });
+
+  test('Line tidak running (poin tidak nambah) -> sisa hari TIDAK berkurang meski banyak hari berlalu', () => {
+    const result = computeLineStatus(
+      {
+        line_id: 1,
+        line_name: 'L1',
+        tgl_pm_monthly_terakhir: daysAgo(0),
+        akumulasi_poin_monthly: 0,
+        tgl_pm_weekly_terakhir: daysAgo(6), // 6 hari kalender berlalu...
+        akumulasi_poin_weekly: 0, // ...tapi Line gak pernah jalan -> poin tetap 0
+      },
+      THRESHOLDS
+    );
+    assert.equal(result.sisa_hari_weekly, 7); // 7-0, BUKAN 7-6
+    assert.equal(result.status_weekly, 'OK');
   });
 });
 

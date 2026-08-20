@@ -4,21 +4,22 @@ const assert = require('node:assert/strict');
 const { determineHelperUpdate, determineOnTime } = require('./pmLineHistoryService');
 
 describe('determineHelperUpdate - Reset Rule MASTER DOCUMENT Bagian 2.D', () => {
-  test('WEEKLY: hanya update tgl_pm_weekly_terakhir, tidak menyentuh Monthly', () => {
+  test('WEEKLY: update tgl_pm_weekly_terakhir + reset akumulasi_poin_weekly, tidak menyentuh Monthly', () => {
     const result = determineHelperUpdate('WEEKLY', '2026-07-11', null, true);
-    assert.deepEqual(result, { tgl_pm_weekly_terakhir: '2026-07-11' });
+    assert.deepEqual(result, { tgl_pm_weekly_terakhir: '2026-07-11', akumulasi_poin_weekly: 0 });
   });
 
-  test('MONTHLY + global default true + line override null -> ikut global (reset 2 kolom)', () => {
+  test('MONTHLY + global default true + line override null -> ikut global (reset semua kolom Monthly+Weekly)', () => {
     const result = determineHelperUpdate('MONTHLY', '2026-07-11', null, true);
     assert.deepEqual(result, {
       tgl_pm_monthly_terakhir: '2026-07-11',
       akumulasi_poin_monthly: 0,
       tgl_pm_weekly_terakhir: '2026-07-11',
+      akumulasi_poin_weekly: 0,
     });
   });
 
-  test('MONTHLY + global default false + line override null -> ikut global (reset 1 kolom saja)', () => {
+  test('MONTHLY + global default false + line override null -> ikut global (reset kolom Monthly saja)', () => {
     const result = determineHelperUpdate('MONTHLY', '2026-07-11', null, false);
     assert.deepEqual(result, {
       tgl_pm_monthly_terakhir: '2026-07-11',
@@ -40,6 +41,7 @@ describe('determineHelperUpdate - Reset Rule MASTER DOCUMENT Bagian 2.D', () => 
       tgl_pm_monthly_terakhir: '2026-07-11',
       akumulasi_poin_monthly: 0,
       tgl_pm_weekly_terakhir: '2026-07-11',
+      akumulasi_poin_weekly: 0,
     });
   });
 
@@ -59,14 +61,19 @@ describe('determineOnTime - Fitur Ketepatan PM Monthly/Weekly', () => {
     assert.equal(determineOnTime('WEEKLY', '2026-07-11', helperBefore, THRESHOLDS), true);
   });
 
-  test('WEEKLY: input persis di batas total hari -> tepat waktu', () => {
-    const helperBefore = { tgl_pm_weekly_terakhir: '2026-07-04' };
-    assert.equal(determineOnTime('WEEKLY', '2026-07-11', helperBefore, THRESHOLDS), true); // 7 hari = weeklyTotalDays
+  test('WEEKLY: akumulasi poin belum mentok cap -> tepat waktu', () => {
+    const helperBefore = { tgl_pm_weekly_terakhir: '2026-07-04', akumulasi_poin_weekly: 5 };
+    assert.equal(determineOnTime('WEEKLY', '2026-07-11', helperBefore, THRESHOLDS), true); // 5 < 7
   });
 
-  test('WEEKLY: input 1 hari melewati batas -> telat', () => {
-    const helperBefore = { tgl_pm_weekly_terakhir: '2026-07-04' };
-    assert.equal(determineOnTime('WEEKLY', '2026-07-12', helperBefore, THRESHOLDS), false); // 8 hari > 7
+  test('WEEKLY: akumulasi poin sudah mentok cap -> telat', () => {
+    const helperBefore = { tgl_pm_weekly_terakhir: '2026-07-04', akumulasi_poin_weekly: 7 };
+    assert.equal(determineOnTime('WEEKLY', '2026-07-12', helperBefore, THRESHOLDS), false); // 7 >= 7
+  });
+
+  test('WEEKLY: Line tidak pernah running sejak PM terakhir (poin 0) -> tetap tepat waktu walau banyak hari berlalu', () => {
+    const helperBefore = { tgl_pm_weekly_terakhir: '2026-06-01', akumulasi_poin_weekly: 0 };
+    assert.equal(determineOnTime('WEEKLY', '2026-07-12', helperBefore, THRESHOLDS), true);
   });
 
   test('MONTHLY: belum pernah PM sama sekali -> tepat waktu (belum ada due date)', () => {

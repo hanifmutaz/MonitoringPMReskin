@@ -6,6 +6,7 @@
 // faint)]). Data/logic (query, target input modal) TIDAK berubah sama
 // sekali.
 import { useState } from 'react';
+import { Plus } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { usePmLineStatus } from '../hooks/usePmLineStatus';
 import StatusBadge from '../components/StatusBadge';
@@ -35,16 +36,27 @@ function PmLineStatusPage() {
 
   const { data, isLoading, isError } = usePmLineStatus({});
   const [inputTarget, setInputTarget] = useState(null); // { line, jenisPm }
+  // Modal "Input PM" TANPA preset - dipindah kesini dari menu Sidebar
+  // (sebelumnya halaman /pm-line/form terpisah, diminta lewat chat). Form
+  // yang sama otomatis nampilin dropdown pilih Line + jenis PM karena
+  // presetLine kosong (lihat isPrefilled di PmLineHistoryForm).
+  const [showInputForm, setShowInputForm] = useState(false);
 
   return (
     <div className="flex flex-col gap-4">
       <Banner>
-        Status Monthly dihitung dari akumulasi poin (cap 30), status Weekly murni hitung mundur kalender 7 hari.
-        Reset Monthly bisa ikut nge-reset Weekly tergantung setting{' '}
-        <code className="font-[var(--font-mono)]">auto_reset_weekly_on_monthly</code>. Angka{' '}
+        Status Monthly maupun Weekly sama-sama dihitung dari akumulasi poin harian (Line yang tidak running di suatu
+        hari tidak menambah poin, jadi sisa harinya tidak berkurang). Reset Monthly bisa ikut nge-reset Weekly
+        tergantung setting <code className="font-[var(--font-mono)]">auto_reset_weekly_on_monthly</code>. Angka{' '}
         <strong>Ketepatan</strong> di bawah status menunjukkan persentase PM yang dilakukan sebelum/tepat waktu sejak
         awal tahun ini.
       </Banner>
+
+      <div className="flex justify-end">
+        <Button type="button" size="sm" onClick={() => setShowInputForm(true)}>
+          <Plus size={14} /> Input PM
+        </Button>
+      </div>
 
       <div className="rounded-lg border border-border bg-card p-4.5">
         {isError && (
@@ -70,6 +82,7 @@ function PmLineStatusPage() {
                       'Sisa Hari Monthly',
                       'Status Monthly',
                       'Tgl Weekly Terakhir',
+                      'Poin',
                       'Sisa Hari Weekly',
                       'Status Weekly',
                       '',
@@ -98,6 +111,7 @@ function PmLineStatusPage() {
                       <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">
                         {line.tgl_pm_weekly_terakhir || '-'}
                       </td>
+                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{line.akumulasi_poin_weekly}</td>
                       <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{line.sisa_hari_weekly ?? '-'}</td>
                       <td className="px-3 py-3">
                         <StatusWithKetepatan status={line.status_weekly} percentage={line.ketepatan_weekly_percentage} />
@@ -133,6 +147,12 @@ function PmLineStatusPage() {
             onCancel={() => setInputTarget(null)}
             onSuccess={() => setInputTarget(null)}
           />
+        </Modal>
+      )}
+
+      {showInputForm && (
+        <Modal title="Input PM Monthly/Weekly" onClose={() => setShowInputForm(false)}>
+          <PmLineHistoryForm onCancel={() => setShowInputForm(false)} onSuccess={() => setShowInputForm(false)} />
         </Modal>
       )}
     </div>
