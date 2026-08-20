@@ -7,7 +7,6 @@
 // kebaca di memori) TIDAK butuh ini - "select all" di situ otomatis udah
 // nyakup semua row yang cocok filter, gak scoped per-halaman.
 import { useState } from 'react';
-import { Button } from './ui/button';
 
 function SelectAllAcrossPagesBar({ pageCount, total, onSelectAll, alreadySelectedAll }) {
   const [pending, setPending] = useState(false);

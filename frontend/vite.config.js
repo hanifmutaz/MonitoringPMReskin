@@ -15,4 +15,28 @@ export default defineConfig({
   server: {
     port: 5173,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Pisahkan vendor library dari kode aplikasi sendiri jadi chunk
+        // terpisah. Library ini jarang berubah dibanding kode src/ kita,
+        // jadi browser bisa cache chunk vendor ini lama-lama - user gak
+        // perlu re-download React/Radix/dll tiap kali kita deploy fix kecil
+        // di kode aplikasi. Dikombinasikan dengan React.lazy() per-halaman
+        // di App.jsx untuk code-splitting route.
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-radix': [
+            '@radix-ui/react-alert-dialog',
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-label',
+            '@radix-ui/react-select',
+            '@radix-ui/react-slot',
+            '@radix-ui/react-tooltip',
+          ],
+          'vendor-query': ['@tanstack/react-query'],
+        },
+      },
+    },
+  },
 });

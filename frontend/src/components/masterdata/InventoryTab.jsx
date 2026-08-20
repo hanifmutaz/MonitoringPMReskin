@@ -21,7 +21,6 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
 import { useRowSelection } from '../../hooks/useRowSelection';
 import { useBulkDeleteMutation } from '../../hooks/useRecycleBin';
-import { cn } from '../../lib/utils';
 import Modal from '../Modal';
 import KpiCard from '../KpiCard';
 import SearchBar from '../SearchBar';
