@@ -1,11 +1,18 @@
-// src/components/StatusFilterPills.jsx
+// src/components/pm-part/StatusFilterPills.jsx
+// Relocated from components/StatusFilterPills.jsx (docs/frontend/
+// MIGRATION-PLAN.md Phase 7 - domain/pm-part/ extraction, following the
+// components/masterdata/ precedent). Only used by PmPartMonitoringPage -
+// PM-Part-specific despite the generic-sounding name (options are the PM
+// status enum, not a reusable filter-pill primitive). Props/logic/markup
+// unchanged, only the file's location and import depth change.
+//
 // Reskin (checklist §3 item 6 "PM pages", batch 1/N - shared component
 // duluan karena dipakai di banyak PM page): `.btn` + inline style lama
 // dilepas total, diganti Tailwind - visual & pola className PERSIS
 // NGIKUTIN filter pill Aktif/Nonaktif di LinesTab.jsx/SuppliersTab.jsx
 // (termasuk fix cursor-pointer yang sempet ketinggalan di situ), BUKAN
 // gaya baru. Props (value, onChange) & daftar opsi TIDAK berubah.
-import { cn } from '../lib/utils';
+import { cn } from '../../lib/utils';
 
 const OPTIONS = [
   { value: '', label: 'Semua' },

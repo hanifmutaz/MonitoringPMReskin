@@ -50,7 +50,7 @@ Status legend: **Existing** = present, keep as-is. **Refactor** = present, needs
 | Folder | Status | Notes |
 |---|---|---|
 | `masterdata/` (existing name, brief expects lowercase-hyphen convention like others — reconcile naming, low priority) | Existing | 6 files, already a working precedent for the whole `domain/` layer. Use its file-per-tab pattern as the template for other domains. |
-| `pm-part/` | New | Extract from `PmPartMonitoringPage`, `PmPartFormPage`, `PmPartHistoryPage` incrementally during their migration phases. |
+| `pm-part/` (`components/pm-part/`, not the nested `components/domain/pm-part/` the brief illustrates — see `MIGRATION-PLAN.md` Phase 7) | **Done (24 Aug 2026)** | 7 files: `WearRing.jsx`, `StatusFilterPills.jsx`, `BarcodeScannerModal.jsx`, `PmPartHistoryForm.jsx` (all relocated from flat `components/`), `KetepatanPerLinePanel.jsx` + `pmPartColumns.jsx` (extracted out of `PmPartMonitoringPage.jsx`), `constants.js` (new — single source for the `jenis_penggantian` enum, replacing a real two-shape duplication found during the move). `PmPartFormPage`/`PmPartHistoryPage` updated to import from here. `api/pmPartApi.js` etc. stay in the app-wide flat `api/`/`hooks/` layer, not moved. |
 | `pm-line/` (brief says "monthly-pm"/"weekly-pm" — codebase term kept, see `ROUTE-MAP.md` note) | New | Extract from the three `PmLine*Page` files. |
 | `inventory/` | New | Extract from `InventoryPage`, `InventoryHistoryPage`. |
 | `administration/` | New | Extract from `UserManagementPage`, `SettingsPage`, `RecycleBinPage`, and wherever Roles & Permissions turns out to live (see `OPEN-QUESTIONS.md`). |

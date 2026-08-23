@@ -32,143 +32,33 @@
 // isLoading - refetch di background pas keepPreviousData aktif) sekarang
 // juga divisualisasikan (opacity turun dikit di tabel), sebelumnya gak ada
 // indikator sama sekali pas ganti filter/page.
+//
+// domain/pm-part/ extraction (Phase 7, follow-up): KetepatanPerLinePanel
+// and the DataTable column definitions (buildColumns) were local to this
+// file - both moved to components/pm-part/ (following the components/
+// masterdata/ precedent), along with WearRing/StatusFilterPills/
+// BarcodeScannerModal/PmPartHistoryForm which were already PM-Part-only
+// but sitting flat in components/. Nothing in this list changed behaviour
+// or markup, only location - this page is now purely composition.
 import { useState } from 'react';
-import { Truck, X, Plus, Inbox } from 'lucide-react';
+import { Plus, X, Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
-import { usePmPartList, usePmPartKetepatanPerLine } from '../hooks/usePmPartList';
+import { usePmPartList } from '../hooks/usePmPartList';
 import { useLines } from '../hooks/useLines';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import WearRing from '../components/WearRing';
-import StatusBadge from '../components/data-display/StatusBadge';
-import StatusFilterPills from '../components/StatusFilterPills';
+import KetepatanPerLinePanel from '../components/pm-part/KetepatanPerLinePanel';
+import buildPmPartColumns from '../components/pm-part/pmPartColumns';
+import StatusFilterPills from '../components/pm-part/StatusFilterPills';
+import PmPartHistoryForm from '../components/pm-part/PmPartHistoryForm';
 import SearchBar from '../components/SearchBar';
 import { DataTable, DataTableNoResult } from '../components/data-display/DataTable';
 import { FilterBar } from '../components/data-display/FilterBar';
 import { EmptyState } from '../components/ui/empty-state';
 import Modal from '../components/Modal';
-import PmPartHistoryForm from '../components/PmPartHistoryForm';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 const LIMIT = 20;
-
-const KETEPATAN_CLASS = {
-  ok: 'text-ok',
-  warn: 'text-warn',
-  danger: 'text-danger',
-  muted: 'text-[var(--text-faint)]',
-};
-
-function ketepatanTone(percentage) {
-  if (percentage === null || percentage === undefined) return 'muted';
-  if (percentage >= 90) return 'ok';
-  if (percentage >= 50) return 'warn';
-  return 'danger';
-}
-
-// Mini-card per Line (bukan chip "Line X: 92%" seperti sebelumnya) - pola
-// chip inline gak konsisten sama badge lain di app ini (badge di sini
-// selalu [dot + 1 kata status], bukan [label: value]). Kartu kecil lebih
-// gampang di-scan sekilas dan null-state-nya jelas beda warna (abu-abu,
-// bukan hijau seolah "bagus").
-function KetepatanPerLinePanel() {
-  const { data, isLoading } = usePmPartKetepatanPerLine();
-
-  if (isLoading || !data || data.length === 0) return null;
-
-  return (
-    <div className="rounded-lg border border-border bg-card p-3.5">
-      <div className="mb-2.5 text-xs text-muted-foreground">Ketepatan PM Part per Line (tahun berjalan)</div>
-      <div className="flex flex-wrap gap-2.5">
-        {data.map((l) => (
-          <div key={l.line_id} className="min-w-[120px] rounded-md border border-border bg-[var(--panel-2)] px-3.5 py-2.5">
-            <div className="text-xs text-muted-foreground">{l.line_name}</div>
-            <div className={`font-[var(--font-display)] text-[22px] font-semibold ${KETEPATAN_CLASS[ketepatanTone(l.percentage)]}`}>
-              {l.percentage === null ? '-' : `${l.percentage}%`}
-            </div>
-            <div className="text-[11px] text-[var(--text-faint)]">
-              {l.percentage === null ? 'belum ada data' : `${l.total} event`}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// Function, not a static array: the last column's action button needs
-// setGantiPartItem from component state, so columns are built per-render
-// inside PmPartMonitoringPage rather than hoisted as a module constant.
-function buildColumns(onGantiPart) {
-  return [
-  {
-    key: 'wear',
-    header: '',
-    render: (item) => <WearRing percentage={item.wear_percentage} status={item.status} />,
-  },
-  {
-    key: 'line',
-    header: 'Line',
-    render: (item) => <span className="font-[var(--font-mono)] text-[13px]">{item.line_name}</span>,
-  },
-  {
-    key: 'part',
-    header: 'Drawing No / Part Name',
-    render: (item) => (
-      <>
-        <div className="text-[13px]">{item.part_name}</div>
-        <div className="font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
-          {item.drawing_no} <span className="text-[var(--text-faint)]">({item.jig_name})</span>
-        </div>
-        {item.primary_supplier_name ? (
-          <div className="mt-0.5 flex items-center gap-1 text-xs text-[var(--text-dim)]">
-            <Truck size={11} /> {item.primary_supplier_name}
-          </div>
-        ) : (
-          <div className="mt-0.5 text-xs text-[var(--text-faint)]">Belum ada Supplier utama</div>
-        )}
-      </>
-    ),
-  },
-  {
-    key: 'counter',
-    header: 'Counter',
-    align: 'right',
-    render: (item) => <span className="font-[var(--font-mono)] text-[13px]">{item.counter.toLocaleString('id-ID')}</span>,
-  },
-  {
-    key: 'target_shot',
-    header: 'Target Shot',
-    align: 'right',
-    render: (item) => <span className="font-[var(--font-mono)] text-[13px]">{item.target_shot.toLocaleString('id-ID')}</span>,
-  },
-  {
-    key: 'remaining_shot',
-    header: 'Sisa Shot',
-    align: 'right',
-    render: (item) => <span className="font-[var(--font-mono)] text-[13px]">{item.remaining_shot.toLocaleString('id-ID')}</span>,
-  },
-  {
-    key: 'estimated_pm_date',
-    header: 'Estimasi PM',
-    render: (item) => <span className="font-[var(--font-mono)] text-[13px]">{item.estimated_pm_date || '-'}</span>,
-  },
-  {
-    key: 'status',
-    header: 'Status',
-    render: (item) => <StatusBadge status={item.status} />,
-  },
-  {
-    key: 'actions',
-    header: '',
-    render: (item) => (
-      <Button type="button" size="sm" variant="outline" onClick={() => onGantiPart(item)}>
-        Ganti Part
-      </Button>
-    ),
-  },
-  ];
-}
 
 function PmPartMonitoringPage() {
   usePageHeader({ title: 'Monitoring PM Part' });
@@ -261,7 +151,7 @@ function PmPartMonitoringPage() {
       </FilterBar>
 
       <DataTable
-        columns={buildColumns(setGantiPartItem)}
+        columns={buildPmPartColumns(setGantiPartItem)}
         rows={data?.items}
         getRowKey={(item) => item.part_id}
         isLoading={isLoading && !data}

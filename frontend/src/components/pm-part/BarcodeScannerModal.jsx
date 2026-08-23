@@ -1,4 +1,9 @@
-// src/components/BarcodeScannerModal.jsx
+// src/components/pm-part/BarcodeScannerModal.jsx
+// Relocated from components/BarcodeScannerModal.jsx (docs/frontend/
+// MIGRATION-PLAN.md Phase 7 - domain/pm-part/ extraction). Only used by
+// PmPartHistoryForm.jsx (scans a Drawing No, a PM Part concept). Scan
+// logic and markup unchanged, only the file's location and import depth
+// (./ui/x -> ../ui/x) change.
 //
 // Scan barcode Drawing No pakai kamera device (target utama: iPad di
 // lapangan, lihat konteks fitur di PmPartHistoryForm.jsx). Pakai
@@ -17,9 +22,9 @@
 // cleanup) TIDAK berubah sama sekali - cuma markup.
 import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Camera, X } from 'lucide-react';
-import { Button } from './ui/button';
+import { Button } from '../ui/button';
 
 function BarcodeScannerModal({ open, onClose, onDetected }) {
   const videoRef = useRef(null);

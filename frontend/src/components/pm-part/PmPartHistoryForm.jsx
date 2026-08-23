@@ -1,4 +1,14 @@
-// src/components/PmPartHistoryForm.jsx
+// src/components/pm-part/PmPartHistoryForm.jsx
+// Relocated from components/PmPartHistoryForm.jsx (docs/frontend/
+// MIGRATION-PLAN.md Phase 7 - domain/pm-part/ extraction, following the
+// components/masterdata/ precedent). Import depth updated (./ui/x ->
+// ../ui/x, ../hooks/x -> ../../hooks/x, ../api/x -> ../../api/x);
+// BarcodeScannerModal import stays './BarcodeScannerModal' since it moved
+// to this same folder. JENIS_OPTIONS now comes from the shared
+// './constants' (previously a local duplicate of PmPartHistoryPage.jsx's
+// JENIS_LABEL - see constants.js for why). Form logic, 2-mode rendering,
+// scan/lookup/candidate-selection/create-mutation behaviour unchanged.
+//
 // Reskin (checklist §3 item 6 "PM pages", batch 5/N): `.panel`/
 // `.panel-header`/`.panel-title`/`.form-label`/`.form-select`/`.form-input`/
 // `.error-state`/`.caption`/`.btn`/`.mono`/inline style lama dilepas total,
@@ -10,22 +20,17 @@
 // drawing no/candidate selection/create mutation TIDAK berubah sama sekali.
 import { useState } from 'react';
 import { ScanLine } from 'lucide-react';
-import { useLines } from '../hooks/useLines';
-import { useParts } from '../hooks/useParts';
-import { useCreatePmPartHistory } from '../hooks/usePmPartHistory';
-import { lookupPartsByDrawingNo } from '../api/partsApi';
+import { useLines } from '../../hooks/useLines';
+import { useParts } from '../../hooks/useParts';
+import { useCreatePmPartHistory } from '../../hooks/usePmPartHistory';
+import { lookupPartsByDrawingNo } from '../../api/partsApi';
 import BarcodeScannerModal from './BarcodeScannerModal';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-
-const JENIS_OPTIONS = [
-  { value: 'TERJADWAL', label: 'Terjadwal' },
-  { value: 'PM_EARLY', label: 'PM Early' },
-  { value: 'BROKEN', label: 'Broken' },
-];
+import { JENIS_OPTIONS } from './constants';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 

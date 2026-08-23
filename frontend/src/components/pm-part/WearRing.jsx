@@ -1,4 +1,7 @@
-// src/components/WearRing.jsx
+// src/components/pm-part/WearRing.jsx
+// Relocated from components/WearRing.jsx (docs/frontend/MIGRATION-PLAN.md
+// Phase 7 - domain/pm-part/ extraction). Only used by PmPartMonitoringPage.
+// No imports to update - pure SVG, no code changes, location only.
 const SIZE = 44;
 const RADIUS = 17;
 const STROKE = 4;

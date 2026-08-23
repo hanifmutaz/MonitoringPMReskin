@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePageHeader } from '../contexts/PageHeaderContext';
-import PmPartHistoryForm from '../components/PmPartHistoryForm';
+import PmPartHistoryForm from '../components/pm-part/PmPartHistoryForm';
 import Banner from '../components/Banner';
 import { Button } from '../components/ui/button';
 

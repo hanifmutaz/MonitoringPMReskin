@@ -17,9 +17,9 @@ import OnTimeBadge from '../components/OnTimeBadge';
 import BulkDeleteBar from '../components/BulkDeleteBar';
 import SelectAllAcrossPagesBar from '../components/SelectAllAcrossPagesBar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { JENIS_LABEL } from '../components/pm-part/constants';
 
 const LIMIT = 20;
-const JENIS_LABEL = { TERJADWAL: 'Terjadwal', PM_EARLY: 'PM Early', BROKEN: 'Broken' };
 
 function PmPartHistoryPage() {
   const [lineId, setLineId] = useState('all');
