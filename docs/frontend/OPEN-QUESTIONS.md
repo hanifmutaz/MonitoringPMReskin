@@ -1,11 +1,21 @@
 # Open Questions — PM Monitoring Frontend
 
+## Resolved (verified against codebase, 24 Aug 2026 — see MIGRATION-PLAN.md Phase 7/8/11 status notes for detail)
+
+1. **Roles & Permissions location**: inside `UserManagementPage.jsx` (same file, additional tabs/sections) — not a separate route. No new migration target needed.
+2. **Audit Log frontend surface**: does not exist — no route in `App.jsx`, no page file. Phase 11 needs to *build* this, not refine an existing page. Recommended as the one place to default to the new `DataTable`/`FilterBar` primitives (Phase 5), since it's genuinely new rather than a migration of a battle-tested hand-rolled table.
+3. **PM Line Weekly vs Monthly structure**: not a mode/param split — `PmLineStatusPage.jsx` shows both cycles' columns side-by-side per Line in one table. Any `scheduling/` component built later needs to represent both cycles at once.
+4. **Part Detail existence — checked across all 4 modules**: pattern is **not uniform**, resolved per module:
+   - **PM Part**: backend endpoint exists (`GET /pm-part/:partId`), frontend `pmPartApi.getPmPartDetail()` has zero call sites — dead capability, not built.
+   - **PM Line**: no detail endpoint on backend at all (`pmLineRoutes.js` only has `GET /`) — no gap on either side, Detail genuinely isn't a concept here.
+   - **Inventory**: backend endpoint exists (`GET /inventory/:id`, `GET /inventory/:id/movements`) **and is consumed** — `components/masterdata/InventoryTab.jsx`'s `ItemDetailModal` calls `useInventoryItemDetail`/`useInventoryMovements`. Already built, as a modal (not a route). No gap.
+   - **User**: no detail endpoint on backend (`userManagementRoutes.js` only has `GET /`) — same as PM Line, not a concept here.
+   - **Net finding**: PM Part is the *only* module with a real gap (built on backend, unused on frontend).
+5. **`doc/` vs `docs/frontend/` duplication**: confirmed `docs/frontend/` is canonical — 8 component files (`ui/badge.jsx`, `ui/alert.jsx`, `ui/tabs.jsx`, `ui/card.jsx`, `data-display/DataTable.jsx`, `data-display/FilterBar.jsx`, `data-display/Pagination.jsx`, `data-display/StatusBadge.jsx`, plus `components/Pagination.jsx`/`StatusBadge.jsx` shims) reference `docs/frontend/*.md` in comments; zero code anywhere referenced `doc/*.md` for these same files. The 7 duplicated frontend files (`COMPONENT-INVENTORY.md`, `DESIGN-TOKENS.md`, `FRONTEND-ARCHITECTURE.md`, `FRONTEND-AUDIT.md`, `MIGRATION-PLAN.md`, `OPEN-QUESTIONS.md`, `ROUTE-MAP.md`) have been removed from `doc/` — that folder now holds only its original backend ADRs (`001`–`007`, `Architecture.md`, `PROJECT_SCOPE.md`, `SECURITY_REVIEW.md`), untouched.
+
 ## Blocking (need an answer before the relevant migration phase can start correctly)
 
-1. **Where do Roles & Permissions live in the UI today, if anywhere?** `rolesApi.js` (`GET /roles`, `GET /roles/permissions`, `updateRolePermissions`) is fully implemented, but no dedicated route was found in `App.jsx`. Likely embedded in `/users` or `/settings`. Blocks: `ROUTE-MAP.md` finalization for this module, `MIGRATION-PLAN.md` Phase 11 scope.
-2. **Where does Audit Log surface to users, if at all?** The append-only audit trigger exists at the data layer (`doc/003-audit-log-append-only-trigger.md`), but no confirmed frontend route/page was found. Blocks: whether Phase 11 needs to build a new page or just refine an existing one.
-3. **Is PM Line Weekly vs. Monthly a mode/param within the existing three `PmLine*Page` files, or are they already visually distinct in ways not yet read?** Blocks: `scheduling/` component design in Phase 8 — building `ScheduleCalendar`/`Checklist` before this is confirmed risks designing against the wrong shape.
-4. **Does `Part Detail` (and other "Detail" screens named in the product map) exist as a separate route, a drawer, or same-page expanded state today?** No dedicated detail route was found for PM Part, PM Line, Inventory, or User despite the product map treating Detail as a first-class node. Blocks: whether Phase 6–11 need new routes or just new in-page components.
+1. **Is `pmPartApi.getPmPartDetail()` (dead code — implemented, unused) intentional scaffolding for a future Detail view, or safe to remove?** Now confirmed as PM Part's own isolated gap (see #4 above — every other module either has no detail concept or already built and wired it as a modal). Recommend either: (a) build a PM Part detail modal following Inventory's exact pattern (`ItemDetailModal` in `InventoryTab.jsx` as the reference implementation), or (b) remove the unused API function if Detail is out of scope for PM Part. Leaving it unused indefinitely is the one option not recommended.
 
 ## Non-blocking (can proceed with the stated default, but worth confirming)
 

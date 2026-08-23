@@ -16,6 +16,7 @@
 //   6. Hasil % (wear_percentage) = Counter / Target Shot * 100
 
 const pmPartQueries = require('../sql/pmPartQueries');
+const pmPartStatusSnapshotQueries = require('../sql/pmPartStatusSnapshotQueries');
 const clMappingQueries = require('../sql/clMappingQueries');
 const partSupplierQueries = require('../sql/partSupplierQueries');
 const settingsService = require('./settingsService');
@@ -70,6 +71,11 @@ function computeMetrics(row, thresholds) {
     // detail) karena justru paling kepake pas lagi liat Monitoring dan part
     // udah DANGER - operator langsung tau kontak siapa tanpa buka halaman lain.
     primary_supplier_name: row.primary_supplier_name || null,
+    // Field baru (additive, tidak mengubah field lain) - dibutuhkan
+    // pmPartSnapshotService buat nyimpen last_tgl_ganti ke
+    // pm_part_status_snapshot tanpa query ulang row.last_tgl_ganti.
+    // Ikut ke response API listPmPart/getPmPartDetail juga (harmless).
+    last_tgl_ganti: row.last_tgl_ganti || null,
   };
 }
 
@@ -90,9 +96,9 @@ async function getAllComputedMetrics({ lineId, search } = {}) {
 async function listPmPart({ lineId, status, search, page, limit }) {
   const pageNum = Number(page) > 0 ? Number(page) : 1;
   const limitNum = Number(limit) > 0 ? Number(limit) : 20;
+  const offset = (pageNum - 1) * limitNum;
 
   if (!status) {
-    const offset = (pageNum - 1) * limitNum;
     const thresholds = await getThresholds();
     const [rows, total] = await Promise.all([
       pmPartQueries.findAllWithCounter({ lineId, search, limit: limitNum, offset }),
@@ -102,12 +108,38 @@ async function listPmPart({ lineId, status, search, page, limit }) {
     return { items, total, page: pageNum, limit: limitNum };
   }
 
-  let computed = await getAllComputedMetrics({ lineId, search });
-  computed = computed.filter((item) => item.status === status.toUpperCase());
+  // Filter status: baca dari pm_part_status_snapshot (di-refresh scheduled
+  // job, lihat pmPartSnapshotService.js & migration 1700000021000), BUKAN
+  // compute-all + filter di JS lagi (TECHNICAL_DEBT.md #1 - itu makan ~8,7
+  // detik/request begitu production_cache sudah jutaan row, diukur
+  // langsung). Konsekuensi: status di jalur ini bisa telat maksimal 1
+  // interval sync (default 30 menit) - trade-off yang sama seperti
+  // akumulasi_poin_monthly (ADR 006). Kalau butuh status yang benar-benar
+  // real-time per detik, pakai jalur tanpa filter status lalu filter
+  // manual di client - itu di luar scope perf fix ini.
+  const statusUpper = status.toUpperCase();
+  const [rows, total] = await Promise.all([
+    pmPartStatusSnapshotQueries.findByStatus({ status: statusUpper, lineId, search, limit: limitNum, offset }),
+    pmPartStatusSnapshotQueries.countByStatus({ status: statusUpper, lineId, search }),
+  ]);
 
-  const total = computed.length;
-  const start = (pageNum - 1) * limitNum;
-  const items = computed.slice(start, start + limitNum);
+  const items = rows.map((row) => ({
+    part_id: row.part_id,
+    line_id: row.line_id,
+    line_name: row.line_name,
+    jig_name: row.jig_name,
+    drawing_no: row.drawing_no,
+    part_name: row.part_name,
+    counter: Number(row.counter),
+    target_shot: Number(row.target_shot),
+    remaining_shot: Number(row.remaining_shot),
+    usage_per_day: Number(row.usage_per_day),
+    estimated_pm_date: dateUtils.formatDate(row.estimated_pm_date),
+    status: row.status,
+    wear_percentage: row.wear_percentage,
+    primary_supplier_name: row.primary_supplier_name || null,
+    last_tgl_ganti: row.last_tgl_ganti || null,
+  }));
 
   return { items, total, page: pageNum, limit: limitNum };
 }

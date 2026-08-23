@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const db = require('../config/db');
 const pmPartService = require('./pmPartService');
+const pmPartSnapshotService = require('./pmPartSnapshotService');
 
 const RUN_ID = Date.now();
 const LINE_NAME = `TestLine_${RUN_ID}`;
@@ -20,17 +21,17 @@ describe('pmPartService.listPmPart — pagination (TECHNICAL_DEBT.md #1)', () =>
 
         for (let i = 0; i < 5; i += 1) {
             const res = await db.query(
-                `INSERT INTO parts (line_id, drawing_no, part_name, target_shot, is_active)
-         VALUES ($1, $2, $3, 100000, TRUE) RETURNING id`,
-                [lineId, `DWG-${RUN_ID}-${i}`, `Part ${i}`]
+                `INSERT INTO parts (line_id, drawing_no, part_name, target_shot, jig_name, is_active)
+         VALUES ($1, $2, $3, 100000, $4, TRUE) RETURNING id`,
+                [lineId, `DWG-${RUN_ID}-${i}`, `Part ${i}`, `JIG-${RUN_ID}-${i}`]
             );
             partIds.push(res.rows[0].id);
         }
 
         const dangerRes = await db.query(
-            `INSERT INTO parts (line_id, drawing_no, part_name, target_shot, is_active)
-       VALUES ($1, $2, $3, 100, TRUE) RETURNING id`,
-            [lineId, `DWG-${RUN_ID}-danger`, 'Part Danger']
+            `INSERT INTO parts (line_id, drawing_no, part_name, target_shot, jig_name, is_active)
+       VALUES ($1, $2, $3, 100, $4, TRUE) RETURNING id`,
+            [lineId, `DWG-${RUN_ID}-danger`, 'Part Danger', `JIG-${RUN_ID}-danger`]
         );
         const dangerPartId = dangerRes.rows[0].id;
         partIds.push(dangerPartId);
@@ -52,6 +53,13 @@ describe('pmPartService.listPmPart — pagination (TECHNICAL_DEBT.md #1)', () =>
        VALUES ($1, $2, CURRENT_DATE, 500)`,
             [lineId, clNo]
         );
+
+        // Filter status baca dari pm_part_status_snapshot (lihat migration
+        // 1700000021000 & pmPartSnapshotService.js), bukan real-time lagi -
+        // simulasikan scheduled job jalan sekali sebelum test yang butuh
+        // filter status. Fixture "tanpa filter status" di bawah TIDAK
+        // butuh ini karena jalur itu tetap real-time (findAllWithCounter).
+        await pmPartSnapshotService.recomputeAll();
     });
 
     after(async () => {
@@ -77,7 +85,7 @@ describe('pmPartService.listPmPart — pagination (TECHNICAL_DEBT.md #1)', () =>
         assert.equal(uniqueIds.size, 6, 'tidak boleh ada part yang muncul di 2 halaman sekaligus');
     });
 
-    test('Dengan filter status=DANGER: hasil correct meski lewat jalur compute-all', async () => {
+    test('Dengan filter status=DANGER: baca dari snapshot (SQL-level pagination), hasil tetap benar', async () => {
         const res = await pmPartService.listPmPart({ lineId, status: 'DANGER', page: 1, limit: 10 });
 
         assert.equal(res.total, 1);
