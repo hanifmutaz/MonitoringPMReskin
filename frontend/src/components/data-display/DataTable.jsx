@@ -50,6 +50,7 @@ function DataTable({
         errorState || (
           <EmptyState
             icon={AlertTriangle}
+            tone="danger"
             title="Data gagal dimuat"
             description="Terjadi kesalahan saat memuat data. Coba lagi."
           />

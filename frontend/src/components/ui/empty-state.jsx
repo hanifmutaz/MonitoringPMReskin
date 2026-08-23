@@ -7,9 +7,23 @@
 // "empty" visual. Domain pages decide the actual copy per state (e.g.
 // "Belum ada PM Schedule" vs "Tidak ada record yang cocok dengan filter"),
 // this component only owns the layout.
+//
+// `tone` (added during DashboardPage's Phase 6 migration): the original
+// hand-rolled error state used bg-danger-dim/text-danger, not a neutral
+// gray icon - collapsing that into the default neutral look would have
+// been exactly the "Error looks the same as Empty" outcome §8 warns
+// against. tone lets a caller opt into the semantic color without
+// hardcoding it as the only option (most Empty/No-Result cases genuinely
+// are neutral, per the same verified DataTable default usage).
 import { cn } from '../../lib/utils';
 
-function EmptyState({ icon: Icon, title, description, action, className, ...props }) {
+const TONE_CLASS = {
+  neutral: 'bg-secondary text-muted-foreground',
+  danger: 'bg-danger-dim text-danger',
+  warning: 'bg-warn-dim text-warn',
+};
+
+function EmptyState({ icon: Icon, title, description, action, tone = 'neutral', className, ...props }) {
   return (
     <div
       className={cn(
@@ -19,7 +33,7 @@ function EmptyState({ icon: Icon, title, description, action, className, ...prop
       {...props}
     >
       {Icon && (
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+        <div className={cn('flex h-10 w-10 items-center justify-center rounded-full', TONE_CLASS[tone] || TONE_CLASS.neutral)}>
           <Icon className="h-5 w-5" />
         </div>
       )}

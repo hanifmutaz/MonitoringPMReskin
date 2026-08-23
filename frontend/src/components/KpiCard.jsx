@@ -1,8 +1,14 @@
 // src/components/KpiCard.jsx
 // Reskin: props (icon, label, value, caption, status) & output visual PERSIS
-// sama - cuma .kpi-card/.kpi-icon/dst diganti utility Tailwind. .kpi-grid
-// & .kpi-card (dipakai buat loading skeleton di DashboardPage.jsx) dibiarkan
-// di components.css apa adanya, belum dimigrasi.
+// sama - cuma .kpi-card/.kpi-icon/dst diganti utility Tailwind.
+// (Correction, Phase 6 dashboard migration: the note that used to be here
+// about `.kpi-grid`/`.kpi-card` "dipakai buat loading skeleton di
+// DashboardPage.jsx, belum dimigrasi" is stale - DashboardPage.jsx's own
+// loading skeleton already moved off those classes to raw Tailwind a while
+// back, and a repo-wide grep confirms zero live className references to
+// either class anywhere in .jsx files. They're confirmed dead code left in
+// components.css, for Phase 14 cleanup - not a real dependency of this
+// file.)
 // Class HARUS ditulis lengkap & statis di sini (bukan di-interpolate lewat
 // template string) - Tailwind JIT nyari candidate class lewat regex di teks
 // mentah file, jadi `bg-[var(--${status}-dim)]` gak bakal ke-detect dan

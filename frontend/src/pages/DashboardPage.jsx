@@ -15,6 +15,10 @@ import LineStatusDonut from '../components/LineStatusDonut';
 import CriticalAlertsPanel from '../components/CriticalAlertsPanel';
 import GanttUpcomingPanel from '../components/GanttUpcomingPanel';
 import SiteSwitcher from '../components/SiteSwitcher';
+import { Card, CardHeader, CardTitle } from '../components/ui/card';
+import { Skeleton } from '../components/ui/skeleton';
+import { EmptyState } from '../components/ui/empty-state';
+import { Button } from '../components/ui/button';
 
 // Reskin layout (checklist §3 item 3): `.panel`/`.kpi-grid` lama dilepas
 // TOTAL (bukan digabung - lihat aturan §7.3 RESKIN-PLAN.md), diganti
@@ -51,6 +55,28 @@ import SiteSwitcher from '../components/SiteSwitcher';
 //   di RESKIN-PLAN.md §1.
 // Data/logic (hook, query, permission gating) TETAP SAMA - cuma markup yang
 // berubah.
+//
+// Phase 6 migration (docs/frontend/MIGRATION-PLAN.md): the repeated
+// "rounded-lg border border-border bg-card p-4.5" + "mb-4 flex ... h2"
+// panel wrapper (used identically by the Ketepatan PM section, the
+// Ringkasan Status Line section, and KetepatanAttentionPanel) is now
+// Card/CardHeader/CardTitle from ui/card - same markup, just no longer
+// copy-pasted three times. KpiCard/LineStatusDonut/CriticalAlertsPanel/
+// GanttUpcomingPanel/SiteSwitcher are untouched (not flagged as needing
+// change, still working, still domain-appropriate).
+//
+// The full-page error state (errorSummary) previously showed static text
+// "Coba Lagi" with no actual button - useDashboardSummary() already
+// returns `refetch` via TanStack Query, it just wasn't wired to anything.
+// Now wired to a real retry action, per 01-PRODUCT-UX-BRIEF.md §8's
+// requirement that Error states have a working primary action - this only
+// adds behavior, doesn't change the existing error-detection logic
+// (errorSummary is computed exactly as before).
+//
+// KPI loading placeholder previously was 4 empty boxes with a literal "..."
+// - replaced with a skeleton shaped like the real KpiCard (icon box + label
+// line + value line + caption line) using the ui/Skeleton primitive, same
+// approach already established by data-display/DataTable's loading state.
 
 function formatKetepatan(percentage) {
   return percentage === null || percentage === undefined ? '-' : `${percentage}%`;
@@ -140,6 +166,23 @@ function HealthStat({ value, label, tone }) {
   );
 }
 
+// Shaped like the real KpiCard (icon box 34x34, label line, value line,
+// caption line) rather than a generic empty box, so the loading state
+// doesn't visually jump when real data arrives. Local to this file since
+// KpiCard's exact shape is Dashboard-specific for now - promote to
+// data-display/ only if a second consumer needs it (COMPONENT-INVENTORY.md
+// rule: new abstractions need multiple justified consumers).
+function KpiCardSkeleton() {
+  return (
+    <div className="rounded-lg border border-border bg-card p-4.5">
+      <Skeleton className="mb-3 h-[34px] w-[34px] rounded-sm" />
+      <Skeleton className="mb-2 h-2.5 w-20" />
+      <Skeleton className="mb-1 h-7 w-16" />
+      <Skeleton className="h-3 w-24" />
+    </div>
+  );
+}
+
 // Diubah jadi terima data lewat props (bukan manggil hook sendiri) supaya
 // bisa dipakai buat data lokal MAUPUN data site lain hasil switcher - satu
 // komponen, dua sumber data.
@@ -147,17 +190,15 @@ function KetepatanAttentionPanel({ data = [], isLoading }) {
   if (isLoading) return null;
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4.5">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="m-0 flex items-center gap-1.5 font-[var(--font-display)] text-[15px] font-semibold">
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-1.5">
           <TrendingDown size={16} />
           Line Perlu Perhatian — Ketepatan PM Terendah (Tahun Berjalan)
-        </h2>
-      </div>
+        </CardTitle>
+      </CardHeader>
       {data.length === 0 ? (
-        <div className="px-4 py-5.5 text-center text-[var(--text-faint)]">
-          Belum ada data ketepatan PM tahun ini buat dirangking.
-        </div>
+        <EmptyState title="Belum ada data" description="Belum ada data ketepatan PM tahun ini buat dirangking." />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
@@ -194,7 +235,7 @@ function KetepatanAttentionPanel({ data = [], isLoading }) {
           </table>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -236,9 +277,17 @@ function DashboardPage() {
 
   if (errorSummary) {
     return (
-      <div className="rounded-lg bg-danger-dim px-4 py-5 text-center text-danger">
-        Gagal memuat data dashboard. Coba lagi.
-      </div>
+      <EmptyState
+        icon={AlertTriangle}
+        tone="danger"
+        title="Gagal memuat data dashboard"
+        description="Terjadi kesalahan saat memuat ringkasan dashboard."
+        action={
+          <Button type="button" size="sm" variant="outline" onClick={() => localSummary.refetch()}>
+            Coba Lagi
+          </Button>
+        }
+      />
     );
   }
 
@@ -248,10 +297,10 @@ function DashboardPage() {
     return (
       <div className="flex flex-col gap-5">
         <SiteSwitcher sites={sites} selectedSiteId={selectedSiteId} onChange={setSelectedSiteId} />
-        <div className="px-4 py-5 text-center text-[var(--text-faint)]">
-          Belum pernah berhasil narik data dari {remoteSite.site_label}.
-          {remoteSite.error && ` (${remoteSite.error})`}
-        </div>
+        <EmptyState
+          title="Belum ada data"
+          description={`Belum pernah berhasil narik data dari ${remoteSite.site_label}.${remoteSite.error ? ` (${remoteSite.error})` : ''}`}
+        />
       </div>
     );
   }
@@ -263,12 +312,7 @@ function DashboardPage() {
       {loadingSummary ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="flex h-[148px] items-center justify-center rounded-lg border border-border bg-card text-[var(--text-faint)]"
-            >
-              ...
-            </div>
+            <KpiCardSkeleton key={i} />
           ))}
         </div>
       ) : (
@@ -309,10 +353,10 @@ function DashboardPage() {
         <NeedsDataCard icon={<Timer size={18} />} label="MTTR" note="Butuh sumber data breakdown/downtime mesin" />
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-4.5">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Ketepatan PM (Tahun Berjalan)</h2>
-        </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Ketepatan PM (Tahun Berjalan)</CardTitle>
+        </CardHeader>
         {!loadingSummary && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <KpiCard
@@ -350,17 +394,17 @@ function DashboardPage() {
             />
           </div>
         )}
-      </div>
+      </Card>
 
       <KetepatanAttentionPanel
         data={ketepatanAttention}
         isLoading={isRemoteView ? false : localKetepatan.isLoading}
       />
 
-      <div className="rounded-lg border border-border bg-card p-4.5">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Ringkasan Status Line</h2>
-        </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Ringkasan Status Line</CardTitle>
+        </CardHeader>
         {!loadingSummary && (
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
             <LineStatusDonut
@@ -375,7 +419,7 @@ function DashboardPage() {
             </div>
           </div>
         )}
-      </div>
+      </Card>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {!(isRemoteView ? false : localAttention.isLoading) && <CriticalAlertsPanel items={attention} />}
