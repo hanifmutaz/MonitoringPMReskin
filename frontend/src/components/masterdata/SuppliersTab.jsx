@@ -9,8 +9,15 @@
 // (useDebouncedValue, pola yang sama dipakai halaman lain) lalu diteruskan
 // ke useSuppliers(). Sort & pagination TETAP client-side (gak ada param itu
 // di API). Logic create/update/delete/toggle-active TIDAK berubah sama sekali.
+//
+// DataTable migration (docs/frontend/MIGRATION-PLAN.md Phase 9): hand-
+// rolled <table> diganti data-display/DataTable dengan `selection`, sama
+// persis pola LinesTab.jsx (client-side pagination, filteredIds bukan
+// paged yang di-pass ke useRowSelection). Kolom (5 data + aksi) pindah ke
+// suppliersColumns.jsx. Toolbar (KpiCard/filter pill/search/sort) TIDAK
+// disentuh, sama alasan LinesTab. Semua state/query/mutation TIDAK berubah.
 import { useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, Building2, CheckCircle2, XCircle } from 'lucide-react';
+import { Plus, Building2, CheckCircle2, XCircle, Inbox } from 'lucide-react';
 import { useSuppliers } from '../../hooks/useSuppliers';
 import { useSupplierMutations } from '../../hooks/useSupplierMutations';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
@@ -18,12 +25,14 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useRowSelection } from '../../hooks/useRowSelection';
 import { useBulkDeleteMutation } from '../../hooks/useRecycleBin';
 import { cn } from '../../lib/utils';
+import buildSuppliersColumns from './suppliersColumns';
 import Modal from '../Modal';
 import KpiCard from '../KpiCard';
 import SearchBar from '../SearchBar';
-import Pagination from '../Pagination';
 import PageSizeSelector from '../PageSizeSelector';
 import BulkDeleteBar from '../BulkDeleteBar';
+import { DataTable, DataTableNoResult } from '../data-display/DataTable';
+import { EmptyState } from '../ui/empty-state';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -154,7 +163,7 @@ function SuppliersTab() {
   const debouncedSearch = useDebouncedValue(search, 400);
   const activeFilter = FILTERS.find((f) => f.key === filter);
 
-  const { data: suppliers = [], isLoading } = useSuppliers({
+  const { data: suppliers = [], isLoading, isFetching } = useSuppliers({
     isActive: activeFilter.isActive,
     search: debouncedSearch || undefined,
   });
@@ -207,6 +216,18 @@ function SuppliersTab() {
     } catch (err) {
       setDeleteError(err.response?.data?.message || 'Gagal menghapus Supplier');
     }
+  }
+
+  const columns = buildSuppliersColumns({
+    onEdit: (s) => setModalState({ mode: 'edit', supplier: s }),
+    onDelete: handleDelete,
+    onToggleActive: (s, checked) => update.mutate({ id: s.id, payload: { is_active: checked } }),
+  });
+
+  function handleResetFilter() {
+    setFilter('all');
+    setSearch('');
+    setPage(1);
   }
 
   async function handleBulkDelete() {
@@ -297,100 +318,29 @@ function SuppliersTab() {
         label="Supplier"
       />
 
-      {isLoading && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
-
-      {!isLoading && paged.length === 0 && (
-        <div className="py-8 text-center text-sm text-[var(--text-faint)]">Tidak ada Supplier yang cocok.</div>
-      )}
-
-      {!isLoading && paged.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-border">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="w-[36px] px-3 py-2">
-                  <input
-                    type="checkbox"
-                    checked={selection.allOnPageSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
-                    }}
-                    onChange={selection.toggleAllOnPage}
-                    className="h-3.5 w-3.5 accent-[var(--accent)]"
-                  />
-                </th>
-                {['Nama Supplier', 'Kontak', 'Telepon', 'Email', 'Status'].map((h) => (
-                  <th
-                    key={h}
-                    className="px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
-                  >
-                    {h}
-                  </th>
-                ))}
-                <th className="w-[90px] px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
-                  Aksi
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {paged.map((s) => (
-                <tr key={s.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                  <td className="px-3 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selection.isSelected(s.id)}
-                      onChange={() => selection.toggle(s.id)}
-                      className="h-3.5 w-3.5 accent-[var(--accent)]"
-                    />
-                  </td>
-                  <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{s.supplier_name}</td>
-                  <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{s.contact_person || '-'}</td>
-                  <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{s.phone || '-'}</td>
-                  <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{s.email || '-'}</td>
-                  <td className="px-3 py-3">
-                    <label className="flex cursor-pointer items-center gap-2 text-[13px]">
-                      <input
-                        type="checkbox"
-                        checked={s.is_active}
-                        onChange={(e) => update.mutate({ id: s.id, payload: { is_active: e.target.checked } })}
-                        className="h-3.5 w-3.5 accent-[var(--accent)]"
-                      />
-                      {s.is_active ? 'Aktif' : 'Nonaktif'}
-                    </label>
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex gap-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => setModalState({ mode: 'edit', supplier: s })}
-                      >
-                        <Pencil size={13} />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => handleDelete(s)}
-                      >
-                        <Trash2 size={13} />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        rows={paged}
+        getRowKey={(s) => s.id}
+        isLoading={isLoading}
+        isRefreshing={isFetching && !isLoading}
+        selection={selection}
+        page={page}
+        limit={limit}
+        total={sorted.length}
+        onPageChange={setPage}
+        emptyState={
+          filter !== 'all' || search ? (
+            <DataTableNoResult onReset={handleResetFilter} />
+          ) : (
+            <EmptyState icon={Inbox} title="Belum ada Supplier" />
+          )
+        }
+      />
 
       {!isLoading && sorted.length > 0 && (
-        <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+        <div className="mt-3 flex justify-end">
           <PageSizeSelector value={limit} onChange={(v) => { setLimit(v); setPage(1); }} options={[10, 25, 50, 100]} />
-          <Pagination page={page} limit={limit} total={sorted.length} onPageChange={setPage} />
         </div>
       )}
 

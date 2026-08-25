@@ -12,8 +12,22 @@
 // bg-ok-dim/text-ok, bg-warn-dim/text-warn yang udah dipakai di seluruh app.
 // Logic create/update/delete/adjustStock/detail/histori mutasi TIDAK
 // berubah sama sekali.
+//
+// DataTable migration (docs/frontend/MIGRATION-PLAN.md Phase 9): KEDUA
+// hand-rolled <table> di file ini diganti data-display/DataTable - list
+// item utama (server-side paginated, `selection` + `SelectAllAcrossPagesBar`,
+// pola sama persis PartsTab) DAN tabel histori mutasi di dalam
+// ItemDetailModal (tanpa selection/pagination - `useInventoryMovements`
+// dipanggil fixed `{page:1,limit:20}`, gak ada UI pagination baik sebelum
+// maupun sesudah migrasi ini, jadi DataTable cukup dikasih `rows` doang,
+// props page/limit/total/onPageChange sengaja diomit semua - sama seperti
+// PmLineStatusPage). RopBadge pindah ke inventoryColumns.jsx (dipakai di
+// 2 tempat: kolom Status tabel utama, DAN ringkasan ROP di ItemDetailModal
+// - tetap diimpor di sini buat pemakaian kedua itu). Kolom (7 + 5) pindah
+// ke inventoryColumns.jsx. Semua state/query/mutation/handler TIDAK
+// berubah.
 import { useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, History, ArrowDownCircle, ArrowUpCircle, Package, ShoppingCart, AlertCircle } from 'lucide-react';
+import { Plus, Package, ShoppingCart, AlertCircle, History } from 'lucide-react';
 import { useInventoryItems, useInventoryRopStatus } from '../../hooks/useInventoryItems';
 import { useInventoryItemDetail, useInventoryMovements } from '../../hooks/useInventoryItemDetail';
 import { useInventoryMutations } from '../../hooks/useInventoryMutations';
@@ -21,13 +35,15 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
 import { useRowSelection } from '../../hooks/useRowSelection';
 import { useBulkDeleteMutation } from '../../hooks/useRecycleBin';
+import { RopBadge, buildInventoryColumns, inventoryMovementColumns } from './inventoryColumns';
 import Modal from '../Modal';
 import KpiCard from '../KpiCard';
 import SearchBar from '../SearchBar';
-import Pagination from '../Pagination';
 import PageSizeSelector from '../PageSizeSelector';
 import BulkDeleteBar from '../BulkDeleteBar';
 import SelectAllAcrossPagesBar from '../SelectAllAcrossPagesBar';
+import { DataTable, DataTableNoResult } from '../data-display/DataTable';
+import { EmptyState } from '../ui/empty-state';
 import { fetchInventoryItems } from '../../api/inventoryApi';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -38,20 +54,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 const DEFAULT_LIMIT = 50;
 
 const emptyForm = { spare_part_number: '', part_name: '', location: '', note: '', lead_time_days: '', initial_stock: '' };
-
-function RopBadge({ rop }) {
-  if (!rop || rop.status === 'NOT_CONFIGURED') {
-    return <span className="rounded px-1.5 py-0.5 text-[11px] font-medium bg-warn-dim text-warn">Belum lengkap</span>;
-  }
-  if (rop.status === 'ORDER') {
-    return (
-      <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium bg-danger-dim text-danger">
-        <ShoppingCart size={11} /> Order ({rop.order_qty})
-      </span>
-    );
-  }
-  return <span className="rounded px-1.5 py-0.5 text-[11px] font-medium bg-ok-dim text-ok">OK</span>;
-}
 
 function ItemFormModal({ initial, onClose }) {
   const isEdit = !!initial;
@@ -241,7 +243,7 @@ function AdjustStockForm({ item, onDone }) {
 
 function ItemDetailModal({ itemId, onClose }) {
   const { data: item } = useInventoryItemDetail(itemId);
-  const { data: movementData } = useInventoryMovements(itemId, { page: 1, limit: 20 });
+  const { data: movementData, isLoading: isMovementsLoading } = useInventoryMovements(itemId, { page: 1, limit: 20 });
   const { data: ropData } = useInventoryRopStatus();
 
   if (!item) return null;
@@ -322,52 +324,19 @@ function ItemDetailModal({ itemId, onClose }) {
         <div className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
           <History size={12} /> Histori Mutasi
         </div>
-        {(!movementData || movementData.items.length === 0) && (
-          <div className="py-4 text-center text-sm text-[var(--text-faint)]">Belum ada mutasi.</div>
-        )}
-        {movementData?.items.length > 0 && (
-          <div className="overflow-hidden rounded-lg border border-border">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-border">
-                  {['Tanggal', 'Jenis', 'Qty', 'Catatan', 'Oleh'].map((h) => (
-                    <th
-                      key={h}
-                      className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {movementData.items.map((m) => (
-                  <tr key={m.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                    <td className="px-3 py-2 font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
-                      {new Date(m.created_at).toLocaleString('id-ID')}
-                    </td>
-                    <td className="px-3 py-2">
-                      {m.movement_type === 'STOCK_OUT' ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-danger">
-                          <ArrowDownCircle size={12} /> Stock Out
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-ok">
-                          <ArrowUpCircle size={12} /> {m.movement_type === 'ADJUSTMENT' ? 'Adjustment' : 'Stock In'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 font-[var(--font-mono)] text-[13px]">
-                      {m.qty.toLocaleString('id-ID')}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-[var(--text-dim)]">{m.note || '-'}</td>
-                    <td className="px-3 py-2 text-xs text-[var(--text-dim)]">{m.user_full_name}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {/* isLoading pakai isMovementsLoading dari hook (bukan infer dari
+            !movementData seperti sebelumnya) - satu perbaikan kecil yang
+            ikut kebawa: dulu saat loading, modal ini sempat kelip
+            nampilin "Belum ada mutasi" sebelum data datang (movementData
+            undefined selagi query jalan == kelihatan sama kayak "kosong").
+            Sekarang DataTable bedain loading vs genuinely-empty. */}
+        <DataTable
+          columns={inventoryMovementColumns}
+          rows={movementData?.items}
+          getRowKey={(m) => m.id}
+          isLoading={isMovementsLoading}
+          emptyState={<EmptyState icon={History} title="Belum ada mutasi" />}
+        />
       </div>
     </Modal>
   );
@@ -382,7 +351,7 @@ function InventoryTab() {
   const [actionError, setActionError] = useState('');
 
   const debouncedSearch = useDebouncedValue(search);
-  const { data, isLoading } = useInventoryItems({ search: debouncedSearch || undefined, page, limit });
+  const { data, isLoading, isFetching } = useInventoryItems({ search: debouncedSearch || undefined, page, limit });
   const { data: ropData } = useInventoryRopStatus();
   const { remove } = useInventoryMutations();
   const confirm = useConfirm();
@@ -408,6 +377,13 @@ function InventoryTab() {
       incomplete: list.filter((r) => r.status === 'NOT_CONFIGURED').length,
     };
   }, [ropData]);
+
+  const columns = buildInventoryColumns({
+    ropById,
+    onDetail: (item) => setDetailItemId(item.id),
+    onEdit: (item) => setModalState({ mode: 'edit', item }),
+    onDelete: handleDelete,
+  });
 
   async function handleDelete(item) {
     if (!(await confirm(`Hapus Inventory Item "${item.spare_part_number}"?`))) return;
@@ -501,111 +477,25 @@ function InventoryTab() {
         />
       )}
 
-      {isLoading && !data && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
-      {data && data.items.length === 0 && (
-        <div className="py-8 text-center text-sm text-[var(--text-faint)]">Belum ada Inventory Item.</div>
-      )}
-
-      {data && data.items.length > 0 && (
-        <>
-          <div className="overflow-hidden rounded-lg border border-border">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="w-[36px] px-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={selection.allOnPageSelected}
-                        ref={(el) => {
-                          if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
-                        }}
-                        onChange={selection.toggleAllOnPage}
-                        className="h-3.5 w-3.5 accent-[var(--accent)]"
-                      />
-                    </th>
-                    {['Spare Part Number / Nama', 'Lokasi', 'Stok', 'ROP', 'Status', 'Dipakai Part', 'Aksi'].map(
-                      (h) => (
-                        <th
-                          key={h}
-                          className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
-                        >
-                          {h}
-                        </th>
-                      )
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.items.map((item) => {
-                    const rop = ropById.get(item.id);
-                    return (
-                      <tr key={item.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                        <td className="px-3 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selection.isSelected(item.id)}
-                            onChange={() => selection.toggle(item.id)}
-                            className="h-3.5 w-3.5 accent-[var(--accent)]"
-                          />
-                        </td>
-                        <td className="px-3 py-3">
-                          <div className="font-[var(--font-mono)] text-[13px]">{item.spare_part_number}</div>
-                          <div className="text-xs text-[var(--text-dim)]">{item.part_name}</div>
-                        </td>
-                        <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{item.location || '-'}</td>
-                        <td className="px-3 py-3 text-right font-[var(--font-mono)] text-[13px]">
-                          {item.current_stock.toLocaleString('id-ID')}
-                        </td>
-                        <td className="px-3 py-3 text-right font-[var(--font-mono)] text-[13px]">{rop?.rop ?? '-'}</td>
-                        <td className="px-3 py-3">
-                          <RopBadge rop={rop} />
-                        </td>
-                        <td className="px-3 py-3 text-center font-[var(--font-mono)] text-[13px]">
-                          {item.linked_part_count}
-                        </td>
-                        <td className="px-3 py-3">
-                          <div className="flex gap-1">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-7 w-7"
-                              title="Detail & Mutasi Stok"
-                              onClick={() => setDetailItemId(item.id)}
-                            >
-                              <History size={13} />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => setModalState({ mode: 'edit', item })}
-                            >
-                              <Pencil size={13} />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => handleDelete(item)}
-                            >
-                              <Trash2 size={13} />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <Pagination page={data.page} limit={data.limit} total={data.total} onPageChange={setPage} />
-        </>
-      )}
+      <DataTable
+        columns={columns}
+        rows={data?.items}
+        getRowKey={(item) => item.id}
+        isLoading={isLoading && !data}
+        isRefreshing={isFetching && !isLoading}
+        selection={selection}
+        page={data?.page}
+        limit={data?.limit}
+        total={data?.total}
+        onPageChange={setPage}
+        emptyState={
+          search ? (
+            <DataTableNoResult onReset={() => { setSearch(''); setPage(1); }} />
+          ) : (
+            <EmptyState icon={Package} title="Belum ada Inventory Item" />
+          )
+        }
+      />
 
       {modalState && (
         <ItemFormModal initial={modalState.mode === 'edit' ? modalState.item : null} onClose={() => setModalState(null)} />

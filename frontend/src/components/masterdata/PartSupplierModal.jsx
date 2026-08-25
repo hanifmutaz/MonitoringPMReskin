@@ -3,8 +3,21 @@
 // lama dilepas TOTAL, diganti Tailwind + shadcn ui murni supaya konsisten
 // sama PartsTab (Modal pembungkusnya) yang udah direskin. Logic
 // create/setPrimary/remove TIDAK berubah sama sekali.
+//
+// DataTable migration (docs/frontend/MIGRATION-PLAN.md Phase 9): hand-
+// rolled <table> diganti data-display/DataTable dengan `selection`. Kolom
+// (Star primary-toggle + 3 data) didefinisikan lokal, sama alasan
+// ClMappingModal.jsx (1 consumer, kecil). PRESERVED AS-IS, bukan
+// diperbaiki (di luar scope migrasi presentational): komentar `locked`
+// bilang "isinya locked notice" pas Package B terkunci, tapi gak ada JSX
+// notice yang beneran ada - kalau locked, query di-`enabled:false`,
+// `links` tetap default `[]`, jadi yang kelihatan cuma empty state biasa
+// ("Belum ada Supplier terhubung"), bukan notice soal Package B. Ini
+// perilaku pre-existing (bukan sesuatu yang baru muncul akibat migrasi
+// ini) - dicatat di sini, tidak diperbaiki, karena bukan bagian dari task
+// DataTable migration.
 import { useState } from 'react';
-import { Plus, Trash2, Star } from 'lucide-react';
+import { Plus, Trash2, Star, Inbox } from 'lucide-react';
 import { usePartSuppliers, usePartSupplierMutations } from '../../hooks/usePartSuppliers';
 import { useSuppliers } from '../../hooks/useSuppliers';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
@@ -14,12 +27,73 @@ import { useBulkDeleteMutation } from '../../hooks/useRecycleBin';
 import { cn } from '../../lib/utils';
 import Modal from '../Modal';
 import BulkDeleteBar from '../BulkDeleteBar';
+import { DataTable } from '../data-display/DataTable';
+import { EmptyState } from '../ui/empty-state';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 const emptyForm = { supplier_id: '', notes: '' };
+
+function buildPartSupplierColumns({ onTogglePrimary, onRemove, setPrimaryPending }) {
+  return [
+    {
+      key: 'primary',
+      header: '',
+      render: (l) => (
+        <button
+          type="button"
+          title={l.is_primary ? 'Supplier utama - klik buat lepas' : 'Jadikan Supplier utama'}
+          onClick={() => onTogglePrimary(l)}
+          disabled={setPrimaryPending}
+          className={cn(
+            'flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50',
+            l.is_primary ? 'text-warn' : 'text-[var(--text-faint)]'
+          )}
+        >
+          <Star size={13} fill={l.is_primary ? 'currentColor' : 'none'} />
+        </button>
+      ),
+    },
+    {
+      key: 'supplier_name',
+      header: 'Supplier',
+      render: (l) => (
+        <span className="font-[var(--font-mono)] text-[13px]">
+          {l.supplier_name}
+          {!l.supplier_is_active && <span className="block text-[11px] text-[var(--text-faint)]">(nonaktif)</span>}
+        </span>
+      ),
+    },
+    {
+      key: 'contact',
+      header: 'Kontak',
+      className: 'text-xs text-[var(--text-dim)]',
+      render: (l) => (
+        <>
+          {l.contact_person || '-'}
+          {l.phone && <div className="font-[var(--font-mono)]">{l.phone}</div>}
+        </>
+      ),
+    },
+    {
+      key: 'notes',
+      header: 'Catatan',
+      className: 'text-xs text-[var(--text-dim)]',
+      render: (l) => l.notes || '-',
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (l) => (
+        <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onRemove(l.id)}>
+          <Trash2 size={12} />
+        </Button>
+      ),
+    },
+  ];
+}
 
 function PartSupplierModal({ part, onClose }) {
   const { hasPackage } = useAuth();
@@ -79,6 +153,12 @@ function PartSupplierModal({ part, onClose }) {
     setPrimary.mutate({ id: link.id, isPrimary: !link.is_primary });
   }
 
+  const columns = buildPartSupplierColumns({
+    onTogglePrimary: handleTogglePrimary,
+    onRemove: handleRemove,
+    setPrimaryPending: setPrimary.isPending,
+  });
+
   return (
     <Modal title={`Supplier — ${part.drawing_no} (${part.jig_name})`} onClose={onClose} width={600}>
       <p className="mb-2.5 text-xs text-muted-foreground">
@@ -86,106 +166,23 @@ function PartSupplierModal({ part, onClose }) {
         klik bintang buat pindah/lepas status utama.
       </p>
 
-      {isLoading ? (
-        <div className="py-6 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>
-      ) : (
-        <div className="mb-4">
-          <BulkDeleteBar
-            count={selection.selectedCount}
-            onDelete={handleBulkDelete}
-            onClear={selection.clear}
-            pending={bulkDelete.isPending}
-            label="Supplier link"
-          />
-          <div className="overflow-hidden rounded-lg border border-border">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="w-[36px] px-3 py-2">
-                  <input
-                    type="checkbox"
-                    checked={selection.allOnPageSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
-                    }}
-                    onChange={selection.toggleAllOnPage}
-                    className="h-3.5 w-3.5 accent-[var(--accent)]"
-                  />
-                </th>
-                <th className="w-[38px] px-3 py-2" />
-                <th className="px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
-                  Supplier
-                </th>
-                <th className="px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
-                  Kontak
-                </th>
-                <th className="px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
-                  Catatan
-                </th>
-                <th className="w-[44px] px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {links.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-sm text-[var(--text-faint)]">
-                    Belum ada Supplier terhubung ke Part ini.
-                  </td>
-                </tr>
-              )}
-              {links.map((l) => (
-                <tr key={l.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                  <td className="px-3 py-2.5">
-                    <input
-                      type="checkbox"
-                      checked={selection.isSelected(l.id)}
-                      onChange={() => selection.toggle(l.id)}
-                      className="h-3.5 w-3.5 accent-[var(--accent)]"
-                    />
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <button
-                      type="button"
-                      title={l.is_primary ? 'Supplier utama - klik buat lepas' : 'Jadikan Supplier utama'}
-                      onClick={() => handleTogglePrimary(l)}
-                      disabled={setPrimary.isPending}
-                      className={cn(
-                        'flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50',
-                        l.is_primary ? 'text-warn' : 'text-[var(--text-faint)]'
-                      )}
-                    >
-                      <Star size={13} fill={l.is_primary ? 'currentColor' : 'none'} />
-                    </button>
-                  </td>
-                  <td className="px-3 py-2.5 font-[var(--font-mono)] text-[13px]">
-                    {l.supplier_name}
-                    {!l.supplier_is_active && (
-                      <span className="block text-[11px] text-[var(--text-faint)]">(nonaktif)</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 text-xs text-[var(--text-dim)]">
-                    {l.contact_person || '-'}
-                    {l.phone && <div className="font-[var(--font-mono)]">{l.phone}</div>}
-                  </td>
-                  <td className="px-3 py-2.5 text-xs text-[var(--text-dim)]">{l.notes || '-'}</td>
-                  <td className="px-3 py-2.5">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => handleRemove(l.id)}
-                    >
-                      <Trash2 size={12} />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        </div>
-      )}
+      <div className="mb-4">
+        <BulkDeleteBar
+          count={selection.selectedCount}
+          onDelete={handleBulkDelete}
+          onClear={selection.clear}
+          pending={bulkDelete.isPending}
+          label="Supplier link"
+        />
+        <DataTable
+          columns={columns}
+          rows={links}
+          getRowKey={(l) => l.id}
+          isLoading={isLoading}
+          selection={selection}
+          emptyState={<EmptyState icon={Inbox} title="Belum ada Supplier terhubung ke Part ini" />}
+        />
+      </div>
 
       <form onSubmit={handleAdd} className="flex flex-wrap items-end gap-2">
         <div className="min-w-[180px] flex-1">
