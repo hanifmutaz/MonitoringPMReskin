@@ -5,42 +5,46 @@
 // Data (rounded-lg border border-border, thead uppercase text-[var(--text-
 // faint)]). Data/logic (query, target input modal) TIDAK berubah sama
 // sekali.
+//
+// Vertical slice migration (docs/frontend/MIGRATION-PLAN.md Phase 8): hand-
+// rolled <table> diganti data-display/DataTable, mengikuti pola Phase 7
+// (PmPartMonitoringPage.jsx). Tidak ada FilterBar di sini - halaman ini
+// sengaja tidak punya filter/search sama sekali (semua Line aktif
+// ditampilkan sekaligus, ~150 baris, tanpa pagination - lihat
+// usePmLineStatus.js, API-nya memang flat array bukan { items, total,
+// page, limit }, konsisten dengan pmLineRoutes.js yang cuma punya GET /
+// tanpa query params). StatusWithKetepatan dan definisi 10 kolom pindah ke
+// components/pm-line/pmLineColumns.jsx (domain/pm-line/ extraction, sama
+// alasan Phase 7 mindahin buildPmPartColumns.jsx). Modal "Input PM"
+// (dengan/tanpa preset Line), Banner penjelasan formula, dan query TIDAK
+// disentuh.
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { usePmLineStatus } from '../hooks/usePmLineStatus';
-import StatusBadge from '../components/StatusBadge';
+import buildPmLineColumns from '../components/pm-line/pmLineColumns';
 import Banner from '../components/Banner';
 import Modal from '../components/Modal';
-import PmLineHistoryForm from '../components/PmLineHistoryForm';
+import PmLineHistoryForm from '../components/pm-line/PmLineHistoryForm';
+import { DataTable } from '../components/data-display/DataTable';
+import { EmptyState } from '../components/ui/empty-state';
 import { Button } from '../components/ui/button';
-
-function formatKetepatan(percentage) {
-  return percentage === null || percentage === undefined ? 'belum ada data' : `Ketepatan ${percentage}%`;
-}
-
-// Status + Ketepatan digabung 1 cell (badge di atas, caption kecil di bawah)
-// - sebelumnya 2 kolom terpisah bikin tabel ini kepenuhan (11 kolom total)
-// padahal dua-duanya ngomongin hal yang berkaitan buat 1 jenis PM yang sama.
-function StatusWithKetepatan({ status, percentage }) {
-  return (
-    <div>
-      <StatusBadge status={status} />
-      <div className="mt-1 text-xs text-muted-foreground">{formatKetepatan(percentage)}</div>
-    </div>
-  );
-}
 
 function PmLineStatusPage() {
   usePageHeader({ title: 'Monitoring PM Monthly and Weekly' });
 
-  const { data, isLoading, isError } = usePmLineStatus({});
+  const { data, isLoading, isFetching, isError } = usePmLineStatus({});
   const [inputTarget, setInputTarget] = useState(null); // { line, jenisPm }
   // Modal "Input PM" TANPA preset - dipindah kesini dari menu Sidebar
   // (sebelumnya halaman /pm-line/form terpisah, diminta lewat chat). Form
   // yang sama otomatis nampilin dropdown pilih Line + jenis PM karena
   // presetLine kosong (lihat isPrefilled di PmLineHistoryForm).
   const [showInputForm, setShowInputForm] = useState(false);
+
+  const columns = buildPmLineColumns({
+    onInputMonthly: (line) => setInputTarget({ line, jenisPm: 'MONTHLY' }),
+    onInputWeekly: (line) => setInputTarget({ line, jenisPm: 'WEEKLY' }),
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -58,82 +62,15 @@ function PmLineStatusPage() {
         </Button>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-4.5">
-        {isError && (
-          <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
-            Gagal memuat status Line. Coba lagi.
-          </div>
-        )}
-        {isLoading && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
-        {data && data.length === 0 && (
-          <div className="py-8 text-center text-sm text-[var(--text-faint)]">Belum ada Line aktif.</div>
-        )}
-
-        {data && data.length > 0 && (
-          <div className="overflow-hidden rounded-lg border border-border">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-border">
-                    {[
-                      'Line',
-                      'Tgl Monthly Terakhir',
-                      'Poin',
-                      'Sisa Hari Monthly',
-                      'Status Monthly',
-                      'Tgl Weekly Terakhir',
-                      'Poin',
-                      'Sisa Hari Weekly',
-                      'Status Weekly',
-                      '',
-                    ].map((h, i) => (
-                      <th
-                        key={i}
-                        className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.map((line) => (
-                    <tr key={line.line_id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{line.line_name}</td>
-                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">
-                        {line.tgl_pm_monthly_terakhir || '-'}
-                      </td>
-                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{line.akumulasi_poin_monthly}</td>
-                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{line.sisa_hari_monthly ?? '-'}</td>
-                      <td className="px-3 py-3">
-                        <StatusWithKetepatan status={line.status_monthly} percentage={line.ketepatan_monthly_percentage} />
-                      </td>
-                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">
-                        {line.tgl_pm_weekly_terakhir || '-'}
-                      </td>
-                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{line.akumulasi_poin_weekly}</td>
-                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{line.sisa_hari_weekly ?? '-'}</td>
-                      <td className="px-3 py-3">
-                        <StatusWithKetepatan status={line.status_weekly} percentage={line.ketepatan_weekly_percentage} />
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="flex gap-1.5">
-                          <Button type="button" size="sm" variant="outline" onClick={() => setInputTarget({ line, jenisPm: 'MONTHLY' })}>
-                            Input Monthly
-                          </Button>
-                          <Button type="button" size="sm" variant="outline" onClick={() => setInputTarget({ line, jenisPm: 'WEEKLY' })}>
-                            Input Weekly
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
+      <DataTable
+        columns={columns}
+        rows={data}
+        getRowKey={(line) => line.line_id}
+        isLoading={isLoading && !data}
+        isRefreshing={isFetching && !isLoading}
+        isError={isError}
+        emptyState={<EmptyState icon={Inbox} title="Belum ada Line aktif" />}
+      />
 
       {inputTarget && (
         <Modal

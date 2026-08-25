@@ -6,8 +6,30 @@
 // sengaja gak disentuh, kebagian pas reskin halaman itu sendiri") - sekarang
 // kebagian gilirannya. Filter Line/Jenis tetap SERVER-SIDE (gak diubah).
 // Data/logic (query, pagination, toggle form) TIDAK berubah sama sekali.
+//
+// Vertical slice migration (docs/frontend/MIGRATION-PLAN.md Phase 8): hand-
+// rolled <table> diganti data-display/DataTable, mengikuti pola Phase 7.
+// Ini konsumer PERTAMA dari DataTable yang butuh row-selection (bulk-
+// delete) - DataTable sebelumnya gak punya dukungan itu sama sekali
+// (temuan audit Phase 7/8), jadi ditambahin prop `selection` opsional ke
+// DataTable sendiri (lihat komentar di DataTable.jsx). BulkDeleteBar dan
+// SelectAllAcrossPagesBar TETAP komponen terpisah yang sama persis,
+// dirender di atas DataTable seperti sebelumnya - bukan bagian dari
+// DataTable, sama seperti pola di LinesTab/PartsTab/InventoryTab.
+// useRowSelection, useBulkDeleteMutation, handleSelectAllMatching, query,
+// pagination TIDAK berubah sama sekali. Kolom tabel (7 kolom) pindah ke
+// components/pm-line/pmLineHistoryColumns.jsx (domain/pm-line/
+// extraction).
+//
+// SATU perubahan perilaku kecil (bukan murni presentational, disclosure
+// jujur - sama pola disclosure Phase 7 buat DataTable's built-in Empty vs
+// No Result split, 01-PRODUCT-UX-BRIEF.md §8): sebelumnya pesan "Belum ada
+// riwayat PM Line" selalu sama persis baik saat filter aktif maupun
+// tidak. Sekarang DataTable otomatis membedakan "belum ada data sama
+// sekali" vs "ada data, tapi filter yang aktif tidak match" (dengan
+// tombol Reset Filter) - sama seperti PmPartMonitoringPage.jsx.
 import { useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { usePmLineHistoryList } from '../hooks/usePmLineHistory';
 import { useLines } from '../hooks/useLines';
@@ -15,16 +37,16 @@ import { useRowSelection } from '../hooks/useRowSelection';
 import { useBulkDeleteMutation } from '../hooks/useRecycleBin';
 import { useConfirm } from '../contexts/ConfirmDialogContext';
 import { fetchPmLineHistoryList } from '../api/pmLineHistoryApi';
-import PmLineHistoryForm from '../components/PmLineHistoryForm';
-import Pagination from '../components/Pagination';
-import OnTimeBadge from '../components/OnTimeBadge';
+import PmLineHistoryForm from '../components/pm-line/PmLineHistoryForm';
+import pmLineHistoryColumns, { JENIS_LABEL } from '../components/pm-line/pmLineHistoryColumns';
 import BulkDeleteBar from '../components/BulkDeleteBar';
 import SelectAllAcrossPagesBar from '../components/SelectAllAcrossPagesBar';
+import { DataTable, DataTableNoResult } from '../components/data-display/DataTable';
+import { EmptyState } from '../components/ui/empty-state';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 const LIMIT = 20;
-const JENIS_LABEL = { MONTHLY: 'Monthly', WEEKLY: 'Weekly' };
 
 function PmLineHistoryPage() {
   const [showForm, setShowForm] = useState(false);
@@ -58,7 +80,7 @@ function PmLineHistoryPage() {
     page,
     limit: LIMIT,
   };
-  const { data, isLoading, isError } = usePmLineHistoryList(params);
+  const { data, isLoading, isFetching, isError } = usePmLineHistoryList(params);
   const pageIds = data?.items?.map((h) => h.id) ?? [];
   const selection = useRowSelection(pageIds);
   // Entity registry-nya 'pm-line-history' (lihat recycleBinRegistry.js) -
@@ -90,6 +112,14 @@ function PmLineHistoryPage() {
     } catch (err) {
       setBulkError(err.response?.data?.message || 'Gagal menghapus riwayat terpilih');
     }
+  }
+
+  const hasActiveFilter = lineId !== 'all' || jenis !== 'all';
+
+  function handleResetFilter() {
+    setLineId('all');
+    setJenis('all');
+    setPage(1);
   }
 
   return (
@@ -145,100 +175,47 @@ function PmLineHistoryPage() {
         </Select>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-4.5">
-        {isError && (
-          <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
-            Gagal memuat riwayat. Coba lagi.
-          </div>
-        )}
+      {bulkError && (
+        <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{bulkError}</div>
+      )}
 
-        {bulkError && (
-          <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
-            {bulkError}
-          </div>
-        )}
+      <BulkDeleteBar
+        count={selection.selectedCount}
+        onDelete={handleBulkDelete}
+        onClear={selection.clear}
+        pending={bulkDelete.isPending}
+        label="Riwayat"
+      />
 
-        <BulkDeleteBar
-          count={selection.selectedCount}
-          onDelete={handleBulkDelete}
-          onClear={selection.clear}
-          pending={bulkDelete.isPending}
-          label="Riwayat"
+      {data && selection.allOnPageSelected && (
+        <SelectAllAcrossPagesBar
+          pageCount={pageIds.length}
+          total={data.total}
+          alreadySelectedAll={selection.selectedCount >= data.total}
+          onSelectAll={handleSelectAllMatching}
         />
+      )}
 
-        {data && selection.allOnPageSelected && (
-          <SelectAllAcrossPagesBar
-            pageCount={pageIds.length}
-            total={data.total}
-            alreadySelectedAll={selection.selectedCount >= data.total}
-            onSelectAll={handleSelectAllMatching}
-          />
-        )}
-
-        {isLoading && !data && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
-        {data && data.items.length === 0 && (
-          <div className="py-8 text-center text-sm text-[var(--text-faint)]">Belum ada riwayat PM Line.</div>
-        )}
-
-        {data && data.items.length > 0 && (
-          <>
-            <div className="overflow-hidden rounded-lg border border-border">
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="w-[36px] px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={selection.allOnPageSelected}
-                          ref={(el) => {
-                            if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
-                          }}
-                          onChange={selection.toggleAllOnPage}
-                          className="h-3.5 w-3.5 accent-[var(--accent)]"
-                        />
-                      </th>
-                      {['Tanggal', 'Line', 'Jenis', 'PIC', 'Ketepatan', 'Keterangan', 'Oleh'].map((h) => (
-                        <th
-                          key={h}
-                          className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.items.map((item) => (
-                      <tr key={item.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                        <td className="px-3 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selection.isSelected(item.id)}
-                            onChange={() => selection.toggle(item.id)}
-                            className="h-3.5 w-3.5 accent-[var(--accent)]"
-                          />
-                        </td>
-                        <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{item.tgl_input}</td>
-                        <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{item.line_name}</td>
-                        <td className="px-3 py-3 text-[13px]">{JENIS_LABEL[item.jenis_pm]}</td>
-                        <td className="px-3 py-3 text-[13px]">{item.pic_name || '-'}</td>
-                        <td className="px-3 py-3">
-                          <OnTimeBadge onTime={item.on_time} />
-                        </td>
-                        <td className="max-w-[240px] px-3 py-3 text-xs text-[var(--text-dim)]">{item.keterangan || '-'}</td>
-                        <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{item.user_full_name}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <Pagination page={data.page} limit={data.limit} total={data.total} onPageChange={setPage} />
-          </>
-        )}
-      </div>
+      <DataTable
+        columns={pmLineHistoryColumns}
+        rows={data?.items}
+        getRowKey={(item) => item.id}
+        isLoading={isLoading && !data}
+        isRefreshing={isFetching && !isLoading}
+        isError={isError}
+        page={data?.page}
+        limit={data?.limit}
+        total={data?.total}
+        onPageChange={setPage}
+        selection={selection}
+        emptyState={
+          hasActiveFilter ? (
+            <DataTableNoResult onReset={handleResetFilter} />
+          ) : (
+            <EmptyState icon={Inbox} title="Belum ada riwayat PM Line" />
+          )
+        }
+      />
     </div>
   );
 }

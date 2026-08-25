@@ -3,9 +3,13 @@
 // `.mono` lama dilepas, diganti Tailwind. Cuma wrapper - Banner &
 // PmLineHistoryForm udah direskin masing-masing di file-nya sendiri.
 // Data/logic (navigate on success) TIDAK berubah.
+//
+// Phase 8 (domain/pm-line/ extraction): import path diupdate mengikuti
+// PmLineHistoryForm.jsx pindah ke components/pm-line/. Tidak ada
+// perubahan lain di file ini.
 import { useNavigate } from 'react-router-dom';
 import { usePageHeader } from '../contexts/PageHeaderContext';
-import PmLineHistoryForm from '../components/PmLineHistoryForm';
+import PmLineHistoryForm from '../components/pm-line/PmLineHistoryForm';
 import Banner from '../components/Banner';
 
 function PmLineFormPage() {

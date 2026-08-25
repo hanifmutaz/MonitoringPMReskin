@@ -1,4 +1,10 @@
-// src/components/PmLineHistoryForm.jsx
+// src/components/pm-line/PmLineHistoryForm.jsx
+// Moved from flat components/ (docs/frontend/MIGRATION-PLAN.md Phase 8,
+// domain/pm-line/ extraction - single consumer of this component across
+// all three PmLine*Page files, same precondition Phase 7 checked before
+// moving pm-part components). Only import paths changed (one level
+// deeper); markup/logic untouched.
+//
 // Reskin (checklist §3 item 6 "PM pages", batch 2/N): `.panel`/
 // `.panel-header`/`.panel-title`/`.form-label`/`.form-select`/`.form-input`/
 // `.error-state`/`.caption`/`.btn`/inline style lama dilepas total, diganti
@@ -10,13 +16,13 @@
 // pola Master Data/Dashboard). Logic create/preset/reset-hint TIDAK
 // berubah sama sekali.
 import { useState } from 'react';
-import { useLines } from '../hooks/useLines';
-import { useCreatePmLineHistory } from '../hooks/usePmLineHistory';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { useLines } from '../../hooks/useLines';
+import { useCreatePmLineHistory } from '../../hooks/usePmLineHistory';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 

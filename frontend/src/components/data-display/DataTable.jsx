@@ -15,10 +15,19 @@
 // hover:bg-secondary) so a future migration of those pages is a like-for-
 // like swap, not a visual change.
 //
-// NOT YET WIRED INTO ANY PAGE - additive only, same approach as Phase 3's
-// primitives. Acceptance criteria for this phase (per MIGRATION-PLAN.md) is
-// verifying this renders the real envelope correctly in a non-production
-// harness; wiring into Dashboard/PM Part happens in Phase 6/7.
+// Row selection (added Phase 8, docs/frontend/MIGRATION-PLAN.md - PmLine-
+// HistoryPage's bulk-delete was the first consumer that needed this;
+// DataTable had none before). OPT-IN via the `selection` prop - omitting it
+// (as PmPartMonitoringPage/PmLineStatusPage do) renders exactly as before,
+// zero behaviour change for existing callers. Shape matches
+// hooks/useRowSelection.js's return value directly, so callers just pass
+// `selection={selection}` - no adapter needed. DataTable only renders the
+// checkbox column; the "N selected" bar (BulkDeleteBar) and cross-page
+// select-all prompt (SelectAllAcrossPagesBar) stay page-level components
+// composed above DataTable, exactly like every other selection-capable
+// table in this app (LinesTab/PartsTab/SuppliersTab/InventoryTab) - this
+// keeps DataTable ignorant of "bulk delete" as a business action, only
+// "a row can be checked" as a presentation concern.
 import { AlertTriangle, Inbox, SearchX } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Skeleton } from '../ui/skeleton';
@@ -39,6 +48,7 @@ function DataTable({
   total,
   onPageChange,
   skeletonRows = 5,
+  selection,
   className,
 }) {
   const hasRows = Array.isArray(rows) && rows.length > 0;
@@ -56,7 +66,7 @@ function DataTable({
           />
         )
       ) : isLoading ? (
-        <DataTableSkeleton columns={columns} rows={skeletonRows} />
+        <DataTableSkeleton columns={columns} rows={skeletonRows} withSelection={Boolean(selection)} />
       ) : !hasRows ? (
         emptyState || <EmptyState icon={Inbox} title="Belum ada data" />
       ) : (
@@ -71,6 +81,19 @@ function DataTable({
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-border">
+                    {selection && (
+                      <th className="w-[36px] px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={selection.allOnPageSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
+                          }}
+                          onChange={selection.toggleAllOnPage}
+                          className="h-3.5 w-3.5 accent-[var(--accent)]"
+                        />
+                      </th>
+                    )}
                     {columns.map((col) => (
                       <th
                         key={col.key}
@@ -85,25 +108,35 @@ function DataTable({
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
-                    <tr
-                      key={getRowKey(row)}
-                      className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary"
-                    >
-                      {columns.map((col) => (
-                        <td
-                          key={col.key}
-                          className={cn(
-                            'px-3 py-3 text-[13px]',
-                            col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left',
-                            col.className
-                          )}
-                        >
-                          {col.render ? col.render(row) : row[col.key]}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
+                  {rows.map((row) => {
+                    const rowKey = getRowKey(row);
+                    return (
+                      <tr key={rowKey} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                        {selection && (
+                          <td className="px-3 py-3">
+                            <input
+                              type="checkbox"
+                              checked={selection.isSelected(rowKey)}
+                              onChange={() => selection.toggle(rowKey)}
+                              className="h-3.5 w-3.5 accent-[var(--accent)]"
+                            />
+                          </td>
+                        )}
+                        {columns.map((col) => (
+                          <td
+                            key={col.key}
+                            className={cn(
+                              'px-3 py-3 text-[13px]',
+                              col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left',
+                              col.className
+                            )}
+                          >
+                            {col.render ? col.render(row) : row[col.key]}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -116,13 +149,18 @@ function DataTable({
   );
 }
 
-function DataTableSkeleton({ columns, rows }) {
+function DataTableSkeleton({ columns, rows, withSelection }) {
   return (
     <div className="overflow-hidden rounded-lg border border-border">
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b border-border">
+              {withSelection && (
+                <th className="w-[36px] px-3 py-2">
+                  <Skeleton className="h-3.5 w-3.5" />
+                </th>
+              )}
               {columns.map((col) => (
                 <th key={col.key} className="px-3 py-2 text-left">
                   <Skeleton className="h-3 w-16" />
@@ -133,6 +171,11 @@ function DataTableSkeleton({ columns, rows }) {
           <tbody>
             {Array.from({ length: rows }).map((_, i) => (
               <tr key={i} className="border-b border-[var(--border-soft)] last:border-b-0">
+                {withSelection && (
+                  <td className="px-3 py-3">
+                    <Skeleton className="h-3.5 w-3.5" />
+                  </td>
+                )}
                 {columns.map((col) => (
                   <td key={col.key} className="px-3 py-3">
                     <Skeleton className="h-4 w-full max-w-32" />
