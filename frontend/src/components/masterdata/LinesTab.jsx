@@ -10,9 +10,22 @@
 // backend /lines) - bukan fitur baru, cuma preset default limit=10 biar
 // konsisten sama pola Pagination/PageSizeSelector yang dipakai halaman lain.
 // Logic create/update/delete/toggle-active TIDAK berubah sama sekali.
+//
+// DataTable migration (docs/frontend/MIGRATION-PLAN.md Phase 9, "lock the
+// pattern" batch 1/N buat PartsTab/SuppliersTab/InventoryTab): hand-rolled
+// <table> diganti data-display/DataTable, kolom dipindah ke
+// linesColumns.jsx (pola sama persis Phase 7/8's pmPartColumns.jsx /
+// pmLineColumns.jsx). `selection` di-pass langsung dari useRowSelection ke
+// DataTable - shape-nya udah cocok, gak perlu adapter (per DataTable's own
+// header comment). Pagination lokal (`../Pagination`) DIHAPUS - DataTable
+// render Pagination-nya sendiri kalau page/limit/total/onPageChange
+// di-pass, itu file yang sama (data-display/Pagination) cuma via shim,
+// jadi gak ada duplikasi. PageSizeSelector TETAP di luar DataTable (bukan
+// concern DataTable, per Phase 5/7/8 - DataTable gak pernah render page
+// size control, cuma page nav).
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, ListChecks, CheckCircle2, XCircle } from 'lucide-react';
+import { Plus, ListChecks, CheckCircle2, XCircle, Inbox } from 'lucide-react';
 import { fetchLines } from '../../api/linesApi';
 import { useLineMutations } from '../../hooks/useLineMutations';
 import { useRowSelection } from '../../hooks/useRowSelection';
@@ -22,9 +35,11 @@ import { cn } from '../../lib/utils';
 import Modal from '../Modal';
 import KpiCard from '../KpiCard';
 import SearchBar from '../SearchBar';
-import Pagination from '../Pagination';
 import PageSizeSelector from '../PageSizeSelector';
 import BulkDeleteBar from '../BulkDeleteBar';
+import DataTable, { DataTableNoResult } from '../data-display/DataTable';
+import { EmptyState } from '../ui/empty-state';
+import buildLinesColumns from './linesColumns';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -167,6 +182,7 @@ function LinesTab() {
   const selection = useRowSelection(filteredIds);
   const bulkDelete = useBulkDeleteMutation('lines');
   const [bulkError, setBulkError] = useState('');
+  const hasActiveFilter = filter !== 'all' || search.trim() !== '';
 
   async function handleBulkDelete() {
     if (!(await confirm(`Hapus ${selection.selectedCount} Line terpilih (dari semua data, bukan cuma halaman ini)? Bisa direstore lewat Recycle Bin.`))) return;
@@ -193,6 +209,25 @@ function LinesTab() {
       setDeleteError(err.response?.data?.message || 'Gagal menghapus Line');
     }
   }
+
+  function handleToggleActive(line, checked) {
+    update.mutate({ id: line.id, payload: { is_active: checked } });
+  }
+
+  function handleResetFilter() {
+    setFilter('all');
+    setSearch('');
+    setPage(1);
+  }
+
+  // Not memoized, same as buildPmLineColumns()/buildPmPartColumns() call
+  // sites (PmLineStatusPage.jsx/PmPartMonitoringPage.jsx) - columns are
+  // cheap to rebuild each render, no measured perf need for memo here.
+  const columns = buildLinesColumns({
+    onToggleActive: handleToggleActive,
+    onEdit: (line) => setModalState({ mode: 'edit', line }),
+    onDelete: handleDelete,
+  });
 
   return (
     <div>
@@ -270,107 +305,30 @@ function LinesTab() {
         label="Line"
       />
 
-      {isLoading && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
-
-      {!isLoading && paged.length === 0 && (
-        <div className="py-8 text-center text-sm text-[var(--text-faint)]">Tidak ada Line yang cocok.</div>
-      )}
-
-      {!isLoading && paged.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-border">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="w-[36px] px-3 py-2">
-                  <input
-                    type="checkbox"
-                    checked={selection.allOnPageSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
-                    }}
-                    onChange={selection.toggleAllOnPage}
-                    className="h-3.5 w-3.5 accent-[var(--accent)]"
-                  />
-                </th>
-                <th className="px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
-                  Nama Line
-                </th>
-                <th className="px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
-                  Status
-                </th>
-                <th className="px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
-                  Auto-Reset Override
-                </th>
-                <th className="w-[90px] px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
-                  Aksi
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {paged.map((line) => (
-                <tr key={line.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                  <td className="px-3 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selection.isSelected(line.id)}
-                      onChange={() => selection.toggle(line.id)}
-                      className="h-3.5 w-3.5 accent-[var(--accent)]"
-                    />
-                  </td>
-                  <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{line.line_name}</td>
-                  <td className="px-3 py-3">
-                    <label className="flex cursor-pointer items-center gap-2 text-[13px]">
-                      <input
-                        type="checkbox"
-                        checked={line.is_active}
-                        onChange={(e) => update.mutate({ id: line.id, payload: { is_active: e.target.checked } })}
-                        className="h-3.5 w-3.5 accent-[var(--accent)]"
-                      />
-                      {line.is_active ? 'Aktif' : 'Nonaktif'}
-                    </label>
-                  </td>
-                  <td className="px-3 py-3 text-xs text-[var(--text-dim)]">
-                    {line.auto_reset_weekly_on_monthly === null
-                      ? 'Ikut Global'
-                      : line.auto_reset_weekly_on_monthly
-                        ? 'TRUE'
-                        : 'FALSE'}
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex gap-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => setModalState({ mode: 'edit', line })}
-                      >
-                        <Pencil size={13} />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => handleDelete(line)}
-                      >
-                        <Trash2 size={13} />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
       {!isLoading && filtered.length > 0 && (
-        <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-3 flex justify-end">
           <PageSizeSelector value={limit} onChange={(v) => { setLimit(v); setPage(1); }} options={[10, 25, 50, 100]} />
-          <Pagination page={page} limit={limit} total={filtered.length} onPageChange={setPage} />
         </div>
       )}
+
+      <DataTable
+        columns={columns}
+        rows={paged}
+        getRowKey={(line) => line.id}
+        isLoading={isLoading}
+        page={page}
+        limit={limit}
+        total={filtered.length}
+        onPageChange={setPage}
+        selection={selection}
+        emptyState={
+          hasActiveFilter ? (
+            <DataTableNoResult description="Tidak ada Line yang cocok." onReset={handleResetFilter} />
+          ) : (
+            <EmptyState icon={Inbox} title="Belum ada Line" />
+          )
+        }
+      />
 
       {modalState && (
         <LineFormModal

@@ -13,8 +13,18 @@
 // hasil query yang lagi aktif) & Line Aktif (dari `lines`, query terpisah
 // yang emang udah jalan). Logic create/update/delete/CL-mapping/Supplier-link
 // TIDAK berubah sama sekali.
+//
+// DataTable migration (docs/frontend/MIGRATION-PLAN.md Phase 9, batch 3/N,
+// ngikutin LinesTab batch 1/N "lock the pattern"): hand-rolled <table>
+// diganti data-display/DataTable, kolom pindah ke partsColumns.jsx. BEDA
+// dari LinesTab: ini server-side paginated dengan `SelectAllAcrossPagesBar`
+// (pola sama persis PmLineHistoryPage/PartsTab yang lama) - `selection`
+// tetap di-scope ke `pageIds` (halaman aktif doang), bukan semua data,
+// karena server-side gak punya semua id di memori sekaligus. DataTable's
+// built-in Pagination dipasangin langsung ke `data.page/limit/total` dari
+// response server (sama field yang tadinya di-pass ke Pagination manual).
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Link2, Truck, Package, ListChecks } from 'lucide-react';
+import { Plus, Package, ListChecks, Inbox } from 'lucide-react';
 import { useParts } from '../../hooks/useParts';
 import { usePartMutations } from '../../hooks/usePartMutations';
 import { useLines } from '../../hooks/useLines';
@@ -27,10 +37,12 @@ import { useConfirm } from '../../contexts/ConfirmDialogContext';
 import Modal from '../Modal';
 import KpiCard from '../KpiCard';
 import SearchBar from '../SearchBar';
-import Pagination from '../Pagination';
 import PageSizeSelector from '../PageSizeSelector';
 import BulkDeleteBar from '../BulkDeleteBar';
 import SelectAllAcrossPagesBar from '../SelectAllAcrossPagesBar';
+import DataTable, { DataTableNoResult } from '../data-display/DataTable';
+import { EmptyState } from '../ui/empty-state';
+import buildPartsColumns from './partsColumns';
 import { fetchParts } from '../../api/partsApi';
 import ClMappingModal from './ClMappingModal';
 import PartSupplierModal from './PartSupplierModal';
@@ -328,6 +340,23 @@ function PartsTab() {
     }
   }
 
+  function handleResetFilter() {
+    setSearch('');
+    setLineId('all');
+    setPage(1);
+  }
+
+  const hasActiveFilter = search.trim() !== '' || lineId !== 'all';
+
+  // Not memoized, same convention as LinesTab/pmLineColumns/pmPartColumns
+  // call sites - columns are cheap to rebuild each render.
+  const columns = buildPartsColumns({
+    onClMapping: setClMappingPart,
+    onSupplier: setSupplierPart,
+    onEdit: (part) => setModalState({ mode: 'edit', part }),
+    onDelete: handleDelete,
+  });
+
   return (
     <div>
       <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -407,133 +436,25 @@ function PartsTab() {
       )}
 
       {isLoading && !data && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
-      {data && data.items.length === 0 && (
-        <div className="py-8 text-center text-sm text-[var(--text-faint)]">Belum ada part yang cocok.</div>
-      )}
 
-      {data && data.items.length > 0 && (
-        <>
-          <div className="overflow-hidden rounded-lg border border-border">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="w-[36px] px-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={selection.allOnPageSelected}
-                        ref={(el) => {
-                          if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
-                        }}
-                        onChange={selection.toggleAllOnPage}
-                        className="h-3.5 w-3.5 accent-[var(--accent)]"
-                      />
-                    </th>
-                    {['Line', 'Jig', 'Drawing No / Part Name', 'Target Shot', 'CL', 'Supplier', 'Status', 'Aksi'].map(
-                      (h) => (
-                        <th
-                          key={h}
-                          className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
-                        >
-                          {h}
-                        </th>
-                      )
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.items.map((part) => (
-                    <tr key={part.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                      <td className="px-3 py-3">
-                        <input
-                          type="checkbox"
-                          checked={selection.isSelected(part.id)}
-                          onChange={() => selection.toggle(part.id)}
-                          className="h-3.5 w-3.5 accent-[var(--accent)]"
-                        />
-                      </td>
-                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{part.line_name}</td>
-                      <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{part.jig_name}</td>
-                      <td className="px-3 py-3">
-                        <div className="text-[13px]">{part.part_name}</div>
-                        <div className="font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
-                          {part.drawing_no}
-                        </div>
-                        {part.inventory_item_id && (
-                          <div className="text-[10px] text-[var(--text-faint)]">
-                            Stok: {part.inv_spare_part_number} ({part.inv_current_stock})
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-3 py-3 text-right font-[var(--font-mono)] text-[13px]">
-                        {part.target_shot.toLocaleString('id-ID')}
-                      </td>
-                      <td className="px-3 py-3 text-center font-[var(--font-mono)] text-[13px]">{part.cl_count}</td>
-                      <td className="px-3 py-3 text-center font-[var(--font-mono)] text-[13px]">
-                        {part.supplier_count}
-                      </td>
-                      <td className="px-3 py-3">
-                        <span
-                          className={
-                            part.is_active
-                              ? 'rounded px-1.5 py-0.5 text-[11px] font-medium bg-ok-dim text-ok'
-                              : 'rounded px-1.5 py-0.5 text-[11px] font-medium bg-[var(--panel-3)] text-[var(--text-faint)]'
-                          }
-                        >
-                          {part.is_active ? 'Aktif' : 'Nonaktif'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="flex gap-1">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-7 w-7"
-                            title="CL Mapping"
-                            onClick={() => setClMappingPart(part)}
-                          >
-                            <Link2 size={13} />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-7 w-7"
-                            title="Supplier"
-                            onClick={() => setSupplierPart(part)}
-                          >
-                            <Truck size={13} />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => setModalState({ mode: 'edit', part })}
-                          >
-                            <Pencil size={13} />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => handleDelete(part)}
-                          >
-                            <Trash2 size={13} />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <Pagination page={data.page} limit={data.limit} total={data.total} onPageChange={setPage} />
-        </>
-      )}
+      <DataTable
+        columns={columns}
+        rows={data?.items}
+        getRowKey={(part) => part.id}
+        isLoading={isLoading && !data}
+        page={data?.page}
+        limit={data?.limit}
+        total={data?.total}
+        onPageChange={setPage}
+        selection={selection}
+        emptyState={
+          hasActiveFilter ? (
+            <DataTableNoResult description="Tidak ada Part yang cocok." onReset={handleResetFilter} />
+          ) : (
+            <EmptyState icon={Inbox} title="Belum ada Part" />
+          )
+        }
+      />
 
       {modalState && (
         <PartFormModal
