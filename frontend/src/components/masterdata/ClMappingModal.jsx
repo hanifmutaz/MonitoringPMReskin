@@ -3,19 +3,52 @@
 // lama dilepas TOTAL, diganti Tailwind + shadcn ui murni supaya konsisten
 // sama PartsTab (Modal pembungkusnya) yang udah direskin. Logic
 // create/remove mapping TIDAK berubah sama sekali.
+//
+// DataTable migration (docs/frontend/MIGRATION-PLAN.md Phase 9): hand-
+// rolled <table> diganti data-display/DataTable dengan `selection`. Kolom
+// didefinisikan LOKAL di sini (bukan file terpisah) - cuma 4 kolom, cuma
+// 1 consumer (modal ini doang), gak ada preseden builder-function terpisah
+// yang worth dipertahankan untuk kasus sekecil ini (beda dari
+// linesColumns.jsx/partsColumns.jsx yang filenya lebih besar dan/atau ada
+// potensi reuse). Tidak ada pagination sama sekali (semua mapping 1 Part
+// ditampilkan sekaligus, biasanya <10 baris) - sama seperti
+// PmLineStatusPage, props page/limit/total/onPageChange diomit semua.
 import { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Inbox } from 'lucide-react';
 import { useClMapping, useClMappingMutations } from '../../hooks/useClMapping';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
 import { useRowSelection } from '../../hooks/useRowSelection';
 import { useBulkDeleteMutation } from '../../hooks/useRecycleBin';
 import Modal from '../Modal';
 import BulkDeleteBar from '../BulkDeleteBar';
+import { DataTable } from '../data-display/DataTable';
+import { EmptyState } from '../ui/empty-state';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 
 const emptyForm = { cl_no: '', product_name: '', jig_name: '' };
+
+function buildClMappingColumns({ onRemove }) {
+  return [
+    {
+      key: 'cl_no',
+      header: 'CL No',
+      render: (m) => <span className="font-[var(--font-mono)] text-[13px]">{m.cl_no}</span>,
+    },
+    { key: 'product_name', header: 'Product', render: (m) => m.product_name || '-' },
+    { key: 'jig_name', header: 'Jig', render: (m) => m.jig_name || '-' },
+    {
+      key: 'actions',
+      header: '',
+      render: (m) => (
+        <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onRemove(m.id)}>
+          <Trash2 size={12} />
+        </Button>
+      ),
+    },
+  ];
+}
 
 function ClMappingModal({ part, onClose }) {
   const { data: mappings = [], isLoading } = useClMapping(part.id);
@@ -54,85 +87,27 @@ function ClMappingModal({ part, onClose }) {
     }
   }
 
+  const columns = buildClMappingColumns({ onRemove: handleRemove });
+
   return (
     <Modal title={`CL Mapping — ${part.drawing_no} (${part.jig_name})`} onClose={onClose} width={560}>
-      {isLoading ? (
-        <div className="py-6 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>
-      ) : (
-        <div className="mb-4">
-          <BulkDeleteBar
-            count={selection.selectedCount}
-            onDelete={handleBulkDelete}
-            onClear={selection.clear}
-            pending={bulkDelete.isPending}
-            label="mapping"
-          />
-          <div className="overflow-hidden rounded-lg border border-border">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="w-[36px] px-3 py-2">
-                  <input
-                    type="checkbox"
-                    checked={selection.allOnPageSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
-                    }}
-                    onChange={selection.toggleAllOnPage}
-                    className="h-3.5 w-3.5 accent-[var(--accent)]"
-                  />
-                </th>
-                <th className="px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
-                  CL No
-                </th>
-                <th className="px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
-                  Product
-                </th>
-                <th className="px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
-                  Jig
-                </th>
-                <th className="w-[44px] px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {mappings.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-sm text-[var(--text-faint)]">
-                    Belum ada CL No terpetakan.
-                  </td>
-                </tr>
-              )}
-              {mappings.map((m) => (
-                <tr key={m.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                  <td className="px-3 py-2.5">
-                    <input
-                      type="checkbox"
-                      checked={selection.isSelected(m.id)}
-                      onChange={() => selection.toggle(m.id)}
-                      className="h-3.5 w-3.5 accent-[var(--accent)]"
-                    />
-                  </td>
-                  <td className="px-3 py-2.5 font-[var(--font-mono)] text-[13px]">{m.cl_no}</td>
-                  <td className="px-3 py-2.5 text-[13px]">{m.product_name || '-'}</td>
-                  <td className="px-3 py-2.5 text-[13px]">{m.jig_name || '-'}</td>
-                  <td className="px-3 py-2.5">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => handleRemove(m.id)}
-                    >
-                      <Trash2 size={12} />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        </div>
-      )}
+      <div className="mb-4">
+        <BulkDeleteBar
+          count={selection.selectedCount}
+          onDelete={handleBulkDelete}
+          onClear={selection.clear}
+          pending={bulkDelete.isPending}
+          label="mapping"
+        />
+        <DataTable
+          columns={columns}
+          rows={mappings}
+          getRowKey={(m) => m.id}
+          isLoading={isLoading}
+          selection={selection}
+          emptyState={<EmptyState icon={Inbox} title="Belum ada CL No terpetakan" />}
+        />
+      </div>
 
       <form onSubmit={handleAdd} className="flex flex-wrap items-end gap-2">
         <div>

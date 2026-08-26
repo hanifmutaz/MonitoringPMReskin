@@ -9,7 +9,18 @@
 // token bg-ok-dim/text-ok, bg-danger-dim/text-danger, bg-warn-dim/text-warn
 // yang sama dipakai RopBadge di InventoryTab. Query/pagination/logic TIDAK
 // berubah sama sekali.
+//
+// DataTable migration (docs/frontend/MIGRATION-PLAN.md Phase 10): hand-
+// rolled <table> diganti data-display/DataTable dengan `selection` +
+// `SelectAllAcrossPagesBar` - pola identik PartsTab.jsx/PmLineHistoryPage.jsx
+// (server-side paginated, sudah punya bulk-delete via useRowSelection).
+// Kolom (6) pindah ke inventoryHistoryColumns.jsx, co-located di pages/
+// (bukan folder domain terpisah - halaman ini satu-satunya consumer,
+// gak ada komponen lain yang perlu digabung ke domain folder baru,
+// sama alasan ClMappingModal.jsx tetap mendefinisikan kolomnya sendiri).
+// Semua state/query/pagination/handler TIDAK berubah.
 import { useState } from 'react';
+import { Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useAllInventoryMovements } from '../hooks/useInventoryItemDetail';
 import { useInventoryItems } from '../hooks/useInventoryItems';
@@ -17,24 +28,14 @@ import { useRowSelection } from '../hooks/useRowSelection';
 import { useBulkDeleteMutation } from '../hooks/useRecycleBin';
 import { useConfirm } from '../contexts/ConfirmDialogContext';
 import { fetchAllInventoryMovements } from '../api/inventoryApi';
-import Pagination from '../components/Pagination';
 import BulkDeleteBar from '../components/BulkDeleteBar';
 import SelectAllAcrossPagesBar from '../components/SelectAllAcrossPagesBar';
+import { DataTable, DataTableNoResult } from '../components/data-display/DataTable';
+import { EmptyState } from '../components/ui/empty-state';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import inventoryHistoryColumns, { MOVEMENT_TYPE_LABEL } from './inventoryHistoryColumns';
 
 const LIMIT = 20;
-
-const MOVEMENT_TYPE_LABEL = {
-    STOCK_IN: 'Stock In',
-    STOCK_OUT: 'Stock Out',
-    ADJUSTMENT: 'Adjustment',
-};
-
-const MOVEMENT_TYPE_BADGE_CLASS = {
-    STOCK_IN: 'bg-ok-dim text-ok',
-    STOCK_OUT: 'bg-danger-dim text-danger',
-    ADJUSTMENT: 'bg-warn-dim text-warn',
-};
 
 function InventoryHistoryPage() {
     const [itemId, setItemId] = useState('all');
@@ -56,7 +57,7 @@ function InventoryHistoryPage() {
         page,
         limit: LIMIT,
     };
-    const { data, isLoading, isError } = useAllInventoryMovements(params);
+    const { data, isLoading, isFetching, isError } = useAllInventoryMovements(params);
     const pageIds = data?.items?.map((m) => m.id) ?? [];
     const selection = useRowSelection(pageIds);
     // 'inventory-movements' - murni log historis, TIDAK ngaruh ke
@@ -85,6 +86,14 @@ function InventoryHistoryPage() {
         } catch (err) {
             setBulkError(err.response?.data?.message || 'Gagal menghapus riwayat terpilih');
         }
+    }
+
+    const hasActiveFilter = itemId !== 'all' || movementType !== 'all';
+
+    function handleResetFilter() {
+        setItemId('all');
+        setMovementType('all');
+        setPage(1);
     }
 
     return (
@@ -131,117 +140,49 @@ function InventoryHistoryPage() {
                 </Select>
             </div>
 
-            <div className="rounded-lg border border-border bg-card p-4.5">
-                {isError && (
-                    <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
-                        Gagal memuat riwayat. Coba lagi.
-                    </div>
-                )}
+            {bulkError && (
+                <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
+                    {bulkError}
+                </div>
+            )}
 
-                {bulkError && (
-                    <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
-                        {bulkError}
-                    </div>
-                )}
+            <BulkDeleteBar
+                count={selection.selectedCount}
+                onDelete={handleBulkDelete}
+                onClear={selection.clear}
+                pending={bulkDelete.isPending}
+                label="Riwayat"
+            />
 
-                <BulkDeleteBar
-                    count={selection.selectedCount}
-                    onDelete={handleBulkDelete}
-                    onClear={selection.clear}
-                    pending={bulkDelete.isPending}
-                    label="Riwayat"
+            {data && selection.allOnPageSelected && (
+                <SelectAllAcrossPagesBar
+                    pageCount={pageIds.length}
+                    total={data.total}
+                    alreadySelectedAll={selection.selectedCount >= data.total}
+                    onSelectAll={handleSelectAllMatching}
                 />
+            )}
 
-                {data && selection.allOnPageSelected && (
-                    <SelectAllAcrossPagesBar
-                        pageCount={pageIds.length}
-                        total={data.total}
-                        alreadySelectedAll={selection.selectedCount >= data.total}
-                        onSelectAll={handleSelectAllMatching}
-                    />
-                )}
-
-                {isLoading && !data && (
-                    <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>
-                )}
-                {data && data.items.length === 0 && (
-                    <div className="py-8 text-center text-sm text-[var(--text-faint)]">Belum ada mutasi stok.</div>
-                )}
-
-                {data && data.items.length > 0 && (
-                    <>
-                        <div className="overflow-hidden rounded-lg border border-border">
-                            <div className="overflow-x-auto">
-                                <table className="w-full border-collapse">
-                                    <thead>
-                                        <tr className="border-b border-border">
-                                            <th className="w-[36px] px-3 py-2">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selection.allOnPageSelected}
-                                                    ref={(el) => {
-                                                        if (el)
-                                                            el.indeterminate =
-                                                                selection.someOnPageSelected && !selection.allOnPageSelected;
-                                                    }}
-                                                    onChange={selection.toggleAllOnPage}
-                                                    className="h-3.5 w-3.5 accent-[var(--accent)]"
-                                                />
-                                            </th>
-                                            {['Tanggal', 'Item', 'Jenis', 'Qty', 'Catatan', 'Oleh'].map((h) => (
-                                                <th
-                                                    key={h}
-                                                    className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
-                                                >
-                                                    {h}
-                                                </th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {data.items.map((m) => (
-                                            <tr key={m.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                                                <td className="px-3 py-3">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selection.isSelected(m.id)}
-                                                        onChange={() => selection.toggle(m.id)}
-                                                        className="h-3.5 w-3.5 accent-[var(--accent)]"
-                                                    />
-                                                </td>
-                                                <td className="px-3 py-3 font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
-                                                    {new Date(m.created_at).toLocaleString('id-ID')}
-                                                </td>
-                                                <td className="px-3 py-3">
-                                                    <div className="font-[var(--font-mono)] text-[13px]">{m.part_name}</div>
-                                                    <div className="text-xs text-[var(--text-dim)]">{m.spare_part_number}</div>
-                                                </td>
-                                                <td className="px-3 py-3">
-                                                    <span
-                                                        className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${
-                                                            MOVEMENT_TYPE_BADGE_CLASS[m.movement_type] || 'bg-[var(--panel-3)] text-[var(--text-faint)]'
-                                                        }`}
-                                                    >
-                                                        {MOVEMENT_TYPE_LABEL[m.movement_type] || m.movement_type}
-                                                    </span>
-                                                </td>
-                                                <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">
-                                                    {m.movement_type === 'STOCK_OUT' ? '-' : '+'}
-                                                    {Number(m.qty).toLocaleString('id-ID')}
-                                                </td>
-                                                <td className="max-w-[240px] px-3 py-3 text-xs text-[var(--text-dim)]">{m.note || '-'}</td>
-                                                <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{m.user_full_name}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <Pagination page={data.page} limit={data.limit} total={data.total} onPageChange={setPage} />
-                    </>
-                )}
-            </div>
+            <DataTable
+                columns={inventoryHistoryColumns}
+                rows={data?.items}
+                getRowKey={(m) => m.id}
+                isLoading={isLoading && !data}
+                isRefreshing={isFetching && !isLoading}
+                isError={isError}
+                page={data?.page}
+                limit={data?.limit}
+                total={data?.total}
+                onPageChange={setPage}
+                selection={selection}
+                emptyState={
+                    hasActiveFilter ? (
+                        <DataTableNoResult onReset={handleResetFilter} />
+                    ) : (
+                        <EmptyState icon={Inbox} title="Belum ada mutasi stok" />
+                    )
+                }
+            />
         </div>
     );
 }
