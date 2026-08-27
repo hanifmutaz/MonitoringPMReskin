@@ -28,6 +28,16 @@
 // table in this app (LinesTab/PartsTab/SuppliersTab/InventoryTab) - this
 // keeps DataTable ignorant of "bulk delete" as a business action, only
 // "a row can be checked" as a presentation concern.
+//
+// selection.isSelectable(rowKey) (added Phase 11): optional on the
+// selection object - if present and returns false for a row, the checkbox
+// cell renders EMPTY for that row (not disabled, not hidden column -
+// genuinely no checkbox), rather than always rendering one. Real case:
+// UserManagementPage never shows a checkbox on the currently-logged-in
+// user's own row (a deliberate guard against self-selecting for bulk-
+// delete) - `useRowSelection` now exposes `isSelectable` for exactly this.
+// Falls back to "always selectable" if `isSelectable` is absent, so this
+// is non-breaking for any selection object shaped before Phase 11.
 import { AlertTriangle, Inbox, SearchX } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Skeleton } from '../ui/skeleton';
@@ -114,12 +124,14 @@ function DataTable({
                       <tr key={rowKey} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
                         {selection && (
                           <td className="px-3 py-3">
-                            <input
-                              type="checkbox"
-                              checked={selection.isSelected(rowKey)}
-                              onChange={() => selection.toggle(rowKey)}
-                              className="h-3.5 w-3.5 accent-[var(--accent)]"
-                            />
+                            {(!selection.isSelectable || selection.isSelectable(rowKey)) && (
+                              <input
+                                type="checkbox"
+                                checked={selection.isSelected(rowKey)}
+                                onChange={() => selection.toggle(rowKey)}
+                                className="h-3.5 w-3.5 accent-[var(--accent)]"
+                              />
+                            )}
                           </td>
                         )}
                         {columns.map((col) => (

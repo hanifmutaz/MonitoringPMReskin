@@ -11,8 +11,25 @@
 // pointer/not-allowed inline eksplisit), jadi bukan prioritas.
 // Data/logic (hook, mutation, permission checkbox, approve/reject flow)
 // TIDAK berubah sama sekali.
+//
+// DataTable migration (docs/frontend/MIGRATION-PLAN.md Phase 11): SEMUA
+// TIGA hand-rolled <table> di file ini diganti data-display/DataTable.
+// Kolom untuk ketiganya pindah ke userManagementColumns.jsx (co-located di
+// pages/, satu file - sama alasan pmLineHistoryColumns.jsx/
+// inventoryHistoryColumns.jsx, single-page consumer, gak ada domain folder
+// yang pas). PendingApprovalSection: tanpa selection (approve/reject
+// per-baris, bukan bulk action). Main "Daftar User" table & RoleManagement-
+// Section: DUA-duanya butuh `selection.isSelectable` yang BARU ditambahin
+// ke useRowSelection/DataTable Phase 11 ini - sebelumnya checkbox baris
+// tertentu (baris User sendiri yang lagi login; Role bawaan/is_system)
+// disembunyikan dengan `{kondisi && <input.../>}` inline di hand-rolled
+// table. DataTable TIDAK punya cara buat itu sebelum penambahan
+// `isSelectable` (lihat komentar di DataTable.jsx/useRowSelection.js) -
+// jadi ini BUKAN migrasi mekanis murni presentational, ada 1 capability
+// baru yang genuinely dibutuhkan lebih dulu. Semua state/query/mutation/
+// permission-edit-flow TIDAK berubah.
 import { useState } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useUsers, useUserMutations } from '../hooks/useUsers';
 import { useRoles, usePermissionCatalog, useRoleMutations } from '../hooks/useRoles';
@@ -20,9 +37,11 @@ import { useConfirm } from '../contexts/ConfirmDialogContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useRowSelection } from '../hooks/useRowSelection';
 import { useBulkDeleteMutation } from '../hooks/useRecycleBin';
+import { buildPendingApprovalColumns, buildUserColumns, buildRoleColumns } from './userManagementColumns';
 import Modal from '../components/Modal';
 import BulkDeleteBar from '../components/BulkDeleteBar';
-import ToggleSwitch from '../components/ToggleSwitch';
+import { DataTable } from '../components/data-display/DataTable';
+import { EmptyState } from '../components/ui/empty-state';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -168,6 +187,16 @@ function PendingApprovalSection() {
   if (isLoading) return null;
   if (pendingUsers.length === 0) return null;
 
+  const columns = buildPendingApprovalColumns({
+    roles,
+    roleSelections,
+    onRoleSelect: (userId, roleId) => setRoleSelections({ ...roleSelections, [userId]: roleId }),
+    onApprove: handleApprove,
+    onReject: handleReject,
+    approvePending: approve.isPending,
+    rejectPending: reject.isPending,
+  });
+
   return (
     <div className="mb-4 rounded-lg border border-border bg-card p-4.5">
       <div className="mb-4 flex items-center justify-between">
@@ -181,69 +210,7 @@ function PendingApprovalSection() {
         <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{error}</div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-border">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-border">
-                {['Username', 'Full Name', 'Email', 'Daftar Sejak', 'Assign Role', 'Aksi'].map((h) => (
-                  <th
-                    key={h}
-                    className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {pendingUsers.map((u) => (
-                <tr key={u.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                  <td className="px-3 py-2.5 font-[var(--font-mono)] text-[13px]">{u.username}</td>
-                  <td className="px-3 py-2.5 text-[13px]">{u.full_name}</td>
-                  <td className="px-3 py-2.5 text-xs text-[var(--text-dim)]">{u.email || '-'}</td>
-                  <td className="px-3 py-2.5 font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
-                    {new Date(u.created_at).toLocaleString('id-ID')}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <Select
-                      value={roleSelections[u.id] || ''}
-                      onValueChange={(v) => setRoleSelections({ ...roleSelections, [u.id]: v })}
-                    >
-                      <SelectTrigger className="h-8 w-[160px]">
-                        <SelectValue placeholder="Pilih Role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {roles.map((r) => (
-                          <SelectItem key={r.id} value={String(r.id)}>
-                            {r.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex gap-1.5">
-                      <Button type="button" size="sm" onClick={() => handleApprove(u)} disabled={approve.isPending}>
-                        Approve
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleReject(u)}
-                        disabled={reject.isPending}
-                      >
-                        Tolak
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable columns={columns} rows={pendingUsers} getRowKey={(u) => u.id} />
     </div>
   );
 }
@@ -260,13 +227,19 @@ function RoleManagementSection() {
   const [draftPerms, setDraftPerms] = useState({});
   // Role bawaan (is_system) gak bisa di-checklist/dihapus - sama seperti
   // tombol Trash2 per-baris yang juga disembunyikan buat role.is_system.
+  // Dulu ini cuma bergantung pada checkbox yang gak di-render di hand-
+  // rolled table; sekarang selection.isSelectable (Phase 11 - lihat
+  // komentar di useRowSelection.js) yang menegakkan itu di DataTable.
   const selectableIds = roles.filter((r) => !r.is_system).map((r) => r.id);
   const selection = useRowSelection(selectableIds);
   const bulkDelete = useBulkDeleteMutation('roles');
   const [bulkError, setBulkError] = useState('');
 
-  function togglePerm(key, currentList, setter) {
-    setter(currentList.includes(key) ? currentList.filter((k) => k !== key) : [...currentList, key]);
+  function togglePerm(roleId, key) {
+    setDraftPerms((prev) => {
+      const current = prev[roleId] || [];
+      return { ...prev, [roleId]: current.includes(key) ? current.filter((k) => k !== key) : [...current, key] };
+    });
   }
 
   async function handleCreate(e) {
@@ -319,6 +292,21 @@ function RoleManagementSection() {
     }
   }
 
+  function togglePermForNew(key) {
+    setNewRolePerms((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  }
+
+  const columns = buildRoleColumns({
+    permissionCatalog,
+    expandedRoleId,
+    draftPerms,
+    onTogglePerm: togglePerm,
+    onStartEdit: startEditPermissions,
+    onSavePerms: saveDraftPermissions,
+    onDelete: handleDelete,
+    savePending: updatePermissions.isPending,
+  });
+
   return (
     <div className="mb-4 rounded-lg border border-border bg-card p-4.5">
       <div className="mb-4 flex items-center justify-between">
@@ -343,128 +331,9 @@ function RoleManagementSection() {
         label="Role"
       />
 
-      {isLoading && <div className="py-6 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
-
-      {!isLoading && (
-        <div className="mb-4 overflow-hidden rounded-lg border border-border">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="w-[36px] px-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={selection.allOnPageSelected}
-                      ref={(el) => {
-                        if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
-                      }}
-                      onChange={selection.toggleAllOnPage}
-                      className="h-3.5 w-3.5 accent-[var(--accent)]"
-                    />
-                  </th>
-                  {['Nama Role', 'User', 'Permission', 'Aksi'].map((h) => (
-                    <th
-                      key={h}
-                      className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {roles.map((role) => (
-                  <tr key={role.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                    <td className="px-3 py-2.5">
-                      {!role.is_system && (
-                        <input
-                          type="checkbox"
-                          checked={selection.isSelected(role.id)}
-                          onChange={() => selection.toggle(role.id)}
-                          className="h-3.5 w-3.5 accent-[var(--accent)]"
-                        />
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-[13px]">
-                      {role.name}{' '}
-                      {role.is_system && <span className="text-xs text-muted-foreground">(bawaan)</span>}
-                    </td>
-                    <td className="px-3 py-2.5 font-[var(--font-mono)] text-[13px]">{role.user_count}</td>
-                    <td className="px-3 py-2.5">
-                      {expandedRoleId === role.id ? (
-                        <div className="flex flex-wrap gap-2">
-                          {permissionCatalog.map((p) => (
-                            <label key={p.key} className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
-                              <input
-                                type="checkbox"
-                                checked={(draftPerms[role.id] || []).includes(p.key)}
-                                onChange={() =>
-                                  togglePerm(p.key, draftPerms[role.id] || [], (v) =>
-                                    setDraftPerms({ ...draftPerms, [role.id]: v })
-                                  )
-                                }
-                                className="h-3.5 w-3.5 accent-[var(--accent)]"
-                              />
-                              {p.label}
-                            </label>
-                          ))}
-                        </div>
-                      ) : role.name === 'Admin' ? (
-                        <span className="text-xs text-muted-foreground">Semua akses (superuser)</span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          {role.permissions.length > 0
-                            ? role.permissions
-                                .map((k) => permissionCatalog.find((p) => p.key === k)?.label || k)
-                                .join(', ')
-                            : 'Tidak ada akses khusus'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {role.name === 'Admin' ? (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      ) : expandedRoleId === role.id ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => saveDraftPermissions(role)}
-                          disabled={updatePermissions.isPending}
-                        >
-                          Simpan
-                        </Button>
-                      ) : (
-                        <div className="flex gap-1">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => startEditPermissions(role)}
-                          >
-                            <Pencil size={13} />
-                          </Button>
-                          {!role.is_system && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => handleDelete(role)}
-                            >
-                              <Trash2 size={13} />
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <div className="mb-4">
+        <DataTable columns={columns} rows={roles} getRowKey={(role) => role.id} isLoading={isLoading} selection={selection} />
+      </div>
 
       <form onSubmit={handleCreate}>
         <div className="mb-1.5 text-xs text-muted-foreground">Buat role baru</div>
@@ -485,7 +354,7 @@ function RoleManagementSection() {
               <input
                 type="checkbox"
                 checked={newRolePerms.includes(p.key)}
-                onChange={() => togglePerm(p.key, newRolePerms, setNewRolePerms)}
+                onChange={() => togglePermForNew(p.key)}
                 className="h-3.5 w-3.5 accent-[var(--accent)]"
               />
               {p.label}
@@ -515,6 +384,9 @@ function UserManagementPage() {
   // sini adalah gak nawarin checkbox-nya sama sekali buat baris diri
   // sendiri. Kalau kehapus akun lain yang lagi login, sesinya otomatis
   // ke-invalidate di request berikutnya (findUserById filter deleted_at).
+  // DataTable/useRowSelection sekarang menegakkan "gak nawarin checkbox"
+  // itu via selection.isSelectable (Phase 11) - selectableIds di bawah
+  // TETAP jadi satu-satunya sumber kebenaran soal siapa yang selectable.
   const selectableIds = nonPendingUsers.filter((u) => u.id !== currentUser?.id).map((u) => u.id);
   const selection = useRowSelection(selectableIds);
   const bulkDelete = useBulkDeleteMutation('users');
@@ -535,6 +407,12 @@ function UserManagementPage() {
     }
   }
 
+  const columns = buildUserColumns({
+    currentUser,
+    onEdit: (u) => setModalState({ mode: 'edit', user: u }),
+    onToggleActive: (id, next) => update.mutate({ id, payload: { is_active: next } }),
+  });
+
   return (
     <div>
       <RoleManagementSection />
@@ -547,12 +425,6 @@ function UserManagementPage() {
             <Plus size={14} /> Tambah User
           </Button>
         </div>
-
-        {isError && (
-          <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
-            Gagal memuat daftar user.
-          </div>
-        )}
 
         {bulkError && (
           <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
@@ -568,86 +440,15 @@ function UserManagementPage() {
           label="User"
         />
 
-        {isLoading && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
-
-        {!isLoading && (
-          <div className="overflow-hidden rounded-lg border border-border">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="w-[36px] px-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={selection.allOnPageSelected}
-                        ref={(el) => {
-                          if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
-                        }}
-                        onChange={selection.toggleAllOnPage}
-                        className="h-3.5 w-3.5 accent-[var(--accent)]"
-                      />
-                    </th>
-                    {['Username', 'Full Name', 'Email', 'Role', 'Aktif', 'Last Login', 'Aksi'].map((h) => (
-                      <th
-                        key={h}
-                        className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {nonPendingUsers.map((u) => (
-                    <tr key={u.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                      <td className="px-3 py-3">
-                        {u.id !== currentUser?.id && (
-                          <input
-                            type="checkbox"
-                            checked={selection.isSelected(u.id)}
-                            onChange={() => selection.toggle(u.id)}
-                            className="h-3.5 w-3.5 accent-[var(--accent)]"
-                          />
-                        )}
-                      </td>
-                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">
-                        {u.username} {u.id === currentUser?.id && <span className="text-xs text-muted-foreground">(kamu)</span>}
-                      </td>
-                      <td className="px-3 py-3 text-[13px]">{u.full_name}</td>
-                      <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{u.email || '-'}</td>
-                      <td className="px-3 py-3 text-[13px]">
-                        {u.role || '-'}
-                        {u.status === 'REJECTED' && (
-                          <span className="ml-1.5 text-xs text-[var(--danger)]">(Ditolak)</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-3">
-                        <ToggleSwitch
-                          checked={u.is_active}
-                          onChange={(next) => update.mutate({ id: u.id, payload: { is_active: next } })}
-                        />
-                      </td>
-                      <td className="px-3 py-3 font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
-                        {u.last_login ? new Date(u.last_login).toLocaleString('id-ID') : '-'}
-                      </td>
-                      <td className="px-3 py-3">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => setModalState({ mode: 'edit', user: u })}
-                        >
-                          <Pencil size={13} />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        <DataTable
+          columns={columns}
+          rows={nonPendingUsers}
+          getRowKey={(u) => u.id}
+          isLoading={isLoading}
+          isError={isError}
+          selection={selection}
+          emptyState={<EmptyState icon={Inbox} title="Belum ada User" />}
+        />
       </div>
 
       {modalState && (

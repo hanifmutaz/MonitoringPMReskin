@@ -1,8 +1,17 @@
 // src/sql/auditLogQueries.js
+//
+// FIX (docs/frontend/MIGRATION-PLAN.md Phase 11, saat bangun halaman Audit
+// Log): `action_detail` (migration 1700000004000, SECURITY_REVIEW.md
+// Finding #5 - ringkasan human-readable spt "Role diubah: Operator ->
+// Supervisor") DITULIS oleh recordAudit() tapi TIDAK PERNAH di-SELECT
+// balik di sini - genuine gap, bukan sengaja. Ditambahkan sekarang karena
+// halaman Audit Log baru butuh field ini buat ditampilkan; sebelumnya
+// gak ada consumer yang baca kolom ini sama sekali jadi gap-nya gak
+// kelihatan.
 const db = require('../config/db');
 
 const LIST_SELECT = `
-  SELECT a.id, a.table_name, a.record_id, a.action, a.old_value, a.new_value,
+  SELECT a.id, a.table_name, a.record_id, a.action, a.action_detail, a.old_value, a.new_value,
          a.user_id, u.username AS user_username, u.full_name AS user_full_name, a.created_at
   FROM audit_log a
   LEFT JOIN users u ON u.id = a.user_id

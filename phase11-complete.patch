@@ -1,0 +1,1319 @@
+diff --git a/backend/src/sql/auditLogQueries.js b/backend/src/sql/auditLogQueries.js
+index 6c1abe9..6b65726 100644
+--- a/backend/src/sql/auditLogQueries.js
++++ b/backend/src/sql/auditLogQueries.js
+@@ -1,8 +1,17 @@
+ // src/sql/auditLogQueries.js
++//
++// FIX (docs/frontend/MIGRATION-PLAN.md Phase 11, saat bangun halaman Audit
++// Log): `action_detail` (migration 1700000004000, SECURITY_REVIEW.md
++// Finding #5 - ringkasan human-readable spt "Role diubah: Operator ->
++// Supervisor") DITULIS oleh recordAudit() tapi TIDAK PERNAH di-SELECT
++// balik di sini - genuine gap, bukan sengaja. Ditambahkan sekarang karena
++// halaman Audit Log baru butuh field ini buat ditampilkan; sebelumnya
++// gak ada consumer yang baca kolom ini sama sekali jadi gap-nya gak
++// kelihatan.
+ const db = require('../config/db');
+ 
+ const LIST_SELECT = `
+-  SELECT a.id, a.table_name, a.record_id, a.action, a.old_value, a.new_value,
++  SELECT a.id, a.table_name, a.record_id, a.action, a.action_detail, a.old_value, a.new_value,
+          a.user_id, u.username AS user_username, u.full_name AS user_full_name, a.created_at
+   FROM audit_log a
+   LEFT JOIN users u ON u.id = a.user_id
+diff --git a/docs/frontend/COMPONENT-INVENTORY.md b/docs/frontend/COMPONENT-INVENTORY.md
+index b6f4777..3a85f05 100644
+--- a/docs/frontend/COMPONENT-INVENTORY.md
++++ b/docs/frontend/COMPONENT-INVENTORY.md
+@@ -27,9 +27,9 @@ Status legend: **Existing** = present, keep as-is. **Refactor** = present, needs
+ 
+ | Component | Status | Current location | Responsibility | Domain knowledge allowed | Major props | States | Pages using it | Migration notes |
+ |---|---|---|---|---|---|---|---|---|
+-| Pagination | **Done (Phase 5)** | `components/data-display/Pagination.jsx` (`components/Pagination.jsx` is now a re-export shim) | Page navigation for a list | None | `page, limit, total, onPageChange` (verified, unchanged) | — | `PmPartMonitoringPage`, `PmPartHistoryPage`, `PmLineHistoryPage`, `InventoryHistoryPage` (all still import the shim path) | Calculation logic untouched, only relocated. Page-level imports migrate to the direct path in Phase 6-10, not this phase. |
++| Pagination | **Done (Phase 5)** | `components/data-display/Pagination.jsx` (`components/Pagination.jsx` is now a re-export shim) | Page navigation for a list | None | `page, limit, total, onPageChange` (verified, unchanged) | — | Only `PmPartHistoryPage` still imports the shim path directly — `PmPartMonitoringPage`/`PmLineHistoryPage`/`InventoryHistoryPage` no longer call `<Pagination>` themselves at all, they render it indirectly through `DataTable` (which imports the canonical `./Pagination` path, confirmed via grep) since their Phase 7/8/10 migrations | Calculation logic untouched, only relocated. `PmPartHistoryPage` (not yet migrated to `DataTable`) is now the shim's sole remaining consumer. |
+ | StatusBadge | **Done (Phase 5)** | `components/data-display/StatusBadge.jsx` (`components/StatusBadge.jsx` is now a re-export shim) | OK/Warning/Danger status pill | PM/Inventory status semantics — allowed domain knowledge, not a `ui/` primitive | `status` | OK/WARNING/DANGER/fallback | `DashboardPmLineWeeklyPage`, `PmPartMonitoringPage`, `PmLineStatusPage` (all still import the shim path) | The `components.css` `.badge-*` duplication named in the original audit is confirmed **already resolved** — a repo-wide grep at relocation time found zero live `className` usages of `.badge`/`.badge-*` (`badgeClassFor` no longer exists in `DashboardPage.jsx`). The dead CSS rules remain for Phase 14 cleanup. |
+-| DataTable | **Wired into PmPartMonitoringPage (Phase 7), PmLineStatusPage/PmLineHistoryPage (Phase 8), LinesTab/PartsTab/SuppliersTab/InventoryTab×2/ClMappingModal/PartSupplierModal (Phase 9 — every Master Data table except the deliberately-excluded `ImportMasterDataTab.jsx`)** | `components/data-display/DataTable.jsx` | Presentational table: renders columns/rows against the verified envelope + loading/refreshing/empty/error states | None — receives columns/rows via props, all state copy caller-supplied | `columns, rows, getRowKey, isLoading, isRefreshing, isError, errorState, emptyState, page, limit, total, onPageChange, skeletonRows, selection` | loading (skeleton rows, accounts for the selection column too when present) / refreshing (dimmed, rows stay visible) / populated / empty / error — no-result is caller-composed via the exported `DataTableNoResult` helper, since only the page knows whether zero rows means "no data" or "filters matched nothing" | `selection` (added Phase 8, opt-in, shape matches `useRowSelection`'s return value) | Confirmed via 10 live consumers + clean `npm run build`/full-repo `eslint`. `page/limit/total/onPageChange` are all optional as a set — `PmLineStatusPage`/`ClMappingModal` omit them entirely (unpaginated data, shown all at once). `LinesTab`/`SuppliersTab` (Phase 9) are client-side paginated; `PartsTab`/`InventoryTab`'s item list are server-side with `SelectAllAcrossPagesBar` composed above, same pattern as Phase 7/8. `InventoryTab`'s movement-history table and `ClMappingModal`/`PartSupplierModal` (Phase 9) are the first consumers to use `DataTable` at its most minimal — just `columns`/`rows`/`isLoading`/`emptyState`, with or without `selection`, no pagination props at all — confirming the core loading/empty/populated states hold up standalone. `ImportMasterDataTab.jsx` was evaluated and deliberately **not** migrated — its per-row `include` checkbox is row data (via `updateRow`), not `useRowSelection`-style bulk-action selection, and it needs a sticky header `DataTable` doesn't support; forcing it into `selection` would be a category mismatch, not a fit — it remains the only hand-rolled table left in the Master Data domain. Sorting/column-filter callbacks still intentionally **not** included — still no page needs them. |
++| DataTable | **Wired into PmPartMonitoringPage (Phase 7), PmLineStatusPage/PmLineHistoryPage (Phase 8), LinesTab/PartsTab/SuppliersTab/InventoryTab×2/ClMappingModal/PartSupplierModal (Phase 9), InventoryHistoryPage (Phase 10)** | `components/data-display/DataTable.jsx` | Presentational table: renders columns/rows against the verified envelope + loading/refreshing/empty/error states | None — receives columns/rows via props, all state copy caller-supplied | `columns, rows, getRowKey, isLoading, isRefreshing, isError, errorState, emptyState, page, limit, total, onPageChange, skeletonRows, selection` | loading (skeleton rows, accounts for the selection column too when present) / refreshing (dimmed, rows stay visible) / populated / empty / error — no-result is caller-composed via the exported `DataTableNoResult` helper, since only the page knows whether zero rows means "no data" or "filters matched nothing" | `selection` (added Phase 8, opt-in, shape matches `useRowSelection`'s return value) | Confirmed via 11 live consumers + clean `npm run build`/full-repo `eslint`. `InventoryHistoryPage` (Phase 10) is the last of Master Data/Inventory's server-side-paginated + `selection` + `SelectAllAcrossPagesBar` tables — same pattern as `PartsTab`/`PmLineHistoryPage`, no new capability needed. With this, **every remaining hand-rolled table with real `useRowSelection` bulk-delete in the app has been migrated** — anything still hand-rolled from here on (`ImportMasterDataTab.jsx`, whatever's left in Phase 11) either has no selection need or was evaluated and excluded for a genuine shape mismatch. Sorting/column-filter callbacks still intentionally **not** included — still no page needs them. |
+ | FilterBar | **Built, not yet wired (Phase 5)** | `components/data-display/FilterBar.jsx` | Layout wrapper for filter controls above a table (wrap + gap + actions-push-right) | None | `children, actions, className` | — | None yet | Deliberately thin — generalises exactly the `flex flex-wrap items-center gap-3` + `ml-auto` pattern already working in `PmPartMonitoringPage.jsx`'s filter row. Does not know about search/select/pills; those stay as the existing domain components composed as children. |
+ | ColumnControl | New | none | Show/hide table columns | None | `Unknown` | — | None yet — only build if a real page needs it; brief lists it as a capability, not confirmed as currently used anywhere. |
+ | ActivityList | New | `Unknown` — may overlap with `CriticalAlertsPanel.jsx`/`NotificationBell.jsx` | Recent activity feed | None | `Unknown` | — | Check `CriticalAlertsPanel.jsx` and `NotificationBell.jsx` before building — may already partially exist under different names. |
+diff --git a/docs/frontend/MIGRATION-PLAN.md b/docs/frontend/MIGRATION-PLAN.md
+index 70fe6e9..eef885c 100644
+--- a/docs/frontend/MIGRATION-PLAN.md
++++ b/docs/frontend/MIGRATION-PLAN.md
+@@ -107,7 +107,7 @@ A repo-wide grep (`className=` tokens, stripped of Tailwind arbitrary-value brac
+ - **Scope**: `InventoryPage`, `InventoryHistoryPage`.
+ - **Risks**: the confirmed snake_case field leak in `GET /inventory/rop-status` must be normalised at the adapter boundary here, per `FRONTEND-ARCHITECTURE.md`.
+ - **Acceptance criteria**: `PackageRoute` upsell-in-place behavior for Package A instances preserved exactly.
+-- **Status (updated 25 Aug 2026)**: `InventoryPage.jsx`'s `DataTable` work is **done** — it has no `<table>` of its own, it delegates entirely to `components/masterdata/InventoryTab.jsx`, which was migrated as part of Phase 9 (see Phase 9's status note; both of `InventoryTab.jsx`'s tables — item list and movement history — now use `DataTable`). This confirms the cross-phase link flagged earlier: migrating `InventoryTab.jsx` once closed the `DataTable` work for both Phase 9 (`MasterDataPage`) and Phase 10 (`InventoryPage`) simultaneously. `InventoryHistoryPage.jsx` has its own separate `<table>` (not shared with `InventoryTab.jsx`) — reskinned (batch 5/N) but **not yet migrated to `DataTable`**, still open.
++- **Status (DONE, 25 Aug 2026)**: both pages closed. `InventoryPage.jsx`'s `DataTable` work was closed by Phase 9 — it has no `<table>` of its own, it delegates entirely to `components/masterdata/InventoryTab.jsx` (both of its tables now use `DataTable`). This confirms the cross-phase link flagged earlier: migrating `InventoryTab.jsx` once closed the `DataTable` work for both Phase 9 (`MasterDataPage`) and Phase 10 (`InventoryPage`) simultaneously. `InventoryHistoryPage.jsx` had its own separate `<table>` (not shared with `InventoryTab.jsx`) — migrated to `DataTable` with `selection` + `SelectAllAcrossPagesBar`, same server-side-paginated pattern as `PartsTab`/`PmLineHistoryPage`. Columns (6) extracted to `pages/inventoryHistoryColumns.jsx` — co-located in `pages/` rather than a domain folder, since this page is the only consumer (same reasoning as `ClMappingModal.jsx` keeping its columns inline in Phase 9). `npm run build` + `eslint` clean. With this, the `components/Pagination.jsx` re-export shim (Phase 5) is down to a single remaining consumer, `PmPartHistoryPage` — every other page that used to import it directly now gets `Pagination` indirectly through `DataTable`.
+ 
+ ## Phase 11 — Migrate Administration
+ - **Scope**: `UserManagementPage`, `SettingsPage`, `RecycleBinPage`, plus wherever Roles & Permissions is found to live (per `OPEN-QUESTIONS.md`).
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index e8270c3..8131dc1 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -32,6 +32,7 @@ const InventoryHistoryPage = lazy(() => import('./pages/InventoryHistoryPage'));
+ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+ const UserManagementPage = lazy(() => import('./pages/UserManagementPage'));
+ const RecycleBinPage = lazy(() => import('./pages/RecycleBinPage'));
++const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
+ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+ 
+@@ -87,6 +88,7 @@ function App() {
+               <Route path="/settings" element={<SettingsPage />} />
+               <Route path="/users" element={<UserManagementPage />} />
+               <Route path="/recycle-bin" element={<RecycleBinPage />} />
++              <Route path="/audit-log" element={<AuditLogPage />} />
+             </Route>
+           </Route>
+         </Route>
+diff --git a/frontend/src/api/auditLogApi.js b/frontend/src/api/auditLogApi.js
+new file mode 100644
+index 0000000..ce5d6b4
+--- /dev/null
++++ b/frontend/src/api/auditLogApi.js
+@@ -0,0 +1,11 @@
++// src/api/auditLogApi.js
++// New (docs/frontend/MIGRATION-PLAN.md Phase 11). Backend endpoint sudah
++// lengkap dari awal (routes/auditLogRoutes.js, Admin-only) - cuma frontend
++// yang belum pernah consume sama sekali sampai sekarang (lihat
++// OPEN-QUESTIONS.md Resolved #2).
++import apiClient from './client';
++
++export async function fetchAuditLog(params) {
++  const { data } = await apiClient.get('/audit-log', { params });
++  return data.data; // { items, total, page, limit }
++}
+diff --git a/frontend/src/components/Sidebar.jsx b/frontend/src/components/Sidebar.jsx
+index 2a38394..7502a87 100644
+--- a/frontend/src/components/Sidebar.jsx
++++ b/frontend/src/components/Sidebar.jsx
+@@ -132,6 +132,7 @@ const NAV_GROUPS = [
+       { to: '/settings', label: 'Settings' },
+       { to: '/users', label: 'User Management' },
+       { to: '/recycle-bin', label: 'Recycle Bin' },
++      { to: '/audit-log', label: 'Audit Log' },
+     ],
+   },
+ ];
+diff --git a/frontend/src/components/data-display/DataTable.jsx b/frontend/src/components/data-display/DataTable.jsx
+index 8273639..532b5e0 100644
+--- a/frontend/src/components/data-display/DataTable.jsx
++++ b/frontend/src/components/data-display/DataTable.jsx
+@@ -28,6 +28,16 @@
+ // table in this app (LinesTab/PartsTab/SuppliersTab/InventoryTab) - this
+ // keeps DataTable ignorant of "bulk delete" as a business action, only
+ // "a row can be checked" as a presentation concern.
++//
++// selection.isSelectable(rowKey) (added Phase 11): optional on the
++// selection object - if present and returns false for a row, the checkbox
++// cell renders EMPTY for that row (not disabled, not hidden column -
++// genuinely no checkbox), rather than always rendering one. Real case:
++// UserManagementPage never shows a checkbox on the currently-logged-in
++// user's own row (a deliberate guard against self-selecting for bulk-
++// delete) - `useRowSelection` now exposes `isSelectable` for exactly this.
++// Falls back to "always selectable" if `isSelectable` is absent, so this
++// is non-breaking for any selection object shaped before Phase 11.
+ import { AlertTriangle, Inbox, SearchX } from 'lucide-react';
+ import { cn } from '../../lib/utils';
+ import { Skeleton } from '../ui/skeleton';
+@@ -114,12 +124,14 @@ function DataTable({
+                       <tr key={rowKey} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                         {selection && (
+                           <td className="px-3 py-3">
+-                            <input
+-                              type="checkbox"
+-                              checked={selection.isSelected(rowKey)}
+-                              onChange={() => selection.toggle(rowKey)}
+-                              className="h-3.5 w-3.5 accent-[var(--accent)]"
+-                            />
++                            {(!selection.isSelectable || selection.isSelectable(rowKey)) && (
++                              <input
++                                type="checkbox"
++                                checked={selection.isSelected(rowKey)}
++                                onChange={() => selection.toggle(rowKey)}
++                                className="h-3.5 w-3.5 accent-[var(--accent)]"
++                              />
++                            )}
+                           </td>
+                         )}
+                         {columns.map((col) => (
+diff --git a/frontend/src/hooks/useAuditLog.js b/frontend/src/hooks/useAuditLog.js
+new file mode 100644
+index 0000000..439122a
+--- /dev/null
++++ b/frontend/src/hooks/useAuditLog.js
+@@ -0,0 +1,8 @@
++// src/hooks/useAuditLog.js
++// New (docs/frontend/MIGRATION-PLAN.md Phase 11).
++import { useQuery } from '@tanstack/react-query';
++import { fetchAuditLog } from '../api/auditLogApi';
++
++export function useAuditLog(params) {
++  return useQuery({ queryKey: ['audit-log', params], queryFn: () => fetchAuditLog(params) });
++}
+diff --git a/frontend/src/hooks/useRowSelection.js b/frontend/src/hooks/useRowSelection.js
+index 3d6a33e..2994671 100644
+--- a/frontend/src/hooks/useRowSelection.js
++++ b/frontend/src/hooks/useRowSelection.js
+@@ -8,6 +8,20 @@
+ // cuma halaman ini) - dipakai `selectIds()` di bawah buat nambahin id dari
+ // halaman lain yang belum sempat di-render (lihat handleSelectAllMatching
+ // di PartsTab.jsx/InventoryTab.jsx).
++//
++// isSelectable(id) (docs/frontend/MIGRATION-PLAN.md Phase 11): dipakai
++// DataTable buat nentuin row mana yang checkbox-nya di-render sama sekali
++// vs sengaja dikosongin - kasus asli: UserManagementPage TIDAK pernah
++// nampilin checkbox di baris user yang lagi login sendiri (proteksi biar
++// gak bisa keceklis+bulk-delete akun sendiri). Sebelum ini di-tambahin,
++// perlindungan itu cuma bergantung pada `pageIds`/`selectableIds` yang
++// DIKIRIM caller SUDAH exclude id itu dari awal (lihat UserManagementPage
++// - `selectableIds` exclude `currentUser.id`) - tapi `toggle(id)` sendiri
++// TIDAK PERNAH validasi id-nya terhadap `pageIds`, jadi kalau checkbox
++// buat row itu somehow ke-render (mis. lewat DataTable yang render
++// checkbox utk SEMUA row tanpa kecuali), user bisa toggle ID yang
++// sebetulnya "gak boleh diceklis". `isSelectable` menutup celah itu di titik
++// render, bukan cuma titik pengiriman prop.
+ import { useMemo, useState } from 'react';
+ 
+ export function useRowSelection(pageIds = []) {
+@@ -52,11 +66,17 @@ export function useRowSelection(pageIds = []) {
+   }
+ 
+   const selectedIds = useMemo(() => Array.from(selected), [selected]);
++  const pageIdSet = useMemo(() => new Set(pageIds), [pageIds]);
+ 
+   return {
+     selectedIds,
+     selectedCount: selectedIds.length,
+     isSelected: (id) => selected.has(id),
++    // Default TRUE kalau pageIds kosong (tabel tanpa universe eksplisit,
++    // mis. konsumen lama yang belum butuh exclude-row) - biar gak ada
++    // perubahan perilaku buat konsumen existing yang gak punya kasus
++    // "sebagian row gak boleh diceklis".
++    isSelectable: (id) => pageIds.length === 0 || pageIdSet.has(id),
+     toggle,
+     toggleAllOnPage,
+     selectIds,
+diff --git a/frontend/src/pages/AuditLogPage.jsx b/frontend/src/pages/AuditLogPage.jsx
+new file mode 100644
+index 0000000..c4d17a2
+--- /dev/null
++++ b/frontend/src/pages/AuditLogPage.jsx
+@@ -0,0 +1,159 @@
++// src/pages/AuditLogPage.jsx
++// New (docs/frontend/MIGRATION-PLAN.md Phase 11, docs/frontend/
++// OPEN-QUESTIONS.md Resolved #2). Backend endpoint (GET /audit-log,
++// Admin-only) sudah lengkap dari awal - fitur ini murni frontend, gak ada
++// business logic baru yang ditambahkan. Satu backend fix menyertai (lihat
++// auditLogQueries.js): kolom action_detail ditulis tapi belum pernah
++// di-SELECT balik - dibenerin karena halaman ini butuh field itu.
++//
++// Ini satu-satunya tempat di Phase 7-11 yang PAKAI FilterBar (bukan cuma
++// DataTable) - per keputusan Phase 6.5: FilterBar khusus buat surface
++// yang genuinely baru, bukan migrasi tabel hand-rolled yang udah battle-
++// tested (di situ toolbar custom lebih aman, lihat LinesTab/SuppliersTab).
++// Di sini gak ada tabel lama yang dipertaruhkan - jadi FilterBar dipakai
++// sesuai desainnya.
++//
++// Filter table_name/user_id/date_from/date_to semua SERVER-SIDE (backend
++// sudah terima params ini, lihat auditLogController.js) - bukan
++// ditambahkan di sini, cuma di-consume.
++import { useState } from 'react';
++import { Inbox } from 'lucide-react';
++import { usePageHeader } from '../contexts/PageHeaderContext';
++import { useAuditLog } from '../hooks/useAuditLog';
++import { useUsers } from '../hooks/useUsers';
++import buildAuditLogColumns, { TABLE_NAME_LABEL } from './auditLogColumns';
++import Modal from '../components/Modal';
++import { FilterBar } from '../components/data-display/FilterBar';
++import { DataTable, DataTableNoResult } from '../components/data-display/DataTable';
++import { EmptyState } from '../components/ui/empty-state';
++import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
++
++const LIMIT = 20;
++
++function DiffModal({ entry, onClose }) {
++  return (
++    <Modal title={`Detail Perubahan — ${TABLE_NAME_LABEL[entry.table_name] || entry.table_name} #${entry.record_id ?? '-'}`} onClose={onClose} width={640}>
++      {entry.action_detail && (
++        <p className="mb-3 text-[13px]">{entry.action_detail}</p>
++      )}
++      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
++        {entry.old_value && (
++          <div>
++            <div className="mb-1 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">Sebelum</div>
++            <pre className="max-h-[320px] overflow-auto rounded-lg border border-border bg-secondary p-3 text-xs">
++              {JSON.stringify(entry.old_value, null, 2)}
++            </pre>
++          </div>
++        )}
++        {entry.new_value && (
++          <div>
++            <div className="mb-1 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">Sesudah</div>
++            <pre className="max-h-[320px] overflow-auto rounded-lg border border-border bg-secondary p-3 text-xs">
++              {JSON.stringify(entry.new_value, null, 2)}
++            </pre>
++          </div>
++        )}
++      </div>
++    </Modal>
++  );
++}
++
++function AuditLogPage() {
++  usePageHeader({ title: 'Audit Log' });
++
++  const [tableName, setTableName] = useState('all');
++  const [userId, setUserId] = useState('all');
++  const [page, setPage] = useState(1);
++  const [diffEntry, setDiffEntry] = useState(null);
++
++  const { data: usersData } = useUsers({});
++  const users = Array.isArray(usersData) ? usersData : usersData?.items || [];
++
++  const params = {
++    table_name: tableName === 'all' ? undefined : tableName,
++    user_id: userId === 'all' ? undefined : userId,
++    page,
++    limit: LIMIT,
++  };
++  const { data, isLoading, isFetching, isError } = useAuditLog(params);
++
++  const hasActiveFilter = tableName !== 'all' || userId !== 'all';
++
++  function handleResetFilter() {
++    setTableName('all');
++    setUserId('all');
++    setPage(1);
++  }
++
++  const columns = buildAuditLogColumns({ onViewDiff: setDiffEntry });
++
++  return (
++    <div className="flex flex-col gap-4">
++      <FilterBar>
++        <Select
++          value={tableName}
++          onValueChange={(v) => {
++            setTableName(v);
++            setPage(1);
++          }}
++        >
++          <SelectTrigger className="w-[200px]">
++            <SelectValue placeholder="Semua Tabel" />
++          </SelectTrigger>
++          <SelectContent>
++            <SelectItem value="all">Semua Tabel</SelectItem>
++            {Object.entries(TABLE_NAME_LABEL).map(([val, label]) => (
++              <SelectItem key={val} value={val}>
++                {label}
++              </SelectItem>
++            ))}
++          </SelectContent>
++        </Select>
++
++        <Select
++          value={userId}
++          onValueChange={(v) => {
++            setUserId(v);
++            setPage(1);
++          }}
++        >
++          <SelectTrigger className="w-[200px]">
++            <SelectValue placeholder="Semua User" />
++          </SelectTrigger>
++          <SelectContent>
++            <SelectItem value="all">Semua User</SelectItem>
++            {users.map((u) => (
++              <SelectItem key={u.id} value={String(u.id)}>
++                {u.full_name}
++              </SelectItem>
++            ))}
++          </SelectContent>
++        </Select>
++      </FilterBar>
++
++      <DataTable
++        columns={columns}
++        rows={data?.items}
++        getRowKey={(a) => a.id}
++        isLoading={isLoading && !data}
++        isRefreshing={isFetching && !isLoading}
++        isError={isError}
++        page={data?.page}
++        limit={data?.limit}
++        total={data?.total}
++        onPageChange={setPage}
++        emptyState={
++          hasActiveFilter ? (
++            <DataTableNoResult onReset={handleResetFilter} />
++          ) : (
++            <EmptyState icon={Inbox} title="Belum ada aktivitas tercatat" />
++          )
++        }
++      />
++
++      {diffEntry && <DiffModal entry={diffEntry} onClose={() => setDiffEntry(null)} />}
++    </div>
++  );
++}
++
++export default AuditLogPage;
+diff --git a/frontend/src/pages/RecycleBinPage.jsx b/frontend/src/pages/RecycleBinPage.jsx
+index 61c2d31..70ac220 100644
+--- a/frontend/src/pages/RecycleBinPage.jsx
++++ b/frontend/src/pages/RecycleBinPage.jsx
+@@ -8,8 +8,17 @@
+ // Restore = reversible penuh (data balik ke tabel aktifnya). Permanent
+ // Delete = IRREVERSIBLE, makanya minta confirm dua kali (confirm() biasa +
+ // harus ketik ulang label datanya) supaya gak ke-klik gak sengaja.
++//
++// DataTable migration (docs/frontend/MIGRATION-PLAN.md Phase 11): hand-
++// rolled <table> diganti data-display/DataTable dengan `selection` -
++// semua item selectable di sini (gak ada kasus exclude-row kayak
++// UserManagementPage), client-side (semua data Recycle Bin per-entity
++// kebaca sekaligus di memori, sama pola LinesTab/SuppliersTab). Kolom (5)
++// pindah ke recycleBinColumns.jsx. `RecycleBinBulkBar` (custom, BUKAN
++// BulkDeleteBar generik - ada 2 aksi: Restore + Hapus Permanen) TIDAK
++// disentuh, tetap page-level component di atas DataTable.
+ import { useState } from 'react';
+-import { Trash2, RotateCcw, Flame, X } from 'lucide-react';
++import { Trash2, RotateCcw, Flame, X, Inbox } from 'lucide-react';
+ import { usePageHeader } from '../contexts/PageHeaderContext';
+ import {
+   useRecycleBinEntities,
+@@ -22,6 +31,9 @@ import {
+ import { useConfirm } from '../contexts/ConfirmDialogContext';
+ import { useRowSelection } from '../hooks/useRowSelection';
+ import { cn } from '../lib/utils';
++import buildRecycleBinColumns from './recycleBinColumns';
++import { DataTable } from '../components/data-display/DataTable';
++import { EmptyState } from '../components/ui/empty-state';
+ import { Button } from '../components/ui/button';
+ 
+ // Bar aksi massal Recycle Bin - beda dari BulkDeleteBar generik (yang cuma
+@@ -142,13 +154,12 @@ function RecycleBinList({ entityKey }) {
+ 
+   if (isLoading) return <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>;
+ 
+-  if (items.length === 0) {
+-    return (
+-      <div className="py-8 text-center text-sm text-[var(--text-faint)]">
+-        Recycle Bin kosong - belum ada data yang dihapus.
+-      </div>
+-    );
+-  }
++  const columns = buildRecycleBinColumns({
++    onRestore: handleRestore,
++    onPermanentDelete: handlePermanentDelete,
++    restorePending: restore.isPending,
++    deletePending: permanentDelete.isPending,
++  });
+ 
+   return (
+     <div>
+@@ -165,81 +176,13 @@ function RecycleBinList({ entityKey }) {
+         deletePending={bulkPermanentDelete.isPending}
+       />
+ 
+-      <div className="overflow-hidden rounded-lg border border-border">
+-        <div className="overflow-x-auto">
+-          <table className="w-full border-collapse">
+-            <thead>
+-              <tr className="border-b border-border">
+-                <th className="w-[36px] px-3 py-2">
+-                  <input
+-                    type="checkbox"
+-                    checked={selection.allOnPageSelected}
+-                    ref={(el) => {
+-                      if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
+-                    }}
+-                    onChange={selection.toggleAllOnPage}
+-                    className="h-3.5 w-3.5 accent-[var(--accent)]"
+-                  />
+-                </th>
+-                {['Data', 'Konteks', 'Dihapus Pada', 'Dihapus Oleh', 'Aksi'].map((h) => (
+-                  <th
+-                    key={h}
+-                    className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
+-                  >
+-                    {h}
+-                  </th>
+-                ))}
+-              </tr>
+-            </thead>
+-            <tbody>
+-              {items.map((item) => (
+-                <tr key={item.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+-                  <td className="px-3 py-3">
+-                    <input
+-                      type="checkbox"
+-                      checked={selection.isSelected(item.id)}
+-                      onChange={() => selection.toggle(item.id)}
+-                      className="h-3.5 w-3.5 accent-[var(--accent)]"
+-                    />
+-                  </td>
+-                  <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{item.label}</td>
+-                  <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{item.context || '-'}</td>
+-                  <td className="px-3 py-3 font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
+-                    {new Date(item.deleted_at).toLocaleString('id-ID')}
+-                  </td>
+-                  <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{item.deleted_by_name || '-'}</td>
+-                  <td className="px-3 py-3">
+-                    <div className="flex gap-1">
+-                      <Button
+-                        type="button"
+-                        variant="outline"
+-                        size="sm"
+-                        className="h-7"
+-                        onClick={() => handleRestore(item)}
+-                        disabled={restore.isPending}
+-                        title="Restore"
+-                      >
+-                        <RotateCcw size={13} /> Restore
+-                      </Button>
+-                      <Button
+-                        type="button"
+-                        variant="destructive"
+-                        size="icon"
+-                        className="h-7 w-7"
+-                        onClick={() => handlePermanentDelete(item)}
+-                        disabled={permanentDelete.isPending}
+-                        title="Hapus Permanen"
+-                      >
+-                        <Flame size={13} />
+-                      </Button>
+-                    </div>
+-                  </td>
+-                </tr>
+-              ))}
+-            </tbody>
+-          </table>
+-        </div>
+-      </div>
++      <DataTable
++        columns={columns}
++        rows={items}
++        getRowKey={(item) => item.id}
++        selection={selection}
++        emptyState={<EmptyState icon={Inbox} title="Recycle Bin kosong - belum ada data yang dihapus" />}
++      />
+     </div>
+   );
+ }
+diff --git a/frontend/src/pages/UserManagementPage.jsx b/frontend/src/pages/UserManagementPage.jsx
+index a9df749..761362e 100644
+--- a/frontend/src/pages/UserManagementPage.jsx
++++ b/frontend/src/pages/UserManagementPage.jsx
+@@ -11,8 +11,25 @@
+ // pointer/not-allowed inline eksplisit), jadi bukan prioritas.
+ // Data/logic (hook, mutation, permission checkbox, approve/reject flow)
+ // TIDAK berubah sama sekali.
++//
++// DataTable migration (docs/frontend/MIGRATION-PLAN.md Phase 11): SEMUA
++// TIGA hand-rolled <table> di file ini diganti data-display/DataTable.
++// Kolom untuk ketiganya pindah ke userManagementColumns.jsx (co-located di
++// pages/, satu file - sama alasan pmLineHistoryColumns.jsx/
++// inventoryHistoryColumns.jsx, single-page consumer, gak ada domain folder
++// yang pas). PendingApprovalSection: tanpa selection (approve/reject
++// per-baris, bukan bulk action). Main "Daftar User" table & RoleManagement-
++// Section: DUA-duanya butuh `selection.isSelectable` yang BARU ditambahin
++// ke useRowSelection/DataTable Phase 11 ini - sebelumnya checkbox baris
++// tertentu (baris User sendiri yang lagi login; Role bawaan/is_system)
++// disembunyikan dengan `{kondisi && <input.../>}` inline di hand-rolled
++// table. DataTable TIDAK punya cara buat itu sebelum penambahan
++// `isSelectable` (lihat komentar di DataTable.jsx/useRowSelection.js) -
++// jadi ini BUKAN migrasi mekanis murni presentational, ada 1 capability
++// baru yang genuinely dibutuhkan lebih dulu. Semua state/query/mutation/
++// permission-edit-flow TIDAK berubah.
+ import { useState } from 'react';
+-import { Plus, Pencil, Trash2 } from 'lucide-react';
++import { Plus, Inbox } from 'lucide-react';
+ import { usePageHeader } from '../contexts/PageHeaderContext';
+ import { useUsers, useUserMutations } from '../hooks/useUsers';
+ import { useRoles, usePermissionCatalog, useRoleMutations } from '../hooks/useRoles';
+@@ -20,9 +37,11 @@ import { useConfirm } from '../contexts/ConfirmDialogContext';
+ import { useAuth } from '../contexts/AuthContext';
+ import { useRowSelection } from '../hooks/useRowSelection';
+ import { useBulkDeleteMutation } from '../hooks/useRecycleBin';
++import { buildPendingApprovalColumns, buildUserColumns, buildRoleColumns } from './userManagementColumns';
+ import Modal from '../components/Modal';
+ import BulkDeleteBar from '../components/BulkDeleteBar';
+-import ToggleSwitch from '../components/ToggleSwitch';
++import { DataTable } from '../components/data-display/DataTable';
++import { EmptyState } from '../components/ui/empty-state';
+ import { Button } from '../components/ui/button';
+ import { Input } from '../components/ui/input';
+ import { Label } from '../components/ui/label';
+@@ -168,6 +187,16 @@ function PendingApprovalSection() {
+   if (isLoading) return null;
+   if (pendingUsers.length === 0) return null;
+ 
++  const columns = buildPendingApprovalColumns({
++    roles,
++    roleSelections,
++    onRoleSelect: (userId, roleId) => setRoleSelections({ ...roleSelections, [userId]: roleId }),
++    onApprove: handleApprove,
++    onReject: handleReject,
++    approvePending: approve.isPending,
++    rejectPending: reject.isPending,
++  });
++
+   return (
+     <div className="mb-4 rounded-lg border border-border bg-card p-4.5">
+       <div className="mb-4 flex items-center justify-between">
+@@ -181,69 +210,7 @@ function PendingApprovalSection() {
+         <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{error}</div>
+       )}
+ 
+-      <div className="overflow-hidden rounded-lg border border-border">
+-        <div className="overflow-x-auto">
+-          <table className="w-full border-collapse">
+-            <thead>
+-              <tr className="border-b border-border">
+-                {['Username', 'Full Name', 'Email', 'Daftar Sejak', 'Assign Role', 'Aksi'].map((h) => (
+-                  <th
+-                    key={h}
+-                    className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
+-                  >
+-                    {h}
+-                  </th>
+-                ))}
+-              </tr>
+-            </thead>
+-            <tbody>
+-              {pendingUsers.map((u) => (
+-                <tr key={u.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+-                  <td className="px-3 py-2.5 font-[var(--font-mono)] text-[13px]">{u.username}</td>
+-                  <td className="px-3 py-2.5 text-[13px]">{u.full_name}</td>
+-                  <td className="px-3 py-2.5 text-xs text-[var(--text-dim)]">{u.email || '-'}</td>
+-                  <td className="px-3 py-2.5 font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
+-                    {new Date(u.created_at).toLocaleString('id-ID')}
+-                  </td>
+-                  <td className="px-3 py-2.5">
+-                    <Select
+-                      value={roleSelections[u.id] || ''}
+-                      onValueChange={(v) => setRoleSelections({ ...roleSelections, [u.id]: v })}
+-                    >
+-                      <SelectTrigger className="h-8 w-[160px]">
+-                        <SelectValue placeholder="Pilih Role" />
+-                      </SelectTrigger>
+-                      <SelectContent>
+-                        {roles.map((r) => (
+-                          <SelectItem key={r.id} value={String(r.id)}>
+-                            {r.name}
+-                          </SelectItem>
+-                        ))}
+-                      </SelectContent>
+-                    </Select>
+-                  </td>
+-                  <td className="px-3 py-2.5">
+-                    <div className="flex gap-1.5">
+-                      <Button type="button" size="sm" onClick={() => handleApprove(u)} disabled={approve.isPending}>
+-                        Approve
+-                      </Button>
+-                      <Button
+-                        type="button"
+-                        size="sm"
+-                        variant="outline"
+-                        onClick={() => handleReject(u)}
+-                        disabled={reject.isPending}
+-                      >
+-                        Tolak
+-                      </Button>
+-                    </div>
+-                  </td>
+-                </tr>
+-              ))}
+-            </tbody>
+-          </table>
+-        </div>
+-      </div>
++      <DataTable columns={columns} rows={pendingUsers} getRowKey={(u) => u.id} />
+     </div>
+   );
+ }
+@@ -260,13 +227,19 @@ function RoleManagementSection() {
+   const [draftPerms, setDraftPerms] = useState({});
+   // Role bawaan (is_system) gak bisa di-checklist/dihapus - sama seperti
+   // tombol Trash2 per-baris yang juga disembunyikan buat role.is_system.
++  // Dulu ini cuma bergantung pada checkbox yang gak di-render di hand-
++  // rolled table; sekarang selection.isSelectable (Phase 11 - lihat
++  // komentar di useRowSelection.js) yang menegakkan itu di DataTable.
+   const selectableIds = roles.filter((r) => !r.is_system).map((r) => r.id);
+   const selection = useRowSelection(selectableIds);
+   const bulkDelete = useBulkDeleteMutation('roles');
+   const [bulkError, setBulkError] = useState('');
+ 
+-  function togglePerm(key, currentList, setter) {
+-    setter(currentList.includes(key) ? currentList.filter((k) => k !== key) : [...currentList, key]);
++  function togglePerm(roleId, key) {
++    setDraftPerms((prev) => {
++      const current = prev[roleId] || [];
++      return { ...prev, [roleId]: current.includes(key) ? current.filter((k) => k !== key) : [...current, key] };
++    });
+   }
+ 
+   async function handleCreate(e) {
+@@ -319,6 +292,21 @@ function RoleManagementSection() {
+     }
+   }
+ 
++  function togglePermForNew(key) {
++    setNewRolePerms((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
++  }
++
++  const columns = buildRoleColumns({
++    permissionCatalog,
++    expandedRoleId,
++    draftPerms,
++    onTogglePerm: togglePerm,
++    onStartEdit: startEditPermissions,
++    onSavePerms: saveDraftPermissions,
++    onDelete: handleDelete,
++    savePending: updatePermissions.isPending,
++  });
++
+   return (
+     <div className="mb-4 rounded-lg border border-border bg-card p-4.5">
+       <div className="mb-4 flex items-center justify-between">
+@@ -343,128 +331,9 @@ function RoleManagementSection() {
+         label="Role"
+       />
+ 
+-      {isLoading && <div className="py-6 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
+-
+-      {!isLoading && (
+-        <div className="mb-4 overflow-hidden rounded-lg border border-border">
+-          <div className="overflow-x-auto">
+-            <table className="w-full border-collapse">
+-              <thead>
+-                <tr className="border-b border-border">
+-                  <th className="w-[36px] px-3 py-2">
+-                    <input
+-                      type="checkbox"
+-                      checked={selection.allOnPageSelected}
+-                      ref={(el) => {
+-                        if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
+-                      }}
+-                      onChange={selection.toggleAllOnPage}
+-                      className="h-3.5 w-3.5 accent-[var(--accent)]"
+-                    />
+-                  </th>
+-                  {['Nama Role', 'User', 'Permission', 'Aksi'].map((h) => (
+-                    <th
+-                      key={h}
+-                      className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
+-                    >
+-                      {h}
+-                    </th>
+-                  ))}
+-                </tr>
+-              </thead>
+-              <tbody>
+-                {roles.map((role) => (
+-                  <tr key={role.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+-                    <td className="px-3 py-2.5">
+-                      {!role.is_system && (
+-                        <input
+-                          type="checkbox"
+-                          checked={selection.isSelected(role.id)}
+-                          onChange={() => selection.toggle(role.id)}
+-                          className="h-3.5 w-3.5 accent-[var(--accent)]"
+-                        />
+-                      )}
+-                    </td>
+-                    <td className="px-3 py-2.5 text-[13px]">
+-                      {role.name}{' '}
+-                      {role.is_system && <span className="text-xs text-muted-foreground">(bawaan)</span>}
+-                    </td>
+-                    <td className="px-3 py-2.5 font-[var(--font-mono)] text-[13px]">{role.user_count}</td>
+-                    <td className="px-3 py-2.5">
+-                      {expandedRoleId === role.id ? (
+-                        <div className="flex flex-wrap gap-2">
+-                          {permissionCatalog.map((p) => (
+-                            <label key={p.key} className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+-                              <input
+-                                type="checkbox"
+-                                checked={(draftPerms[role.id] || []).includes(p.key)}
+-                                onChange={() =>
+-                                  togglePerm(p.key, draftPerms[role.id] || [], (v) =>
+-                                    setDraftPerms({ ...draftPerms, [role.id]: v })
+-                                  )
+-                                }
+-                                className="h-3.5 w-3.5 accent-[var(--accent)]"
+-                              />
+-                              {p.label}
+-                            </label>
+-                          ))}
+-                        </div>
+-                      ) : role.name === 'Admin' ? (
+-                        <span className="text-xs text-muted-foreground">Semua akses (superuser)</span>
+-                      ) : (
+-                        <span className="text-xs text-muted-foreground">
+-                          {role.permissions.length > 0
+-                            ? role.permissions
+-                                .map((k) => permissionCatalog.find((p) => p.key === k)?.label || k)
+-                                .join(', ')
+-                            : 'Tidak ada akses khusus'}
+-                        </span>
+-                      )}
+-                    </td>
+-                    <td className="px-3 py-2.5">
+-                      {role.name === 'Admin' ? (
+-                        <span className="text-xs text-muted-foreground">-</span>
+-                      ) : expandedRoleId === role.id ? (
+-                        <Button
+-                          type="button"
+-                          size="sm"
+-                          onClick={() => saveDraftPermissions(role)}
+-                          disabled={updatePermissions.isPending}
+-                        >
+-                          Simpan
+-                        </Button>
+-                      ) : (
+-                        <div className="flex gap-1">
+-                          <Button
+-                            type="button"
+-                            variant="outline"
+-                            size="icon"
+-                            className="h-7 w-7"
+-                            onClick={() => startEditPermissions(role)}
+-                          >
+-                            <Pencil size={13} />
+-                          </Button>
+-                          {!role.is_system && (
+-                            <Button
+-                              type="button"
+-                              variant="outline"
+-                              size="icon"
+-                              className="h-7 w-7"
+-                              onClick={() => handleDelete(role)}
+-                            >
+-                              <Trash2 size={13} />
+-                            </Button>
+-                          )}
+-                        </div>
+-                      )}
+-                    </td>
+-                  </tr>
+-                ))}
+-              </tbody>
+-            </table>
+-          </div>
+-        </div>
+-      )}
++      <div className="mb-4">
++        <DataTable columns={columns} rows={roles} getRowKey={(role) => role.id} isLoading={isLoading} selection={selection} />
++      </div>
+ 
+       <form onSubmit={handleCreate}>
+         <div className="mb-1.5 text-xs text-muted-foreground">Buat role baru</div>
+@@ -485,7 +354,7 @@ function RoleManagementSection() {
+               <input
+                 type="checkbox"
+                 checked={newRolePerms.includes(p.key)}
+-                onChange={() => togglePerm(p.key, newRolePerms, setNewRolePerms)}
++                onChange={() => togglePermForNew(p.key)}
+                 className="h-3.5 w-3.5 accent-[var(--accent)]"
+               />
+               {p.label}
+@@ -515,6 +384,9 @@ function UserManagementPage() {
+   // sini adalah gak nawarin checkbox-nya sama sekali buat baris diri
+   // sendiri. Kalau kehapus akun lain yang lagi login, sesinya otomatis
+   // ke-invalidate di request berikutnya (findUserById filter deleted_at).
++  // DataTable/useRowSelection sekarang menegakkan "gak nawarin checkbox"
++  // itu via selection.isSelectable (Phase 11) - selectableIds di bawah
++  // TETAP jadi satu-satunya sumber kebenaran soal siapa yang selectable.
+   const selectableIds = nonPendingUsers.filter((u) => u.id !== currentUser?.id).map((u) => u.id);
+   const selection = useRowSelection(selectableIds);
+   const bulkDelete = useBulkDeleteMutation('users');
+@@ -535,6 +407,12 @@ function UserManagementPage() {
+     }
+   }
+ 
++  const columns = buildUserColumns({
++    currentUser,
++    onEdit: (u) => setModalState({ mode: 'edit', user: u }),
++    onToggleActive: (id, next) => update.mutate({ id, payload: { is_active: next } }),
++  });
++
+   return (
+     <div>
+       <RoleManagementSection />
+@@ -548,12 +426,6 @@ function UserManagementPage() {
+           </Button>
+         </div>
+ 
+-        {isError && (
+-          <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
+-            Gagal memuat daftar user.
+-          </div>
+-        )}
+-
+         {bulkError && (
+           <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
+             {bulkError}
+@@ -568,86 +440,15 @@ function UserManagementPage() {
+           label="User"
+         />
+ 
+-        {isLoading && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
+-
+-        {!isLoading && (
+-          <div className="overflow-hidden rounded-lg border border-border">
+-            <div className="overflow-x-auto">
+-              <table className="w-full border-collapse">
+-                <thead>
+-                  <tr className="border-b border-border">
+-                    <th className="w-[36px] px-3 py-2">
+-                      <input
+-                        type="checkbox"
+-                        checked={selection.allOnPageSelected}
+-                        ref={(el) => {
+-                          if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
+-                        }}
+-                        onChange={selection.toggleAllOnPage}
+-                        className="h-3.5 w-3.5 accent-[var(--accent)]"
+-                      />
+-                    </th>
+-                    {['Username', 'Full Name', 'Email', 'Role', 'Aktif', 'Last Login', 'Aksi'].map((h) => (
+-                      <th
+-                        key={h}
+-                        className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
+-                      >
+-                        {h}
+-                      </th>
+-                    ))}
+-                  </tr>
+-                </thead>
+-                <tbody>
+-                  {nonPendingUsers.map((u) => (
+-                    <tr key={u.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+-                      <td className="px-3 py-3">
+-                        {u.id !== currentUser?.id && (
+-                          <input
+-                            type="checkbox"
+-                            checked={selection.isSelected(u.id)}
+-                            onChange={() => selection.toggle(u.id)}
+-                            className="h-3.5 w-3.5 accent-[var(--accent)]"
+-                          />
+-                        )}
+-                      </td>
+-                      <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">
+-                        {u.username} {u.id === currentUser?.id && <span className="text-xs text-muted-foreground">(kamu)</span>}
+-                      </td>
+-                      <td className="px-3 py-3 text-[13px]">{u.full_name}</td>
+-                      <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{u.email || '-'}</td>
+-                      <td className="px-3 py-3 text-[13px]">
+-                        {u.role || '-'}
+-                        {u.status === 'REJECTED' && (
+-                          <span className="ml-1.5 text-xs text-[var(--danger)]">(Ditolak)</span>
+-                        )}
+-                      </td>
+-                      <td className="px-3 py-3">
+-                        <ToggleSwitch
+-                          checked={u.is_active}
+-                          onChange={(next) => update.mutate({ id: u.id, payload: { is_active: next } })}
+-                        />
+-                      </td>
+-                      <td className="px-3 py-3 font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
+-                        {u.last_login ? new Date(u.last_login).toLocaleString('id-ID') : '-'}
+-                      </td>
+-                      <td className="px-3 py-3">
+-                        <Button
+-                          type="button"
+-                          variant="outline"
+-                          size="icon"
+-                          className="h-7 w-7"
+-                          onClick={() => setModalState({ mode: 'edit', user: u })}
+-                        >
+-                          <Pencil size={13} />
+-                        </Button>
+-                      </td>
+-                    </tr>
+-                  ))}
+-                </tbody>
+-              </table>
+-            </div>
+-          </div>
+-        )}
++        <DataTable
++          columns={columns}
++          rows={nonPendingUsers}
++          getRowKey={(u) => u.id}
++          isLoading={isLoading}
++          isError={isError}
++          selection={selection}
++          emptyState={<EmptyState icon={Inbox} title="Belum ada User" />}
++        />
+       </div>
+ 
+       {modalState && (
+diff --git a/frontend/src/pages/auditLogColumns.jsx b/frontend/src/pages/auditLogColumns.jsx
+new file mode 100644
+index 0000000..186594e
+--- /dev/null
++++ b/frontend/src/pages/auditLogColumns.jsx
+@@ -0,0 +1,87 @@
++// src/pages/auditLogColumns.jsx
++// New (docs/frontend/MIGRATION-PLAN.md Phase 11 - Audit Log built new, per
++// OPEN-QUESTIONS.md Resolved #2). 6 columns: Waktu, Tabel, Aksi, Detail
++// (action_detail human-readable summary, backend gap fixed alongside this
++// - see auditLogQueries.js comment), Oleh, dan tombol buka modal diff
++// old_value/new_value mentah (JSONB) - action_detail cukup buat kebanyakan
++// kasus, tapi diff mentah tetap disediakan buat audit forensik yang
++// beneran butuh lihat before/after utuh (bukan cuma ringkasan).
++import { Eye } from 'lucide-react';
++import { Button } from '../components/ui/button';
++
++const ACTION_BADGE_CLASS = {
++  CREATE: 'bg-ok-dim text-ok',
++  UPDATE: 'bg-warn-dim text-warn',
++  DELETE: 'bg-danger-dim text-danger',
++};
++
++const TABLE_NAME_LABEL = {
++  app_settings: 'Settings',
++  inventory_items: 'Inventory Item',
++  inventory_stock_movements: 'Mutasi Stok',
++  lines: 'Line',
++  part_cl_mapping: 'CL Mapping',
++  part_suppliers: 'Part-Supplier Link',
++  parts: 'Part',
++  pm_monthly_history: 'PM Monthly History',
++  pm_part_history: 'PM Part History',
++  role_permissions: 'Role Permission',
++  roles: 'Role',
++  suppliers: 'Supplier',
++  users: 'User',
++};
++
++function buildAuditLogColumns({ onViewDiff }) {
++  return [
++    {
++      key: 'created_at',
++      header: 'Waktu',
++      className: 'font-[var(--font-mono)] text-xs text-[var(--text-dim)]',
++      render: (a) => new Date(a.created_at).toLocaleString('id-ID'),
++    },
++    {
++      key: 'table_name',
++      header: 'Tabel',
++      render: (a) => (
++        <>
++          <span className="text-[13px]">{TABLE_NAME_LABEL[a.table_name] || a.table_name}</span>
++          {a.record_id && <span className="ml-1 font-[var(--font-mono)] text-xs text-[var(--text-faint)]">#{a.record_id}</span>}
++        </>
++      ),
++    },
++    {
++      key: 'action',
++      header: 'Aksi',
++      render: (a) => (
++        <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${ACTION_BADGE_CLASS[a.action] || 'bg-[var(--panel-3)] text-[var(--text-faint)]'}`}>
++          {a.action}
++        </span>
++      ),
++    },
++    {
++      key: 'action_detail',
++      header: 'Detail',
++      className: 'max-w-[320px] text-xs text-[var(--text-dim)]',
++      render: (a) => a.action_detail || '-',
++    },
++    {
++      key: 'user',
++      header: 'Oleh',
++      className: 'text-xs text-[var(--text-dim)]',
++      render: (a) => a.user_full_name || a.user_username || '-',
++    },
++    {
++      key: 'diff',
++      header: '',
++      render: (a) =>
++        (a.old_value || a.new_value) && (
++          <Button type="button" variant="outline" size="icon" className="h-7 w-7" title="Lihat detail perubahan" onClick={() => onViewDiff(a)}>
++            <Eye size={13} />
++          </Button>
++        ),
++    },
++  ];
++}
++
++export { TABLE_NAME_LABEL };
++export default buildAuditLogColumns;
+diff --git a/frontend/src/pages/recycleBinColumns.jsx b/frontend/src/pages/recycleBinColumns.jsx
+new file mode 100644
+index 0000000..d43881c
+--- /dev/null
++++ b/frontend/src/pages/recycleBinColumns.jsx
+@@ -0,0 +1,67 @@
++// src/pages/recycleBinColumns.jsx
++// New (docs/frontend/MIGRATION-PLAN.md Phase 11). Extracted from the
++// hand-rolled <table> in RecycleBinPage.jsx - same 5 columns, following
++// the pmLineHistoryColumns.jsx/userManagementColumns.jsx precedent
++// (co-located in pages/, single consumer, no domain folder case).
++import { RotateCcw, Flame } from 'lucide-react';
++import { Button } from '../components/ui/button';
++
++function buildRecycleBinColumns({ onRestore, onPermanentDelete, restorePending, deletePending }) {
++  return [
++    {
++      key: 'label',
++      header: 'Data',
++      render: (item) => <span className="font-[var(--font-mono)] text-[13px]">{item.label}</span>,
++    },
++    {
++      key: 'context',
++      header: 'Konteks',
++      className: 'text-xs text-[var(--text-dim)]',
++      render: (item) => item.context || '-',
++    },
++    {
++      key: 'deleted_at',
++      header: 'Dihapus Pada',
++      className: 'font-[var(--font-mono)] text-xs text-[var(--text-dim)]',
++      render: (item) => new Date(item.deleted_at).toLocaleString('id-ID'),
++    },
++    {
++      key: 'deleted_by_name',
++      header: 'Dihapus Oleh',
++      className: 'text-xs text-[var(--text-dim)]',
++      render: (item) => item.deleted_by_name || '-',
++    },
++    {
++      key: 'actions',
++      header: 'Aksi',
++      render: (item) => (
++        <div className="flex gap-1">
++          <Button
++            type="button"
++            variant="outline"
++            size="sm"
++            className="h-7"
++            onClick={() => onRestore(item)}
++            disabled={restorePending}
++            title="Restore"
++          >
++            <RotateCcw size={13} /> Restore
++          </Button>
++          <Button
++            type="button"
++            variant="destructive"
++            size="icon"
++            className="h-7 w-7"
++            onClick={() => onPermanentDelete(item)}
++            disabled={deletePending}
++            title="Hapus Permanen"
++          >
++            <Flame size={13} />
++          </Button>
++        </div>
++      ),
++    },
++  ];
++}
++
++export default buildRecycleBinColumns;
+diff --git a/frontend/src/pages/userManagementColumns.jsx b/frontend/src/pages/userManagementColumns.jsx
+new file mode 100644
+index 0000000..f7908d9
+--- /dev/null
++++ b/frontend/src/pages/userManagementColumns.jsx
+@@ -0,0 +1,191 @@
++// src/pages/userManagementColumns.jsx
++// New (docs/frontend/MIGRATION-PLAN.md Phase 11). Extracted from the three
++// hand-rolled <table>s in UserManagementPage.jsx (PendingApprovalSection,
++// the main "Daftar User" table, RoleManagementSection) - one file since
++// all three are single-page-scoped, no cross-page reuse case (same
++// reasoning as pmLineHistoryColumns.jsx/inventoryHistoryColumns.jsx being
++// co-located in pages/ rather than a domain folder).
++//
++// buildRoleColumns' Permission cell is the most complex render function in
++// the app so far - it closes over expandedRoleId/draftPerms (per-row
++// expand-to-edit state) same as any other column render function closing
++// over page state, nothing new architecturally, just more local state
++// than usual.
++import { Pencil, Trash2 } from 'lucide-react';
++import { Button } from '../components/ui/button';
++import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
++import ToggleSwitch from '../components/ToggleSwitch';
++
++function buildPendingApprovalColumns({ roles, roleSelections, onRoleSelect, onApprove, onReject, approvePending, rejectPending }) {
++  return [
++    { key: 'username', header: 'Username', className: 'font-[var(--font-mono)] text-[13px]', render: (u) => u.username },
++    { key: 'full_name', header: 'Full Name', render: (u) => u.full_name },
++    { key: 'email', header: 'Email', className: 'text-xs text-[var(--text-dim)]', render: (u) => u.email || '-' },
++    {
++      key: 'created_at',
++      header: 'Daftar Sejak',
++      className: 'font-[var(--font-mono)] text-xs text-[var(--text-dim)]',
++      render: (u) => new Date(u.created_at).toLocaleString('id-ID'),
++    },
++    {
++      key: 'role',
++      header: 'Assign Role',
++      render: (u) => (
++        <Select value={roleSelections[u.id] || ''} onValueChange={(v) => onRoleSelect(u.id, v)}>
++          <SelectTrigger className="h-8 w-[160px]">
++            <SelectValue placeholder="Pilih Role" />
++          </SelectTrigger>
++          <SelectContent>
++            {roles.map((r) => (
++              <SelectItem key={r.id} value={String(r.id)}>
++                {r.name}
++              </SelectItem>
++            ))}
++          </SelectContent>
++        </Select>
++      ),
++    },
++    {
++      key: 'actions',
++      header: 'Aksi',
++      render: (u) => (
++        <div className="flex gap-1.5">
++          <Button type="button" size="sm" onClick={() => onApprove(u)} disabled={approvePending}>
++            Approve
++          </Button>
++          <Button type="button" size="sm" variant="outline" onClick={() => onReject(u)} disabled={rejectPending}>
++            Tolak
++          </Button>
++        </div>
++      ),
++    },
++  ];
++}
++
++function buildUserColumns({ currentUser, onEdit, onToggleActive }) {
++  return [
++    {
++      key: 'username',
++      header: 'Username',
++      render: (u) => (
++        <span className="font-[var(--font-mono)] text-[13px]">
++          {u.username} {u.id === currentUser?.id && <span className="text-xs text-muted-foreground">(kamu)</span>}
++        </span>
++      ),
++    },
++    { key: 'full_name', header: 'Full Name', render: (u) => u.full_name },
++    { key: 'email', header: 'Email', className: 'text-xs text-[var(--text-dim)]', render: (u) => u.email || '-' },
++    {
++      key: 'role',
++      header: 'Role',
++      render: (u) => (
++        <>
++          {u.role || '-'}
++          {u.status === 'REJECTED' && <span className="ml-1.5 text-xs text-[var(--danger)]">(Ditolak)</span>}
++        </>
++      ),
++    },
++    {
++      key: 'is_active',
++      header: 'Aktif',
++      // ToggleSwitch diimport langsung di sini (bukan lewat prop runtime -
++      // col.render cuma nerima 1 argumen: row). Komponennya sendiri
++      // SENGAJA gak ikut direskin (lihat komentar asli UserManagementPage.jsx
++      // - shared, juga dipakai SettingsPage.jsx, di luar cakupan ini) -
++      // tapi tetap boleh diimport & dipakai apa adanya di sini.
++      render: (u) => <ToggleSwitch checked={u.is_active} onChange={(next) => onToggleActive(u.id, next)} />,
++    },
++    {
++      key: 'last_login',
++      header: 'Last Login',
++      className: 'font-[var(--font-mono)] text-xs text-[var(--text-dim)]',
++      render: (u) => (u.last_login ? new Date(u.last_login).toLocaleString('id-ID') : '-'),
++    },
++    {
++      key: 'actions',
++      header: 'Aksi',
++      render: (u) => (
++        <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(u)}>
++          <Pencil size={13} />
++        </Button>
++      ),
++    },
++  ];
++}
++
++function buildRoleColumns({
++  permissionCatalog,
++  expandedRoleId,
++  draftPerms,
++  onTogglePerm,
++  onStartEdit,
++  onSavePerms,
++  onDelete,
++  savePending,
++}) {
++  return [
++    {
++      key: 'name',
++      header: 'Nama Role',
++      render: (role) => (
++        <>
++          {role.name} {role.is_system && <span className="text-xs text-muted-foreground">(bawaan)</span>}
++        </>
++      ),
++    },
++    { key: 'user_count', header: 'User', className: 'font-[var(--font-mono)] text-[13px]', render: (role) => role.user_count },
++    {
++      key: 'permissions',
++      header: 'Permission',
++      render: (role) =>
++        expandedRoleId === role.id ? (
++          <div className="flex flex-wrap gap-2">
++            {permissionCatalog.map((p) => (
++              <label key={p.key} className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
++                <input
++                  type="checkbox"
++                  checked={(draftPerms[role.id] || []).includes(p.key)}
++                  onChange={() => onTogglePerm(role.id, p.key)}
++                  className="h-3.5 w-3.5 accent-[var(--accent)]"
++                />
++                {p.label}
++              </label>
++            ))}
++          </div>
++        ) : role.name === 'Admin' ? (
++          <span className="text-xs text-muted-foreground">Semua akses (superuser)</span>
++        ) : (
++          <span className="text-xs text-muted-foreground">
++            {role.permissions.length > 0
++              ? role.permissions.map((k) => permissionCatalog.find((p) => p.key === k)?.label || k).join(', ')
++              : 'Tidak ada akses khusus'}
++          </span>
++        ),
++    },
++    {
++      key: 'actions',
++      header: 'Aksi',
++      render: (role) =>
++        role.name === 'Admin' ? (
++          <span className="text-xs text-muted-foreground">-</span>
++        ) : expandedRoleId === role.id ? (
++          <Button type="button" size="sm" onClick={() => onSavePerms(role)} disabled={savePending}>
++            Simpan
++          </Button>
++        ) : (
++          <div className="flex gap-1">
++            <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onStartEdit(role)}>
++              <Pencil size={13} />
++            </Button>
++            {!role.is_system && (
++              <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(role)}>
++                <Trash2 size={13} />
++              </Button>
++            )}
++          </div>
++        ),
++    },
++  ];
++}
++
++export { buildPendingApprovalColumns, buildUserColumns, buildRoleColumns };

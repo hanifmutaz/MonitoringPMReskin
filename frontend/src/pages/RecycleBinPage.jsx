@@ -8,8 +8,17 @@
 // Restore = reversible penuh (data balik ke tabel aktifnya). Permanent
 // Delete = IRREVERSIBLE, makanya minta confirm dua kali (confirm() biasa +
 // harus ketik ulang label datanya) supaya gak ke-klik gak sengaja.
+//
+// DataTable migration (docs/frontend/MIGRATION-PLAN.md Phase 11): hand-
+// rolled <table> diganti data-display/DataTable dengan `selection` -
+// semua item selectable di sini (gak ada kasus exclude-row kayak
+// UserManagementPage), client-side (semua data Recycle Bin per-entity
+// kebaca sekaligus di memori, sama pola LinesTab/SuppliersTab). Kolom (5)
+// pindah ke recycleBinColumns.jsx. `RecycleBinBulkBar` (custom, BUKAN
+// BulkDeleteBar generik - ada 2 aksi: Restore + Hapus Permanen) TIDAK
+// disentuh, tetap page-level component di atas DataTable.
 import { useState } from 'react';
-import { Trash2, RotateCcw, Flame, X } from 'lucide-react';
+import { Trash2, RotateCcw, Flame, X, Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import {
   useRecycleBinEntities,
@@ -22,6 +31,9 @@ import {
 import { useConfirm } from '../contexts/ConfirmDialogContext';
 import { useRowSelection } from '../hooks/useRowSelection';
 import { cn } from '../lib/utils';
+import buildRecycleBinColumns from './recycleBinColumns';
+import { DataTable } from '../components/data-display/DataTable';
+import { EmptyState } from '../components/ui/empty-state';
 import { Button } from '../components/ui/button';
 
 // Bar aksi massal Recycle Bin - beda dari BulkDeleteBar generik (yang cuma
@@ -142,13 +154,12 @@ function RecycleBinList({ entityKey }) {
 
   if (isLoading) return <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>;
 
-  if (items.length === 0) {
-    return (
-      <div className="py-8 text-center text-sm text-[var(--text-faint)]">
-        Recycle Bin kosong - belum ada data yang dihapus.
-      </div>
-    );
-  }
+  const columns = buildRecycleBinColumns({
+    onRestore: handleRestore,
+    onPermanentDelete: handlePermanentDelete,
+    restorePending: restore.isPending,
+    deletePending: permanentDelete.isPending,
+  });
 
   return (
     <div>
@@ -165,81 +176,13 @@ function RecycleBinList({ entityKey }) {
         deletePending={bulkPermanentDelete.isPending}
       />
 
-      <div className="overflow-hidden rounded-lg border border-border">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="w-[36px] px-3 py-2">
-                  <input
-                    type="checkbox"
-                    checked={selection.allOnPageSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
-                    }}
-                    onChange={selection.toggleAllOnPage}
-                    className="h-3.5 w-3.5 accent-[var(--accent)]"
-                  />
-                </th>
-                {['Data', 'Konteks', 'Dihapus Pada', 'Dihapus Oleh', 'Aksi'].map((h) => (
-                  <th
-                    key={h}
-                    className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                  <td className="px-3 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selection.isSelected(item.id)}
-                      onChange={() => selection.toggle(item.id)}
-                      className="h-3.5 w-3.5 accent-[var(--accent)]"
-                    />
-                  </td>
-                  <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{item.label}</td>
-                  <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{item.context || '-'}</td>
-                  <td className="px-3 py-3 font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
-                    {new Date(item.deleted_at).toLocaleString('id-ID')}
-                  </td>
-                  <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{item.deleted_by_name || '-'}</td>
-                  <td className="px-3 py-3">
-                    <div className="flex gap-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7"
-                        onClick={() => handleRestore(item)}
-                        disabled={restore.isPending}
-                        title="Restore"
-                      >
-                        <RotateCcw size={13} /> Restore
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => handlePermanentDelete(item)}
-                        disabled={permanentDelete.isPending}
-                        title="Hapus Permanen"
-                      >
-                        <Flame size={13} />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={items}
+        getRowKey={(item) => item.id}
+        selection={selection}
+        emptyState={<EmptyState icon={Inbox} title="Recycle Bin kosong - belum ada data yang dihapus" />}
+      />
     </div>
   );
 }

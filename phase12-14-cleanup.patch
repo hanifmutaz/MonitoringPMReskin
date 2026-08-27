@@ -1,0 +1,423 @@
+diff --git a/docs/frontend/MIGRATION-PLAN.md b/docs/frontend/MIGRATION-PLAN.md
+index eef885c..7580259 100644
+--- a/docs/frontend/MIGRATION-PLAN.md
++++ b/docs/frontend/MIGRATION-PLAN.md
+@@ -125,6 +125,10 @@ A repo-wide grep (`className=` tokens, stripped of Tailwind arbitrary-value brac
+ 
+ ## Phase 14 — Remove confirmed dead code
+ - **Scope**: remove `components.css` `.badge-*`/legacy classes only after every call site (including `DashboardPage.badgeClassFor`) is confirmed migrated. Do not remove anything flagged `Unknown` in the audit without a fresh grep at this point in time (call sites may have shifted).
++- **Status (DONE, 26 Aug 2026)**: `badgeClassFor` confirmed gone from `DashboardPage.jsx` entirely (zero repo-wide matches) — that specific named blocker was already resolved, undocumented, sometime during the Phase 6 reskin. A full repo-wide grep of **every single class** defined in `components.css` (not just `.badge-*` — `.brand-*`, `.nav-*`, `.sidebar-*`, `.kpi-*`, `.panel`/`.panel-header`, `.data-table`, `.form-*`, `.btn*`, `.tabs`/`.tab-item`, `.empty-state`/`.error-state`) found exactly 3 live matches, all traced down and closed:
++  - `.panel`/`.empty-state` in `pages/PlaceholderPage.jsx` — this file was already confirmed dead code earlier in this audit (zero imports anywhere, not routed in `App.jsx`) but hadn't actually been deleted yet. **Deleted now.**
++  - `.tabs`/`.tab-item` in `components/SiteSwitcher.jsx` — genuinely live (imported by `DashboardPage`/`DashboardPmLineWeeklyPage`/`DashboardPmPartPage`, all three already Phase-6-reskinned), but this specific child component had itself been missed by that reskin pass, which is why the class still showed as "in use" despite every *page* being clean. **Reskinned to Tailwind now** (`border-b-2 border-b-primary`/`text-primary` for the active tab, matching the color convention already established in `LinesTab.jsx`'s filter pills) — same visual/behavior, zero legacy classes.
++  - With both closed, a full re-scan confirms **zero** live usages of any `components.css` class anywhere in the app. `components.css` itself **deleted**, along with its `import` in `main.jsx`. `tokens.css` (which `components.css` used to `@import` for its own variable access) remains loaded correctly — it's independently `@import`-ed by `global.css`, confirmed unaffected. `npm run build` + full-repo `eslint` clean after removal.
+ 
+ ## Phase 15 — Final consistency audit
+ - **Scope**: re-run the same inspection checklist used for `FRONTEND-AUDIT.md` against the migrated codebase, confirm no `Unknown`s remain that should have been resolved, confirm token/spacing/density consistency across all pages.
+diff --git a/frontend/src/components/SiteSwitcher.jsx b/frontend/src/components/SiteSwitcher.jsx
+index e3d35d9..3c3694d 100644
+--- a/frontend/src/components/SiteSwitcher.jsx
++++ b/frontend/src/components/SiteSwitcher.jsx
+@@ -1,9 +1,18 @@
+ // src/components/SiteSwitcher.jsx
+-// Reuse class .tabs/.tab-item yang udah ada (lihat MasterDataPage.jsx) -
+-// bukan komponen tab baru. Titik warna kecil di tiap tab nunjukin status
+-// koneksi ke site itu (ok/stale/unreachable) - warna sama kayak yang dipake
+-// StatusBadge.jsx (var(--ok)/var(--warn)/var(--danger)), tapi ukurannya
+-// dikecilin karena ini di dalam tab, bukan badge berdiri sendiri.
++// Reskin (docs/frontend/MIGRATION-PLAN.md Phase 14 - ditemukan pas cross-
++// check class CSS lama sebelum hapus components.css, BUKAN sengaja
++// ditunda): file ini kelewat pas Phase 6 reskin Dashboard, padahal
++// dipakai LANGSUNG oleh 3 halaman Dashboard yang udah direskin
++// (DashboardPage/DashboardPmLineWeeklyPage/DashboardPmPartPage) - jadi
++// walau ketiga halaman itu udah bersih dari class lama, komponen anak
++// ini masih pakai `.tabs`/`.tab-item` (components.css), bikin class itu
++// KELIHATAN masih "live" padahal cuma dari satu file yang kelewat.
++// `.tabs`/`.tab-item` diganti Tailwind - visual & behavior identik (garis
++// bawah 2px buat tab aktif, warna primary/text-dim sama kayak
++// LinesTab.jsx punya filter pill). Titik warna status (ok/stale/
++// unreachable) TIDAK berubah.
++import { cn } from '../lib/utils';
++
+ const DOT_COLOR = {
+   ok: 'var(--ok)',
+   stale: 'var(--warn)',
+@@ -16,23 +25,22 @@ function SiteSwitcher({ sites, selectedSiteId, onChange }) {
+   if (!sites || sites.length <= 1) return null;
+ 
+   return (
+-    <div className="tabs">
++    <div className="mb-5 flex gap-1 border-b border-border">
+       {sites.map((site) => (
+         <button
+           key={site.site_id}
+           type="button"
+-          className={`tab-item${selectedSiteId === site.site_id ? ' active' : ''}`}
+           onClick={() => onChange(site.site_id)}
++          className={cn(
++            'flex cursor-pointer items-center border-x-0 border-t-0 border-b-2 bg-transparent px-4 py-2.5 text-[13px] font-medium transition-colors',
++            selectedSiteId === site.site_id
++              ? 'border-b-primary text-primary'
++              : 'border-b-transparent text-[var(--text-dim)] hover:text-foreground'
++          )}
+         >
+           <span
+-            style={{
+-              display: 'inline-block',
+-              width: 6,
+-              height: 6,
+-              borderRadius: '50%',
+-              background: DOT_COLOR[site.status] || 'var(--text-faint)',
+-              marginRight: 6,
+-            }}
++            className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full"
++            style={{ background: DOT_COLOR[site.status] || 'var(--text-faint)' }}
+           />
+           {site.site_label}
+         </button>
+diff --git a/frontend/src/main.jsx b/frontend/src/main.jsx
+index b219eb8..9ebae57 100644
+--- a/frontend/src/main.jsx
++++ b/frontend/src/main.jsx
+@@ -8,7 +8,6 @@ import { AuthProvider } from './contexts/AuthContext';
+ import { ConfirmDialogProvider } from './contexts/ConfirmDialogContext';
+ import { queryClient } from './api/queryClient';
+ import './styles/global.css';
+-import './styles/components.css';
+ import './styles/tailwind.css';
+ 
+ ReactDOM.createRoot(document.getElementById('root')).render(
+diff --git a/frontend/src/pages/PlaceholderPage.jsx b/frontend/src/pages/PlaceholderPage.jsx
+deleted file mode 100644
+index f130a6e..0000000
+--- a/frontend/src/pages/PlaceholderPage.jsx
++++ /dev/null
+@@ -1,13 +0,0 @@
+-// src/pages/PlaceholderPage.jsx
+-import { usePageHeader } from '../contexts/PageHeaderContext';
+-
+-function PlaceholderPage({ title }) {
+-  usePageHeader({ title });
+-  return (
+-    <div className="panel empty-state">
+-      Halaman <strong>{title}</strong> akan dibangun di fase berikutnya.
+-    </div>
+-  );
+-}
+-
+-export default PlaceholderPage;
+diff --git a/frontend/src/styles/components.css b/frontend/src/styles/components.css
+deleted file mode 100644
+index e8275bf..0000000
+--- a/frontend/src/styles/components.css
++++ /dev/null
+@@ -1,310 +0,0 @@
+-/* src/styles/components.css */
+-@import './tokens.css';
+-
+-/* ============== 4.2 Badge Status ============== */
+-.badge {
+-  display: inline-flex;
+-  align-items: center;
+-  gap: var(--space-1);
+-  padding: 3px 10px;
+-  border-radius: 999px;
+-  font-family: var(--font-mono);
+-  font-size: 12px;
+-}
+-.badge .dot {
+-  width: 6px;
+-  height: 6px;
+-  border-radius: 50%;
+-}
+-.badge-ok {
+-  background: var(--ok-dim);
+-  color: var(--ok);
+-}
+-.badge-ok .dot {
+-  background: var(--ok);
+-}
+-.badge-warning {
+-  background: var(--warn-dim);
+-  color: var(--warn);
+-}
+-.badge-warning .dot {
+-  background: var(--warn);
+-}
+-.badge-danger {
+-  background: var(--danger-dim);
+-  color: var(--danger);
+-}
+-.badge-danger .dot {
+-  background: var(--danger);
+-}
+-.badge-muted {
+-  background: var(--panel-3);
+-  color: var(--text-faint);
+-}
+-.badge-muted .dot {
+-  background: var(--text-faint);
+-}
+-
+-/* ============== Sidebar (3.1 / 3.2) ============== */
+-.brand-mark-row {
+-  display: flex;
+-  align-items: center;
+-  gap: var(--space-3);
+-  padding: var(--space-5) var(--space-4);
+-  border-bottom: 1px solid var(--border);
+-}
+-.brand-mark {
+-  width: 32px;
+-  height: 32px;
+-  border-radius: var(--radius-sm);
+-  background: var(--accent-dim);
+-  color: var(--accent);
+-  display: flex;
+-  align-items: center;
+-  justify-content: center;
+-  font-family: var(--font-display);
+-  font-weight: 600;
+-  flex-shrink: 0;
+-}
+-.brand-text-title {
+-  font-family: var(--font-display);
+-  font-weight: 600;
+-  font-size: 14px;
+-  line-height: 1.2;
+-}
+-.brand-text-sub {
+-  color: var(--text-faint);
+-  font-size: 11px;
+-}
+-
+-.nav-scroll {
+-  flex: 1;
+-  overflow-y: auto;
+-  padding: var(--space-4) var(--space-2);
+-}
+-.nav-group-label {
+-  padding: var(--space-2) var(--space-3);
+-  font-size: 11px;
+-  text-transform: uppercase;
+-  letter-spacing: 0.5px;
+-  color: var(--text-faint);
+-  margin-top: var(--space-3);
+-}
+-.nav-item {
+-  display: flex;
+-  align-items: center;
+-  justify-content: space-between;
+-  gap: var(--space-2);
+-  padding: var(--space-2) var(--space-3);
+-  border-radius: var(--radius-sm);
+-  font-size: 13px;
+-  color: var(--text-dim);
+-  text-decoration: none;
+-  cursor: pointer;
+-}
+-.nav-item:hover {
+-  background: var(--panel-2);
+-  color: var(--text);
+-}
+-.nav-item.active {
+-  background: var(--accent-dim);
+-  color: var(--accent);
+-}
+-.nav-item-badge {
+-  background: var(--danger);
+-  color: #fff;
+-  font-size: 10px;
+-  font-family: var(--font-mono);
+-  border-radius: 999px;
+-  padding: 1px 6px;
+-  line-height: 1.5;
+-}
+-
+-.sidebar-user {
+-  padding: var(--space-4);
+-  border-top: 1px solid var(--border);
+-}
+-.sidebar-user-name {
+-  font-size: 13px;
+-  font-weight: 500;
+-}
+-.sidebar-user-role {
+-  font-size: 11px;
+-  color: var(--text-faint);
+-}
+-.sidebar-logout-btn {
+-  margin-top: var(--space-2);
+-  width: 100%;
+-  background: transparent;
+-  border: 1px solid var(--border);
+-  color: var(--text-dim);
+-  border-radius: var(--radius-sm);
+-  padding: 6px var(--space-2);
+-  font-size: 12px;
+-  cursor: pointer;
+-}
+-.sidebar-logout-btn:hover {
+-  background: var(--panel-2);
+-  color: var(--text);
+-}
+-
+-/* ============== KPI Card (4.1) ============== */
+-.kpi-grid {
+-  display: grid;
+-  grid-template-columns: repeat(4, 1fr);
+-  gap: var(--space-4);
+-}
+-@media (max-width: 1000px) {
+-  .kpi-grid {
+-    grid-template-columns: repeat(2, 1fr);
+-  }
+-}
+-.kpi-card {
+-  background: var(--panel);
+-  border: 1px solid var(--border);
+-  border-radius: var(--radius);
+-  padding: var(--space-4-5);
+-}
+-.kpi-icon {
+-  width: 34px;
+-  height: 34px;
+-  border-radius: var(--radius-sm);
+-  display: flex;
+-  align-items: center;
+-  justify-content: center;
+-  margin-bottom: var(--space-3);
+-}
+-.kpi-label {
+-  font-family: var(--font-mono);
+-  font-size: 11px;
+-  text-transform: uppercase;
+-  letter-spacing: 0.5px;
+-  color: var(--text-faint);
+-  margin-bottom: var(--space-1);
+-}
+-.kpi-caption {
+-  font-size: 12px;
+-  color: var(--text-dim);
+-  margin-top: var(--space-1);
+-}
+-
+-/* ============== Panel generik ============== */
+-.panel {
+-  background: var(--panel);
+-  border: 1px solid var(--border);
+-  border-radius: var(--radius);
+-  padding: var(--space-4-5);
+-}
+-.panel-header {
+-  display: flex;
+-  align-items: center;
+-  justify-content: space-between;
+-  margin-bottom: var(--space-4);
+-}
+-
+-/* ============== Tabel (4.7) ============== */
+-table.data-table {
+-  width: 100%;
+-  border-collapse: collapse;
+-}
+-.data-table th {
+-  text-align: left;
+-  padding: var(--space-2) var(--space-3);
+-  border-bottom: 1px solid var(--border);
+-  font-family: var(--font-mono);
+-  font-size: 11px;
+-  text-transform: uppercase;
+-  letter-spacing: 0.5px;
+-  color: var(--text-faint);
+-}
+-.data-table td {
+-  padding: var(--space-3);
+-  border-bottom: 1px solid var(--border-soft);
+-  font-size: 13px;
+-}
+-.data-table tbody tr:hover {
+-  background: var(--panel-2);
+-}
+-.data-table td.mono,
+-.data-table th.mono {
+-  font-family: var(--font-mono);
+-}
+-
+-/* ============== Form (4.9) ============== */
+-.form-input,
+-.form-select {
+-  background: var(--panel-3);
+-  border: 1px solid var(--border);
+-  border-radius: var(--radius-sm);
+-  color: var(--text);
+-  padding: 8px 10px;
+-  font-size: 13px;
+-}
+-.form-label {
+-  font-size: 12px;
+-  color: var(--text-dim);
+-  margin-bottom: var(--space-1);
+-  display: block;
+-}
+-.btn {
+-  border-radius: var(--radius-sm);
+-  padding: 8px 16px;
+-  font-size: 13px;
+-  font-weight: 500;
+-  cursor: pointer;
+-  border: 1px solid transparent;
+-}
+-.btn-primary {
+-  background: var(--accent);
+-  color: #fff;
+-}
+-.btn-primary:hover {
+-  opacity: 0.9;
+-}
+-.btn-secondary {
+-  background: transparent;
+-  border-color: var(--border);
+-  color: var(--text-dim);
+-}
+-.btn-secondary:hover {
+-  background: var(--panel-2);
+-  color: var(--text);
+-}
+-
+-/* ============== Tabs ============== */
+-.tabs {
+-  display: flex;
+-  gap: 4px;
+-  border-bottom: 1px solid var(--border);
+-  margin-bottom: 20px;
+-}
+-.tab-item {
+-  padding: 10px 16px;
+-  font-size: 13px;
+-  font-weight: 500;
+-  color: var(--text-dim);
+-  cursor: pointer;
+-  border-bottom: 2px solid transparent;
+-  background: none;
+-  border-top: none;
+-  border-left: none;
+-  border-right: none;
+-}
+-.tab-item.active {
+-  color: var(--accent);
+-  border-bottom-color: var(--accent);
+-}
+-.tab-item:hover:not(.active) {
+-  color: var(--text);
+-}
+-.empty-state,
+-.error-state {
+-  text-align: center;
+-  padding: var(--space-5) var(--space-4);
+-  color: var(--text-faint);
+-}
+-.error-state {
+-  color: var(--danger);
+-  background: var(--danger-dim);
+-  border-radius: var(--radius);
+-}

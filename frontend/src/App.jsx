@@ -32,6 +32,7 @@ const InventoryHistoryPage = lazy(() => import('./pages/InventoryHistoryPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const UserManagementPage = lazy(() => import('./pages/UserManagementPage'));
 const RecycleBinPage = lazy(() => import('./pages/RecycleBinPage'));
+const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
@@ -87,6 +88,7 @@ function App() {
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/users" element={<UserManagementPage />} />
               <Route path="/recycle-bin" element={<RecycleBinPage />} />
+              <Route path="/audit-log" element={<AuditLogPage />} />
             </Route>
           </Route>
         </Route>

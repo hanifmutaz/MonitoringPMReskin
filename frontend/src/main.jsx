@@ -8,7 +8,6 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ConfirmDialogProvider } from './contexts/ConfirmDialogContext';
 import { queryClient } from './api/queryClient';
 import './styles/global.css';
-import './styles/components.css';
 import './styles/tailwind.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(

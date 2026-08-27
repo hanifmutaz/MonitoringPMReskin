@@ -132,6 +132,7 @@ const NAV_GROUPS = [
       { to: '/settings', label: 'Settings' },
       { to: '/users', label: 'User Management' },
       { to: '/recycle-bin', label: 'Recycle Bin' },
+      { to: '/audit-log', label: 'Audit Log' },
     ],
   },
 ];

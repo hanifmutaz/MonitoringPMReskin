@@ -8,6 +8,20 @@
 // cuma halaman ini) - dipakai `selectIds()` di bawah buat nambahin id dari
 // halaman lain yang belum sempat di-render (lihat handleSelectAllMatching
 // di PartsTab.jsx/InventoryTab.jsx).
+//
+// isSelectable(id) (docs/frontend/MIGRATION-PLAN.md Phase 11): dipakai
+// DataTable buat nentuin row mana yang checkbox-nya di-render sama sekali
+// vs sengaja dikosongin - kasus asli: UserManagementPage TIDAK pernah
+// nampilin checkbox di baris user yang lagi login sendiri (proteksi biar
+// gak bisa keceklis+bulk-delete akun sendiri). Sebelum ini di-tambahin,
+// perlindungan itu cuma bergantung pada `pageIds`/`selectableIds` yang
+// DIKIRIM caller SUDAH exclude id itu dari awal (lihat UserManagementPage
+// - `selectableIds` exclude `currentUser.id`) - tapi `toggle(id)` sendiri
+// TIDAK PERNAH validasi id-nya terhadap `pageIds`, jadi kalau checkbox
+// buat row itu somehow ke-render (mis. lewat DataTable yang render
+// checkbox utk SEMUA row tanpa kecuali), user bisa toggle ID yang
+// sebetulnya "gak boleh diceklis". `isSelectable` menutup celah itu di titik
+// render, bukan cuma titik pengiriman prop.
 import { useMemo, useState } from 'react';
 
 export function useRowSelection(pageIds = []) {
@@ -52,11 +66,17 @@ export function useRowSelection(pageIds = []) {
   }
 
   const selectedIds = useMemo(() => Array.from(selected), [selected]);
+  const pageIdSet = useMemo(() => new Set(pageIds), [pageIds]);
 
   return {
     selectedIds,
     selectedCount: selectedIds.length,
     isSelected: (id) => selected.has(id),
+    // Default TRUE kalau pageIds kosong (tabel tanpa universe eksplisit,
+    // mis. konsumen lama yang belum butuh exclude-row) - biar gak ada
+    // perubahan perilaku buat konsumen existing yang gak punya kasus
+    // "sebagian row gak boleh diceklis".
+    isSelectable: (id) => pageIds.length === 0 || pageIdSet.has(id),
     toggle,
     toggleAllOnPage,
     selectIds,
