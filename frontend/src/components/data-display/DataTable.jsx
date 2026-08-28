@@ -38,6 +38,20 @@
 // delete) - `useRowSelection` now exposes `isSelectable` for exactly this.
 // Falls back to "always selectable" if `isSelectable` is absent, so this
 // is non-breaking for any selection object shaped before Phase 11.
+//
+// getRowLabel (added Phase 13, static a11y review): both selection
+// checkboxes were bare `<input type="checkbox">` with NO accessible name
+// at all - a screen reader would announce "checkbox, not checked" with
+// zero context on every one of the ~8 tables using `selection`
+// (LinesTab/PartsTab/SuppliersTab/InventoryTab/PmLineHistoryPage/
+// UserManagementPage×2/RecycleBinPage). Fixed with `aria-label` on both
+// checkboxes - header gets a static label, each row gets
+// `getRowLabel(row)` if the caller provides it (e.g. "Line-3",
+// "user@example.com"), or falls back to the row's key (still an
+// accessible name, just less descriptive) if the caller hasn't been
+// updated yet - so this fix applies to every existing consumer with zero
+// required call-site changes, and callers can opt into a better label
+// later without needing to.
 import { AlertTriangle, Inbox, SearchX } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Skeleton } from '../ui/skeleton';
@@ -59,6 +73,7 @@ function DataTable({
   onPageChange,
   skeletonRows = 5,
   selection,
+  getRowLabel,
   className,
 }) {
   const hasRows = Array.isArray(rows) && rows.length > 0;
@@ -100,6 +115,7 @@ function DataTable({
                             if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
                           }}
                           onChange={selection.toggleAllOnPage}
+                          aria-label="Pilih semua baris di halaman ini"
                           className="h-3.5 w-3.5 accent-[var(--accent)]"
                         />
                       </th>
@@ -129,6 +145,7 @@ function DataTable({
                                 type="checkbox"
                                 checked={selection.isSelected(rowKey)}
                                 onChange={() => selection.toggle(rowKey)}
+                                aria-label={`Pilih ${getRowLabel ? getRowLabel(row) : rowKey}`}
                                 className="h-3.5 w-3.5 accent-[var(--accent)]"
                               />
                             )}

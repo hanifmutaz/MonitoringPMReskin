@@ -25,7 +25,15 @@ Re-examined the two existing persistent-`Banner`-instead-of-toast cases (`PmPart
 
 *(none remaining — see Resolved above)*
 
-## Assumptions to validate
+## `--text-faint` contrast (Phase 13 finding, 26 Aug 2026 — still open, same class of decision as Design Tokens Set A/B)
+
+Computed actual WCAG contrast ratios (relative-luminance formula) for `tokens.css` color pairs against `--bg`, as part of Phase 13's static accessibility review. `--text-faint` (`#5c6675`) on `--bg` (`#0d1117`) measures **3.26:1** — fails WCAG AA for normal-size text (4.5:1 required), only clears the bar for 18px+/14px-bold "large text." This token is used at `text-[11px]`, no bold weight, in **17 files** — `DataTable.jsx`'s column headers (every migrated table in the app), `KpiCard.jsx` captions, and most panels' small secondary labels — none of which qualify as large text, so this is a real, systemic failure, not a false positive from eyeballing. Also checked `--text-faint` on `--panel-3` (used for count badges inside inactive filter pills, e.g. `LinesTab.jsx`): **2.49:1**, fails even the large-text threshold.
+
+**Recommended fix**: swap the "small uppercase label" usage pattern from `--text-faint` to `--text-dim` (`#8d97a6`, **6.41:1** against `--bg` — comfortably passes AA). Not applied yet — this changes visual hierarchy (every table header, every KPI caption becomes visibly less faint) across the entire app in one sweep, so it needs the same kind of explicit confirmation the Design Tokens Set A/B decision got, not a unilateral 17-file edit.
+
+## Phase 13 blocker: live browser testing unavailable in this environment
+
+Attempted Playwright-based viewport screenshots + `axe-core` accessibility scans (the only way to verify actual rendered behavior, not just static markup). Blocked at the sandbox's network level: the egress allowlist doesn't include any browser-binary CDN (`cdn.playwright.dev` explicitly rejected: *"Host not in allowlist"*), and no system browser is installable either (`chromium-browser` via `apt` is a transitional snap package, unusable here). This is an environment constraint, not a scope decision — closing Phase 13 properly requires running this review somewhere with real browser access (a dev machine, CI runner, or a sandbox with a broader egress allowlist).
 
 9. ~~Assumed `PmPartFormPage`/`PmLineFormPage` role restrictions match their parent monitoring pages~~ **Confirmed (24 Aug 2026)**: both routes (`/pm-part/form`, `/pm-line/form`, `App.jsx` lines 52/56) sit in the same route group as their parent monitoring pages, above the `<Route element={<ProtectedRoute allowedRoles={['Admin']} />}>` wrapper that starts at line 86. Consistent, not a gap.
 10. Assumed the existing four-Context state architecture (Auth/ConfirmDialog/PageHeader/Sidebar) is sufficient for all new shared UI state (e.g. a future Toast queue) rather than needing a new state library — based on the small, well-scoped nature of current contexts, not an exhaustive review of context complexity. *(Judgment call, not fact-checkable via grep — left open.)*
