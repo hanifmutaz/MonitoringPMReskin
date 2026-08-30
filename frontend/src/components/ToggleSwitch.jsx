@@ -1,10 +1,19 @@
 // src/components/ToggleSwitch.jsx
-function ToggleSwitch({ checked, onChange, disabled }) {
+//
+// aria-label (Phase 15, static a11y review): custom switch already had
+// proper role="switch"/aria-checked, but no accessible name at all - a
+// screen reader would announce "switch, on/off" with zero context. `label`
+// is optional (falls back to undefined -> no aria-label rendered, same as
+// before) so this doesn't force every call site to change at once, but
+// both real call sites (UserManagementPage's per-row Aktif toggle,
+// SettingsPage's per-setting toggles) have been updated to pass one.
+function ToggleSwitch({ checked, onChange, disabled, label }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
       style={{

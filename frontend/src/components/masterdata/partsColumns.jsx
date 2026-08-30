@@ -97,10 +97,10 @@ function buildPartsColumns({ onClMapping, onSupplier, onEdit, onDelete }) {
           >
             <Truck size={13} />
           </Button>
-          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(part)}>
+          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(part)} aria-label={`Edit ${part.drawing_no}`}>
             <Pencil size={13} />
           </Button>
-          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(part)}>
+          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(part)} aria-label={`Hapus ${part.drawing_no}`}>
             <Trash2 size={13} />
           </Button>
         </div>

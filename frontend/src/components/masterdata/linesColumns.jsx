@@ -46,10 +46,10 @@ function buildLinesColumns({ onToggleActive, onEdit, onDelete }) {
       header: 'Aksi',
       render: (line) => (
         <div className="flex gap-1">
-          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(line)}>
+          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(line)} aria-label={`Edit ${line.line_name}`}>
             <Pencil size={13} />
           </Button>
-          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(line)}>
+          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(line)} aria-label={`Hapus ${line.line_name}`}>
             <Trash2 size={13} />
           </Button>
         </div>

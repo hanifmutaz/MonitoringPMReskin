@@ -42,7 +42,7 @@ function buildClMappingColumns({ onRemove }) {
       key: 'actions',
       header: '',
       render: (m) => (
-        <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onRemove(m.id)}>
+        <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onRemove(m.id)} aria-label={`Hapus mapping CL ${m.cl_no}`}>
           <Trash2 size={12} />
         </Button>
       ),
@@ -122,7 +122,7 @@ function ClMappingModal({ part, onClose }) {
           <Label className="mb-1.5">Jig</Label>
           <Input value={form.jig_name} onChange={(e) => setForm({ ...form, jig_name: e.target.value })} />
         </div>
-        <Button type="submit" size="icon" disabled={create.isPending}>
+        <Button type="submit" size="icon" disabled={create.isPending} aria-label="Tambah mapping">
           <Plus size={14} />
         </Button>
       </form>

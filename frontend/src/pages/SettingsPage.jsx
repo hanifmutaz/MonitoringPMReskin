@@ -113,6 +113,7 @@ function SettingRow({ setting }) {
           <ToggleSwitch
             checked={localValue === 'true' || localValue === true}
             disabled={updateMutation.isPending}
+            label={SETTING_LABELS[setting.key] || setting.key}
             onChange={(next) => {
               setLocalValue(next);
               save(next);

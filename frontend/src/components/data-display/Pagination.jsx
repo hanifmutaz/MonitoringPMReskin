@@ -6,6 +6,14 @@
 // reskin and stay unchanged here too, only the file's location and import
 // depth (../lib/utils -> ../../lib/utils) change. components/Pagination.jsx
 // now re-exports this file so its 4 existing call sites keep working.
+//
+// aria-label on Prev/Next (Phase 15, resolves FRONTEND-AUDIT.md's explicit
+// `Unknown`: "Icon-only buttons... e.g. pagination chevrons in
+// Pagination.jsx - screen-reader labelling is Unknown"). Confirmed absent
+// on direct read, now fixed - the two ChevronLeft/ChevronRight buttons had
+// no text content and no aria-label at all. Numbered page buttons (`{p}`)
+// are untouched - their visible page number IS their accessible name
+// already, nothing to fix there.
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -25,7 +33,7 @@ function Pagination({ page, limit, total, onPageChange }) {
         Menampilkan {start}–{end} dari {total} entri
       </span>
       <div className="flex gap-1">
-        <PageButton disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
+        <PageButton disabled={page <= 1} onClick={() => onPageChange(page - 1)} label="Halaman sebelumnya">
           <ChevronLeft size={14} />
         </PageButton>
         {pages.map((p) => (
@@ -33,7 +41,7 @@ function Pagination({ page, limit, total, onPageChange }) {
             {p}
           </PageButton>
         ))}
-        <PageButton disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
+        <PageButton disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} label="Halaman berikutnya">
           <ChevronRight size={14} />
         </PageButton>
       </div>
@@ -41,12 +49,13 @@ function Pagination({ page, limit, total, onPageChange }) {
   );
 }
 
-function PageButton({ children, active, disabled, onClick }) {
+function PageButton({ children, active, disabled, onClick, label }) {
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
+      aria-label={label}
       className={cn(
         'flex h-[26px] w-[26px] items-center justify-center rounded-md border font-[var(--font-mono)] text-xs transition-colors',
         // Cursor dipisah dari logic warna/border di bawah (bukan digabung

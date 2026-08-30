@@ -51,10 +51,10 @@ function buildSuppliersColumns({ onEdit, onDelete, onToggleActive }) {
       header: 'Aksi',
       render: (s) => (
         <div className="flex gap-1">
-          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(s)}>
+          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(s)} aria-label={`Edit ${s.supplier_name}`}>
             <Pencil size={13} />
           </Button>
-          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(s)}>
+          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(s)} aria-label={`Hapus ${s.supplier_name}`}>
             <Trash2 size={13} />
           </Button>
         </div>

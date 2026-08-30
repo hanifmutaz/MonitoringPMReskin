@@ -93,7 +93,9 @@ function buildUserColumns({ currentUser, onEdit, onToggleActive }) {
       // SENGAJA gak ikut direskin (lihat komentar asli UserManagementPage.jsx
       // - shared, juga dipakai SettingsPage.jsx, di luar cakupan ini) -
       // tapi tetap boleh diimport & dipakai apa adanya di sini.
-      render: (u) => <ToggleSwitch checked={u.is_active} onChange={(next) => onToggleActive(u.id, next)} />,
+      render: (u) => (
+        <ToggleSwitch checked={u.is_active} onChange={(next) => onToggleActive(u.id, next)} label={`${u.is_active ? 'Nonaktifkan' : 'Aktifkan'} ${u.username}`} />
+      ),
     },
     {
       key: 'last_login',
@@ -105,7 +107,7 @@ function buildUserColumns({ currentUser, onEdit, onToggleActive }) {
       key: 'actions',
       header: 'Aksi',
       render: (u) => (
-        <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(u)}>
+        <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(u)} aria-label={`Edit ${u.username}`}>
           <Pencil size={13} />
         </Button>
       ),
@@ -174,11 +176,11 @@ function buildRoleColumns({
           </Button>
         ) : (
           <div className="flex gap-1">
-            <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onStartEdit(role)}>
+            <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onStartEdit(role)} aria-label={`Edit permission ${role.name}`}>
               <Pencil size={13} />
             </Button>
             {!role.is_system && (
-              <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(role)}>
+              <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(role)} aria-label={`Hapus role ${role.name}`}>
                 <Trash2 size={13} />
               </Button>
             )}

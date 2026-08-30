@@ -87,7 +87,7 @@ function buildPartSupplierColumns({ onTogglePrimary, onRemove, setPrimaryPending
       key: 'actions',
       header: '',
       render: (l) => (
-        <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onRemove(l.id)}>
+        <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onRemove(l.id)} aria-label={`Lepas Supplier ${l.supplier_name}`}>
           <Trash2 size={12} />
         </Button>
       ),
@@ -213,7 +213,7 @@ function PartSupplierModal({ part, onClose }) {
             placeholder="mis. lead time 2 minggu"
           />
         </div>
-        <Button type="submit" size="icon" disabled={create.isPending || !form.supplier_id}>
+        <Button type="submit" size="icon" disabled={create.isPending || !form.supplier_id} aria-label="Tambah Supplier">
           <Plus size={14} />
         </Button>
       </form>

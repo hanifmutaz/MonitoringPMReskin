@@ -75,10 +75,10 @@ function buildInventoryColumns({ ropById, onDetail, onEdit, onDelete }) {
           <Button type="button" variant="outline" size="icon" className="h-7 w-7" title="Detail & Mutasi Stok" onClick={() => onDetail(item)}>
             <History size={13} />
           </Button>
-          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(item)}>
+          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(item)} aria-label={`Edit ${item.part_name}`}>
             <Pencil size={13} />
           </Button>
-          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(item)}>
+          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(item)} aria-label={`Hapus ${item.part_name}`}>
             <Trash2 size={13} />
           </Button>
         </div>
