@@ -11,7 +11,7 @@ function PageSizeSelector({ value, onChange, options = DEFAULT_OPTIONS }) {
     <div className="flex items-center gap-2">
       <span className="whitespace-nowrap text-xs text-[var(--text-faint)]">Tampilkan</span>
       <Select value={String(value)} onValueChange={(v) => onChange(Number(v))}>
-        <SelectTrigger className="h-8 w-[76px]">
+        <SelectTrigger className="h-8 w-[76px]" aria-label="Jumlah baris per halaman">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

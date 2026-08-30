@@ -134,7 +134,7 @@ function PmPartMonitoringPage() {
         <SearchBar value={search} onChange={handleFilterChange(setSearch)} placeholder="Cari drawing no / nama part..." />
 
         <Select value={lineId} onValueChange={handleFilterChange(setLineId)}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[180px]" aria-label="Filter berdasarkan Line">
             <SelectValue placeholder="Semua Line" />
           </SelectTrigger>
           <SelectContent>

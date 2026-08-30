@@ -32,7 +32,7 @@ function buildPendingApprovalColumns({ roles, roleSelections, onRoleSelect, onAp
       header: 'Assign Role',
       render: (u) => (
         <Select value={roleSelections[u.id] || ''} onValueChange={(v) => onRoleSelect(u.id, v)}>
-          <SelectTrigger className="h-8 w-[160px]">
+          <SelectTrigger className="h-8 w-[160px]" aria-label={`Assign role untuk ${u.username}`}>
             <SelectValue placeholder="Pilih Role" />
           </SelectTrigger>
           <SelectContent>

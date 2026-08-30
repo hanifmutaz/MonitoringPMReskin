@@ -281,7 +281,7 @@ function SuppliersTab() {
         <div className="flex flex-wrap items-center gap-2">
           <SearchBar value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Cari nama Supplier..." />
           <Select value={sort} onValueChange={setSort}>
-            <SelectTrigger className="h-9 w-[190px]">
+            <SelectTrigger className="h-9 w-[190px]" aria-label="Urutkan Supplier">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

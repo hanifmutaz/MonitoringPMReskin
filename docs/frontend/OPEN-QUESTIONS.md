@@ -25,11 +25,17 @@ Re-examined the two existing persistent-`Banner`-instead-of-toast cases (`PmPart
 
 *(none remaining — see Resolved above)*
 
-## `--text-faint` contrast (Phase 13 finding, 26 Aug 2026 — still open, same class of decision as Design Tokens Set A/B)
+## `--text-faint` contrast (Phase 13 finding, 26 Aug 2026 — CONFIRMED via real browser 30 Aug 2026, still open, same class of decision as Design Tokens Set A/B)
 
 Computed actual WCAG contrast ratios (relative-luminance formula) for `tokens.css` color pairs against `--bg`, as part of Phase 13's static accessibility review. `--text-faint` (`#5c6675`) on `--bg` (`#0d1117`) measures **3.26:1** — fails WCAG AA for normal-size text (4.5:1 required), only clears the bar for 18px+/14px-bold "large text." This token is used at `text-[11px]`, no bold weight, in **17 files** — `DataTable.jsx`'s column headers (every migrated table in the app), `KpiCard.jsx` captions, and most panels' small secondary labels — none of which qualify as large text, so this is a real, systemic failure, not a false positive from eyeballing. Also checked `--text-faint` on `--panel-3` (used for count badges inside inactive filter pills, e.g. `LinesTab.jsx`): **2.49:1**, fails even the large-text threshold.
 
-**Recommended fix**: swap the "small uppercase label" usage pattern from `--text-faint` to `--text-dim` (`#8d97a6`, **6.41:1** against `--bg` — comfortably passes AA). Not applied yet — this changes visual hierarchy (every table header, every KPI caption becomes visibly less faint) across the entire app in one sweep, so it needs the same kind of explicit confirmation the Design Tokens Set A/B decision got, not a unilateral 17-file edit.
+**Now empirically confirmed** by running `axe-core` against the live app (Playwright, real Chromium, 30 Aug 2026) — this is no longer just token-math, it's measured against actual rendered/computed styles in a real browser. Concrete flagged elements: `Sidebar.jsx`'s site label ("Hirose Internal", 2.97:1 against the sidebar's `#151b23` background) and username caption ("Admin", 2.97:1), and `FooterStatusBar`'s sync-status text and copyright text (3.25:1 against page `#0d1117` background). Both real backgrounds tested (`#151b23` sidebar, `#0d1117` page body) fail AA regardless of which specific background `--text-faint` sits on — this isn't a one-background edge case.
+
+**Recommended fix**: swap the "small uppercase label" usage pattern from `--text-faint` to `--text-dim` (`#8d97a6`, **6.41:1** against `--bg` — comfortably passes AA). Not applied yet — this changes visual hierarchy (every table header, every KPI caption, sidebar labels, footer text becomes visibly less faint) across the entire app in one sweep, so it needs the same kind of explicit confirmation the Design Tokens Set A/B decision got, not a unilateral repo-wide edit.
+
+## Dashboard horizontal overflow at mobile-375 (Phase 13 finding, confirmed via real browser 30 Aug 2026 — open, needs design/layout decision)
+
+Playwright test (`body.scrollWidth` check) confirmed `DashboardPage` at 375px viewport has `document.body.scrollWidth` = 398px > 375px viewport — a genuine horizontal overflow, not just a hypothesis from the earlier static "sparse breakpoint adoption" finding. Something on the Dashboard is 23px+ wider than the mobile viewport allows, forcing horizontal scroll on the whole page (not just inside an intentional `overflow-x-auto` wrapper like `DataTable`'s). Not yet identified which specific element causes it or fixed — needs visual inspection of the saved screenshot (`test-results/dashboard-*-mobile-375.png`) to pinpoint the culprit (likely a fixed-width KPI card row or a Gantt/donut chart component that doesn't shrink below a minimum width), then a layout decision on whether to make Dashboard's mobile view use fewer columns / a scrollable inner region instead of overflowing the whole page.
 
 ## Phase 13 blocker: live browser testing unavailable in this environment
 

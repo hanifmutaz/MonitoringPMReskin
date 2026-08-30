@@ -96,7 +96,7 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm }) {
         <div>
           <Label className="mb-1.5">Line</Label>
           <Select value={form.line_id} onValueChange={(v) => update('line_id', v)} disabled={isPrefilled}>
-            <SelectTrigger>
+            <SelectTrigger aria-label="Pilih Line">
               <SelectValue placeholder="Pilih Line" />
             </SelectTrigger>
             <SelectContent>
@@ -113,7 +113,7 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm }) {
         <div>
           <Label className="mb-1.5">Jenis PM</Label>
           <Select value={form.jenis_pm} onValueChange={(v) => update('jenis_pm', v)} disabled={isPrefilled}>
-            <SelectTrigger>
+            <SelectTrigger aria-label="Pilih Jenis PM">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

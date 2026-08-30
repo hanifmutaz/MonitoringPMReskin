@@ -97,8 +97,7 @@ function AuditLogPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Semua Tabel" />
+          <SelectTrigger className="w-[200px]" aria-label="Filter berdasarkan Tabel">
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Semua Tabel</SelectItem>
@@ -117,7 +116,7 @@ function AuditLogPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-[200px]" aria-label="Filter berdasarkan User">
             <SelectValue placeholder="Semua User" />
           </SelectTrigger>
           <SelectContent>

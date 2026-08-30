@@ -124,7 +124,7 @@ function UserFormModal({ initial, onClose }) {
           <div>
             <Label className="mb-1.5">Role</Label>
             <Select value={form.role_id} onValueChange={(v) => setForm({ ...form, role_id: v })}>
-              <SelectTrigger>
+              <SelectTrigger aria-label="Pilih Role">
                 <SelectValue placeholder="Pilih Role" />
               </SelectTrigger>
               <SelectContent>

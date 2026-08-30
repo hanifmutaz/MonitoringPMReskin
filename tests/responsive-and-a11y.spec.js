@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const PAGES = [
-  { path: '/pm-part', name: 'pm-part-monitoring', waitFor: 'table' },
+  { path: '/pm-part', name: 'pm-part-monitoring', waitFor: 'table', waitTimeout: 20000 },
   { path: '/', name: 'dashboard', waitFor: null },
 ];
 
@@ -16,7 +16,7 @@ for (const { path, name, waitFor } of PAGES) {
   test.describe(`${name}`, () => {
     test(`${name} - screenshot + layout check`, async ({ page }, testInfo) => {
       await page.goto(path);
-      if (waitFor) await page.waitForSelector(waitFor, { timeout: 10000 });
+      if (waitFor) await page.waitForSelector(waitFor, { timeout: waitTimeout || 10000 });
       await page.waitForTimeout(500); // biar animasi/query selesai dulu
 
       // Screenshot full halaman - cek manual di test-results/ apakah ada

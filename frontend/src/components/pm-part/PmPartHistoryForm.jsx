@@ -218,7 +218,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
         <div>
           <Label className="mb-1.5">Line</Label>
           <Select value={form.line_id} onValueChange={(v) => update('line_id', v)} disabled={isPrefilled || isLockedFromScan}>
-            <SelectTrigger>
+            <SelectTrigger aria-label="Pilih Line">
               <SelectValue placeholder="Pilih Line" />
             </SelectTrigger>
             <SelectContent>
@@ -234,7 +234,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
         <div>
           <Label className="mb-1.5">Part (Drawing No / Nama)</Label>
           <Select value={form.part_id} onValueChange={(v) => update('part_id', v)} disabled={isPrefilled || isLockedFromScan}>
-            <SelectTrigger>
+            <SelectTrigger aria-label="Pilih Part">
               <SelectValue placeholder="Pilih Part" />
             </SelectTrigger>
             <SelectContent>
@@ -268,7 +268,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
         <div>
           <Label className="mb-1.5">Shift</Label>
           <Select value={form.shift} onValueChange={(v) => update('shift', v)}>
-            <SelectTrigger>
+            <SelectTrigger aria-label="Pilih Shift">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -298,7 +298,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
         <div>
           <Label className="mb-1.5">Jenis Penggantian</Label>
           <Select value={form.jenis_penggantian} onValueChange={(v) => update('jenis_penggantian', v)}>
-            <SelectTrigger>
+            <SelectTrigger aria-label="Pilih Jenis Penggantian">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

@@ -80,7 +80,7 @@ function PmPartHistoryPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="w-[220px]">
+          <SelectTrigger className="w-[220px]" aria-label="Filter berdasarkan Line">
             <SelectValue placeholder="Semua Line" />
           </SelectTrigger>
           <SelectContent>
@@ -100,7 +100,7 @@ function PmPartHistoryPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[180px]" aria-label="Filter berdasarkan Jenis">
             <SelectValue placeholder="Semua Jenis" />
           </SelectTrigger>
           <SelectContent>

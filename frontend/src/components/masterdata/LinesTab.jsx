@@ -111,7 +111,7 @@ function LineFormModal({ initial, onClose }) {
             value={form.auto_reset_weekly_on_monthly === '' ? 'null' : form.auto_reset_weekly_on_monthly}
             onValueChange={(v) => setForm({ ...form, auto_reset_weekly_on_monthly: v === 'null' ? '' : v })}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label="Pilih Override Auto-Reset Weekly on Monthly">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -268,7 +268,7 @@ function LinesTab() {
         <div className="flex flex-wrap items-center gap-2">
           <SearchBar value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Cari nama Line..." />
           <Select value={sort} onValueChange={setSort}>
-            <SelectTrigger className="h-9 w-[180px]">
+            <SelectTrigger className="h-9 w-[180px]" aria-label="Urutkan Line">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

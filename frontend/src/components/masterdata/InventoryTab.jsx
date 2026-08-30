@@ -206,7 +206,7 @@ function AdjustStockForm({ item, onDone }) {
       <div>
         <Label className="mb-1.5">Jenis</Label>
         <Select value={movementType} onValueChange={setMovementType}>
-          <SelectTrigger className="w-[190px]">
+          <SelectTrigger className="w-[190px]" aria-label="Filter berdasarkan Jenis">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

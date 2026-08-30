@@ -120,7 +120,7 @@ function PartFormModal({ initial, lines, onClose }) {
           <div>
             <Label className="mb-1.5">Line</Label>
             <Select value={form.line_id} onValueChange={(v) => setForm({ ...form, line_id: v })}>
-              <SelectTrigger>
+              <SelectTrigger aria-label="Pilih Line">
                 <SelectValue placeholder="Pilih Line" />
               </SelectTrigger>
               <SelectContent>
@@ -256,7 +256,7 @@ function InventoryLinkSection({ part }) {
       </p>
       <div className="flex gap-2">
         <Select value={selectedId} onValueChange={setSelectedId}>
-          <SelectTrigger className="flex-1">
+          <SelectTrigger className="flex-1" aria-label="Pilih Inventory Item untuk di-link">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -381,7 +381,7 @@ function PartsTab() {
               setPage(1);
             }}
           >
-            <SelectTrigger className="h-9 w-[180px]">
+            <SelectTrigger className="h-9 w-[180px]" aria-label="Urutkan Part">
               <SelectValue placeholder="Semua Line" />
             </SelectTrigger>
             <SelectContent>

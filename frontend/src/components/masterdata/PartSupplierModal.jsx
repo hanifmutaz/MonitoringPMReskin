@@ -188,7 +188,7 @@ function PartSupplierModal({ part, onClose }) {
         <div className="min-w-[180px] flex-1">
           <Label className="mb-1.5">Supplier</Label>
           <Select value={form.supplier_id} onValueChange={(v) => setForm({ ...form, supplier_id: v })}>
-            <SelectTrigger>
+            <SelectTrigger aria-label="Pilih Supplier">
               <SelectValue placeholder="Pilih Supplier" />
             </SelectTrigger>
             <SelectContent>

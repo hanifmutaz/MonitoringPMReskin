@@ -106,7 +106,7 @@ function InventoryHistoryPage() {
                         setPage(1);
                     }}
                 >
-                    <SelectTrigger className="w-[240px]">
+                    <SelectTrigger className="w-[240px]" aria-label="Filter berdasarkan Item">
                         <SelectValue placeholder="Semua Item" />
                     </SelectTrigger>
                     <SelectContent>
@@ -126,7 +126,7 @@ function InventoryHistoryPage() {
                         setPage(1);
                     }}
                 >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-[180px]" aria-label="Filter berdasarkan Jenis Mutasi">
                         <SelectValue placeholder="Semua Jenis" />
                     </SelectTrigger>
                     <SelectContent>
