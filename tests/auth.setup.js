@@ -1,9 +1,3 @@
-// tests/auth.setup.js
-// Login sekali sebagai Admin, simpan cookie/session-nya ke
-// playwright/.auth/admin.json - semua test lain reuse ini (via
-// storageState di playwright.config.js) biar gak login ulang tiap test.
-//
-// GANTI 2 BARIS INI sesuai user Admin yang beneran ada di database lu:
 const TEST_USERNAME = 'admin';
 const TEST_PASSWORD = 'admin1234567';
 

@@ -23,6 +23,8 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests',
   fullyParallel: false, // sequential - biar gampang baca report per halaman
+    workers: 1,
+      retries: 1,
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
     baseURL: 'http://localhost:5173',
