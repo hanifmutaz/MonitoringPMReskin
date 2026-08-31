@@ -7,12 +7,17 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
+// waitTimeout: /pm-part butuh lebih longgar dari default 10000ms - halaman
+// ini nembak lebih banyak request paralel pas load pertama (list Part +
+// dropdown Line + panel Ketepatan) dibanding Dashboard, jadi kena timeout
+// palsu pas dev server masih "dingin" di request pertama. Dashboard gak
+// perlu override (biarin fallback ke default 10000 lewat `|| 10000`).
 const PAGES = [
   { path: '/pm-part', name: 'pm-part-monitoring', waitFor: 'table', waitTimeout: 20000 },
   { path: '/', name: 'dashboard', waitFor: null },
 ];
 
-for (const { path, name, waitFor } of PAGES) {
+for (const { path, name, waitFor, waitTimeout } of PAGES) {
   test.describe(`${name}`, () => {
     test(`${name} - screenshot + layout check`, async ({ page }, testInfo) => {
       await page.goto(path);
@@ -42,7 +47,7 @@ for (const { path, name, waitFor } of PAGES) {
 
     test(`${name} - axe-core accessibility scan`, async ({ page }, testInfo) => {
       await page.goto(path);
-      if (waitFor) await page.waitForSelector(waitFor, { timeout: 10000 });
+      if (waitFor) await page.waitForSelector(waitFor, { timeout: waitTimeout || 10000 });
       await page.waitForTimeout(500);
 
       const results = await new AxeBuilder({ page }).analyze();
@@ -72,43 +77,59 @@ for (const { path, name, waitFor } of PAGES) {
 }
 
 test.describe('keyboard navigation', () => {
-  // tests/responsive-and-a11y.spec.js
+  test('Modal: Escape menutup, focus trap jalan', async ({ page }) => {
+    await page.goto('/pm-part');
+    await page.waitForSelector('table', { timeout: 20000 });
 
-test('Modal: Escape menutup, focus trap jalan', async ({ page }) => {
-  await page.goto('/pm-part');
-  await page.waitForSelector('table', { timeout: 10000 });
+    const rows = page.locator('table tbody tr');
+    const rowCount = await rows.count();
+    test.skip(rowCount === 0, 'Tidak ada data PM Part di database - seed data dulu buat test ini');
 
-  const rows = page.locator('table tbody tr');
-  const rowCount = await rows.count();
-  test.skip(rowCount === 0, 'Tidak ada data PM Part di database - seed data dulu buat test ini');
+    const firstActionButton = rows.first().locator('button').first();
+    await firstActionButton.click();
 
-  const firstActionButton = rows.first().locator('button').first();
-  await firstActionButton.click();
+    const modal = page.getByRole('dialog');
+    await expect(modal).toBeVisible({ timeout: 5000 });
 
-  const modal = page.getByRole('dialog');
-  await expect(modal).toBeVisible({ timeout: 5000 });
+    const focusedInModal = await page.evaluate(() => {
+      const dialog = document.querySelector('[role="dialog"]');
+      return dialog?.contains(document.activeElement);
+    });
+    expect(focusedInModal).toBe(true);
 
-  const focusedInModal = await page.evaluate(() => {
-    const dialog = document.querySelector('[role="dialog"]');
-    return dialog?.contains(document.activeElement);
+    await page.keyboard.press('Escape');
+    await expect(modal).not.toBeVisible({ timeout: 3000 });
   });
-  expect(focusedInModal).toBe(true);
 
-  await page.keyboard.press('Escape');
-  await expect(modal).not.toBeVisible({ timeout: 3000 });
-});
+  test('DataTable: checkbox bisa di-toggle pakai keyboard (Space)', async ({ page }) => {
+    await page.goto('/pm-line/history');
+    await page.waitForSelector('table', { timeout: 20000 });
 
-test('DataTable: checkbox bisa di-toggle pakai keyboard (Space)', async ({ page }) => {
-  await page.goto('/pm-line/history');
-  await page.waitForSelector('table', { timeout: 10000 });
+    const rows = page.locator('table tbody tr');
+    const rowCount = await rows.count();
+    test.skip(rowCount === 0, 'Tidak ada data PM Line History di database - seed data dulu buat test ini');
 
-  const rows = page.locator('table tbody tr');
-  const rowCount = await rows.count();
-  test.skip(rowCount === 0, 'Tidak ada data PM Line History di database - seed data dulu buat test ini');
+    const firstCheckbox = rows.first().locator('input[type="checkbox"]');
+    await firstCheckbox.focus();
+    await page.keyboard.press('Space');
+    await expect(firstCheckbox).toBeChecked();
+  });
 
-  const firstCheckbox = rows.first().locator('input[type="checkbox"]');
-  await firstCheckbox.focus();
-  await page.keyboard.press('Space');
-  await expect(firstCheckbox).toBeChecked();
-});
+  test('Tab order: bisa navigasi FilterBar -> tabel pakai Tab tanpa nyangkut', async ({ page }) => {
+    await page.goto('/audit-log');
+    await page.waitForTimeout(500);
+
+    // Tab beberapa kali dari body, pastikan focus selalu ada di elemen
+    // yang kelihatan (gak "hilang" ke elemen invisible/gak fokusable)
+    for (let i = 0; i < 8; i++) {
+      await page.keyboard.press('Tab');
+      const isVisible = await page.evaluate(() => {
+        const el = document.activeElement;
+        if (!el || el === document.body) return true; // wajar di awal/akhir
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+      expect(isVisible, `Tab ke-${i + 1}: focus jatuh ke elemen yang gak kelihatan`).toBe(true);
+    }
+  });
 });
