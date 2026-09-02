@@ -73,6 +73,7 @@ function buildAuditLogColumns({ onViewDiff }) {
     {
       key: 'diff',
       header: '',
+      srHeader: 'Lihat Detail Perubahan',
       render: (a) =>
         (a.old_value || a.new_value) && (
           <Button type="button" variant="outline" size="icon" className="h-7 w-7" title="Lihat detail perubahan" onClick={() => onViewDiff(a)}>

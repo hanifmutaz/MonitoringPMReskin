@@ -39,6 +39,31 @@
 // Falls back to "always selectable" if `isSelectable` is absent, so this
 // is non-breaking for any selection object shaped before Phase 11.
 //
+// scrollRegionLabel + tabIndex/role="region" on the overflow-x-auto wrapper
+// (added Phase 13, real-browser confirmation - axe-core's
+// `scrollable-region-focusable`): a horizontally-scrollable div with no
+// way to focus it via keyboard means keyboard-only users can't pan wide
+// tables at narrow viewports at all. Confirmed via Playwright+axe on
+// Dashboard's own overflow-x-auto regions (not this file - see
+// DashboardPage.jsx/GanttUpcomingPanel.jsx) - fixed here too as a
+// preventive measure since this exact pattern is shared by all 11
+// DataTable consumers, even though this specific scan (pm-part-monitoring)
+// didn't happen to trigger it (its table wasn't wide enough to overflow
+// at the tested viewports - doesn't mean it never will with more columns
+// or a narrower screen). `scrollRegionLabel` is optional, generic default
+// applies if a caller doesn't pass one - non-breaking.
+//
+// srHeader (added Phase 13, real-browser confirmation - axe-core's
+// `empty-table-header`): columns with a visually-empty `header` (icon-only
+// columns like the WearRing indicator, or action-button columns) still
+// need SOME discernible text for screen readers per WCAG - a `<th>` with
+// nothing in it at all fails. `col.srHeader` renders as a visually-hidden
+// (`sr-only`) span instead, so sighted users see no change but screen
+// readers get "Keausan"/"Aksi"/etc instead of silence. Optional - columns
+// without `srHeader` render exactly as before (this only matters for the
+// handful of columns that already had `header: ''`, not the vast majority
+// with real header text).
+//
 // getRowLabel (added Phase 13, static a11y review): both selection
 // checkboxes were bare `<input type="checkbox">` with NO accessible name
 // at all - a screen reader would announce "checkbox, not checked" with
@@ -74,6 +99,7 @@ function DataTable({
   skeletonRows = 5,
   selection,
   getRowLabel,
+  scrollRegionLabel,
   className,
 }) {
   const hasRows = Array.isArray(rows) && rows.length > 0;
@@ -102,7 +128,12 @@ function DataTable({
               isRefreshing && 'opacity-60'
             )}
           >
-            <div className="overflow-x-auto">
+            <div
+              className="overflow-x-auto"
+              tabIndex="0"
+              role="region"
+              aria-label={scrollRegionLabel || 'Tabel data (scroll horizontal)'}
+            >
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-border">
@@ -128,7 +159,7 @@ function DataTable({
                           col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
                         )}
                       >
-                        {col.header}
+                        {col.header || (col.srHeader && <span className="sr-only">{col.srHeader}</span>)}
                       </th>
                     ))}
                   </tr>
@@ -181,7 +212,7 @@ function DataTable({
 function DataTableSkeleton({ columns, rows, withSelection }) {
   return (
     <div className="overflow-hidden rounded-lg border border-border">
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" tabIndex="0" role="region" aria-label="Memuat data tabel">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b border-border">

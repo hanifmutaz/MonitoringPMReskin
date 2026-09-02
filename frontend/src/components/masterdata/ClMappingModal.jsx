@@ -41,6 +41,7 @@ function buildClMappingColumns({ onRemove }) {
     {
       key: 'actions',
       header: '',
+      srHeader: 'Aksi',
       render: (m) => (
         <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onRemove(m.id)} aria-label={`Hapus mapping CL ${m.cl_no}`}>
           <Trash2 size={12} />

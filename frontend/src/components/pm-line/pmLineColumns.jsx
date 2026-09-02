@@ -75,6 +75,7 @@ function buildPmLineColumns({ onInputMonthly, onInputWeekly }) {
     {
       key: 'actions',
       header: '',
+      srHeader: 'Aksi',
       render: (line) => (
         <div className="flex gap-1.5">
           <Button type="button" size="sm" variant="outline" onClick={() => onInputMonthly(line)}>

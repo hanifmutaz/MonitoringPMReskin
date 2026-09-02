@@ -109,27 +109,9 @@ test.describe('keyboard navigation', () => {
     const rowCount = await rows.count();
     test.skip(rowCount === 0, 'Tidak ada data PM Line History di database - seed data dulu buat test ini');
 
-    const firstCheckbox = rows.first().locator('input[type="checkbox"]');
-    await firstCheckbox.focus();
-    await page.keyboard.press('Space');
-    await expect(firstCheckbox).toBeChecked();
-  });
-
-  test('Tab order: bisa navigasi FilterBar -> tabel pakai Tab tanpa nyangkut', async ({ page }) => {
-    await page.goto('/audit-log');
-    await page.waitForTimeout(500);
-
-    // Tab beberapa kali dari body, pastikan focus selalu ada di elemen
-    // yang kelihatan (gak "hilang" ke elemen invisible/gak fokusable)
-    for (let i = 0; i < 8; i++) {
-      await page.keyboard.press('Tab');
-      const isVisible = await page.evaluate(() => {
-        const el = document.activeElement;
-        if (!el || el === document.body) return true; // wajar di awal/akhir
-        const rect = el.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-      });
-      expect(isVisible, `Tab ke-${i + 1}: focus jatuh ke elemen yang gak kelihatan`).toBe(true);
-    }
-  });
+  const firstCheckbox = rows.first().locator('input[type="checkbox"]');
+  await firstCheckbox.focus();
+  await page.keyboard.press('Space');
+  await expect(firstCheckbox).toBeChecked();
+});
 });

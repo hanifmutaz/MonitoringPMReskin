@@ -41,6 +41,7 @@ function buildPartSupplierColumns({ onTogglePrimary, onRemove, setPrimaryPending
     {
       key: 'primary',
       header: '',
+      srHeader: 'Supplier Utama',
       render: (l) => (
         <button
           type="button"
@@ -86,6 +87,7 @@ function buildPartSupplierColumns({ onTogglePrimary, onRemove, setPrimaryPending
     {
       key: 'actions',
       header: '',
+      srHeader: 'Aksi',
       render: (l) => (
         <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onRemove(l.id)} aria-label={`Lepas Supplier ${l.supplier_name}`}>
           <Trash2 size={12} />

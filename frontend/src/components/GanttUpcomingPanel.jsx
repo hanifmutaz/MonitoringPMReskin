@@ -45,7 +45,7 @@ function GanttUpcomingPanel({ items = [] }) {
           Gak ada jadwal PM dalam 7 hari ke depan.
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex="0" role="region" aria-label="Jadwal PM 7 hari ke depan (scroll horizontal)">
           <div
             className="grid gap-1"
             style={{ gridTemplateColumns: `150px repeat(${columns.length}, 1fr)` }}

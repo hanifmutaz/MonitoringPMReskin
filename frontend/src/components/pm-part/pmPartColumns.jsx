@@ -18,6 +18,7 @@ function buildPmPartColumns(onGantiPart) {
     {
       key: 'wear',
       header: '',
+      srHeader: 'Keausan',
       render: (item) => <WearRing percentage={item.wear_percentage} status={item.status} />,
     },
     {
@@ -75,6 +76,7 @@ function buildPmPartColumns(onGantiPart) {
     {
       key: 'actions',
       header: '',
+      srHeader: 'Aksi',
       render: (item) => (
         <Button type="button" size="sm" variant="outline" onClick={() => onGantiPart(item)}>
           Ganti Part

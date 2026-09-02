@@ -200,7 +200,7 @@ function KetepatanAttentionPanel({ data = [], isLoading }) {
       {data.length === 0 ? (
         <EmptyState title="Belum ada data" description="Belum ada data ketepatan PM tahun ini buat dirangking." />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex="0" role="region" aria-label="Tabel ranking ketepatan PM (scroll horizontal)">
           <table className="w-full border-collapse">
             <thead>
               <tr>
