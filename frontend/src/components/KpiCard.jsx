@@ -16,26 +16,38 @@
 // data" - sengaja BUKAN salah satu dari accent/warn/danger (yang berarti
 // baik/waspada/kritis), jadi dibedain manual pakai token netral yang sudah
 // ada (panel-3/text-faint), bukan token baru.
-const ICON_CLASS = {
-  accent: 'bg-[var(--accent-dim)] text-[var(--accent)]',
-  ok: 'bg-ok-dim text-ok',
-  warn: 'bg-warn-dim text-warn',
-  danger: 'bg-danger-dim text-danger',
-  muted: 'bg-[var(--panel-3)] text-[var(--text-faint)]',
+// Polish pass (requested via chat, "Material Dashboard"-style KPI cards):
+// icon moves from an inline dim-tinted box to a solid, floating badge with
+// a soft shadow tinted to match its own status color (same --accent/--ok/
+// --warn/--danger values already in tokens.css — no new colors introduced).
+// Card itself gets a resting shadow-sm + a hover lift, still on --border/
+// --color-card so it stays consistent with the rest of the dark theme.
+// This intentionally departs from DESIGN-TOKENS.md's default "no shadow,
+// layering only" rule for this one component — KpiCard is the dashboard's
+// most-seen element, treated as the "genuinely elevated surface" exception
+// the doc leaves room for. Not applied to Card.jsx/other panels.
+const ICON_BADGE_CLASS = {
+  accent: 'bg-[var(--accent)] shadow-[0_6px_16px_-4px_var(--accent)]',
+  ok: 'bg-ok shadow-[0_6px_16px_-4px_var(--ok)]',
+  warn: 'bg-warn shadow-[0_6px_16px_-4px_var(--warn)]',
+  danger: 'bg-danger shadow-[0_6px_16px_-4px_var(--danger)]',
+  muted: 'bg-[var(--panel-3)] text-[var(--text-faint)] shadow-none',
 };
 
 function KpiCard({ icon, label, value, caption, status = 'accent' }) {
-  const iconClass = ICON_CLASS[status] || ICON_CLASS.accent;
+  const iconClass = ICON_BADGE_CLASS[status] || ICON_BADGE_CLASS.accent;
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4.5">
-      <div className={`mb-3 flex h-[34px] w-[34px] items-center justify-center rounded-sm ${iconClass}`}>
+    <div className="group relative overflow-visible rounded-xl border border-border bg-card p-4.5 pt-7 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/30">
+      <div
+        className={`absolute -top-3.5 right-4 flex h-11 w-11 items-center justify-center rounded-xl text-white transition-transform duration-200 group-hover:scale-105 ${iconClass}`}
+      >
         {icon}
       </div>
       <div className="mb-1 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
         {label}
       </div>
-      <div className="font-[var(--font-display)] text-[30px] font-semibold">{value}</div>
+      <div className="font-[var(--font-display)] text-[30px] font-semibold tracking-tight">{value}</div>
       {caption && <div className="mt-1 text-xs text-muted-foreground">{caption}</div>}
     </div>
   );

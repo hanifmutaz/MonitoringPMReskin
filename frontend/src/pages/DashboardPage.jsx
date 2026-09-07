@@ -174,8 +174,8 @@ function HealthStat({ value, label, tone }) {
 // rule: new abstractions need multiple justified consumers).
 function KpiCardSkeleton() {
   return (
-    <div className="rounded-lg border border-border bg-card p-4.5">
-      <Skeleton className="mb-3 h-[34px] w-[34px] rounded-sm" />
+    <div className="relative overflow-visible rounded-xl border border-border bg-card p-4.5 pt-7 shadow-sm">
+      <Skeleton className="absolute -top-3.5 right-4 h-11 w-11 rounded-xl" />
       <Skeleton className="mb-2 h-2.5 w-20" />
       <Skeleton className="mb-1 h-7 w-16" />
       <Skeleton className="h-3 w-24" />
@@ -310,13 +310,13 @@ function DashboardPage() {
       <SiteSwitcher sites={sites} selectedSiteId={selectedSiteId} onChange={setSelectedSiteId} />
 
       {loadingSummary ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
             <KpiCardSkeleton key={i} />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             icon={<Package size={18} />}
             label="Total Parts"
@@ -358,7 +358,7 @@ function DashboardPage() {
           <CardTitle>Ketepatan PM (Tahun Berjalan)</CardTitle>
         </CardHeader>
         {!loadingSummary && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 gap-y-6 sm:grid-cols-3">
             <KpiCard
               icon={<Target size={18} />}
               label="Ketepatan PM Part"
