@@ -1,19 +1,8 @@
 // src/components/pm-line/pmLineHistoryColumns.jsx
-// New (docs/frontend/MIGRATION-PLAN.md Phase 8). Extracted from the
-// hand-rolled <table> in pages/PmLineHistoryPage.jsx - same 7 columns,
-// same cell markup, following the buildPmPartColumns.jsx precedent from
-// Phase 7. Static array, not a function - unlike pmLineColumns.jsx/
-// pmPartColumns.jsx, no cell here needs a per-row callback (no action
-// column). The checkbox column is NOT defined here - DataTable renders it
-// itself when the page passes a `selection` prop (see DataTable.jsx's
-// Phase 8 selection support), same as every other column set stays
-// selection-agnostic in this app.
-//
-// OnTimeBadge stays imported from the flat components/ folder (NOT moved
-// into pm-line/) - confirmed via grep it's also used by
-// PmPartHistoryPage.jsx, so it's cross-domain shared, unlike
-// PmLineHistoryForm.jsx which was single-domain and safe to move.
+// Fase 1 (A1/D3): kolom Tanggal pakai formatDate() -> "04 Jul 2026" (bukan
+// tgl_input mentah). Sisanya tidak berubah.
 import OnTimeBadge from '../OnTimeBadge';
+import { formatDate } from '../../utils/formatDate';
 
 const JENIS_LABEL = { MONTHLY: 'Monthly', WEEKLY: 'Weekly' };
 
@@ -21,7 +10,7 @@ const pmLineHistoryColumns = [
   {
     key: 'tgl_input',
     header: 'Tanggal',
-    render: (item) => <span className="font-[var(--font-mono)] text-[13px]">{item.tgl_input}</span>,
+    render: (item) => <span className="font-[var(--font-mono)] text-[13px]">{formatDate(item.tgl_input)}</span>,
   },
   {
     key: 'line',

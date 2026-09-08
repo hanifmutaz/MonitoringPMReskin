@@ -1,26 +1,48 @@
 // src/components/pm-line/pmLineColumns.jsx
-// New (docs/frontend/MIGRATION-PLAN.md Phase 8). Extracted from the
-// hand-rolled <table> in pages/PmLineStatusPage.jsx - same 10 columns,
-// same cell markup, following the buildPmPartColumns.jsx precedent from
-// Phase 7. Function, not a static array: the last column's action buttons
-// need onInputMonthly/onInputWeekly callbacks from the page's component
-// state, same reason Phase 7's columns are a function.
-//
-// StatusWithKetepatan was a local component in PmLineStatusPage.jsx -
-// moved here since it's only ever used inside these columns, not
-// independently reusable elsewhere on the page.
+// Fase 1:
+// - A1/D3: kolom "Tgl Monthly/Weekly Terakhir" pakai formatDate().
+// - A4/D4: `StatusWithKetepatan` diubah dari 2-baris (status di atas, teks
+//   "Ketepatan X%" di baris ke-2) jadi 1 baris: StatusBadge + PercentBadge
+//   inline. Ini yang bikin row tabel Monitoring Monthly/Weekly ketinggian
+//   (makan 2 baris/row). PercentBadge dibikin sekeluarga visual sama
+//   OnTimeBadge/StatusBadge (dot + bg-dim + text mono) - bukan gaya baru.
 import StatusBadge from '../data-display/StatusBadge';
 import { Button } from '../ui/button';
+import { formatDate } from '../../utils/formatDate';
 
-function formatKetepatan(percentage) {
-  return percentage === null || percentage === undefined ? 'belum ada data' : `Ketepatan ${percentage}%`;
+function ketepatanTone(percentage) {
+  if (percentage === null || percentage === undefined) return 'muted';
+  if (percentage >= 90) return 'ok';
+  if (percentage >= 50) return 'warn';
+  return 'danger';
 }
 
+const PERCENT_BADGE_CLASS = {
+  ok: { bg: 'bg-ok-dim', text: 'text-ok', dot: 'bg-ok' },
+  warn: { bg: 'bg-warn-dim', text: 'text-warn', dot: 'bg-warn' },
+  danger: { bg: 'bg-danger-dim', text: 'text-danger', dot: 'bg-danger' },
+  muted: { bg: 'bg-[var(--panel-3)]', text: 'text-[var(--text-faint)]', dot: 'bg-[var(--text-faint)]' },
+};
+
+function KetepatanBadge({ percentage }) {
+  const cfg = PERCENT_BADGE_CLASS[ketepatanTone(percentage)];
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-[8px] py-[2px] font-[var(--font-mono)] text-[11px] ${cfg.bg} ${cfg.text}`}
+      title="Ketepatan PM tahun berjalan"
+    >
+      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cfg.dot}`} />
+      {percentage === null || percentage === undefined ? '–' : `${percentage}%`}
+    </span>
+  );
+}
+
+// Status + ketepatan INLINE (satu baris), bukan ditumpuk 2 baris.
 function StatusWithKetepatan({ status, percentage }) {
   return (
-    <div>
+    <div className="flex items-center gap-2">
       <StatusBadge status={status} />
-      <div className="mt-1 text-xs text-muted-foreground">{formatKetepatan(percentage)}</div>
+      <KetepatanBadge percentage={percentage} />
     </div>
   );
 }
@@ -35,7 +57,7 @@ function buildPmLineColumns({ onInputMonthly, onInputWeekly }) {
     {
       key: 'tgl_monthly',
       header: 'Tgl Monthly Terakhir',
-      render: (line) => <span className="font-[var(--font-mono)] text-[13px]">{line.tgl_pm_monthly_terakhir || '-'}</span>,
+      render: (line) => <span className="font-[var(--font-mono)] text-[13px]">{formatDate(line.tgl_pm_monthly_terakhir)}</span>,
     },
     {
       key: 'poin_monthly',
@@ -55,7 +77,7 @@ function buildPmLineColumns({ onInputMonthly, onInputWeekly }) {
     {
       key: 'tgl_weekly',
       header: 'Tgl Weekly Terakhir',
-      render: (line) => <span className="font-[var(--font-mono)] text-[13px]">{line.tgl_pm_weekly_terakhir || '-'}</span>,
+      render: (line) => <span className="font-[var(--font-mono)] text-[13px]">{formatDate(line.tgl_pm_weekly_terakhir)}</span>,
     },
     {
       key: 'poin_weekly',

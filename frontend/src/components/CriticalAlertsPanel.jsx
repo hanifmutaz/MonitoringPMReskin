@@ -1,13 +1,18 @@
 // src/components/CriticalAlertsPanel.jsx
-// Reskin: props (items) & output visual PERSIS sama - cuma inline style
-// diganti utility Tailwind. Kondisi danger vs warning (2 warna berbeda)
-// ditulis sebagai 2 branch class statis, bukan interpolasi, biar ke-detect
-// Tailwind JIT.
-import { AlertTriangle } from 'lucide-react';
+// Reskin: props (items) & output visual PERSIS sama - inline style diganti
+// utility Tailwind. Kondisi danger vs warning ditulis 2 branch class statis.
+//
+// Empty state: pakai komponen EmptyState yang SUDAH dipakai di seluruh app.
+// PENTING: EmptyState sendiri udah punya `border border-dashed` + `py-12`.
+// Karena di sini dia dibungkus <div> yang UDAH ber-border (bg-card), tanpa
+// override bakal jadi "kotak-dalam-kotak" (2 border) + ketinggian. Makanya
+// dikasih `border-0 py-8` biar nyatu jadi isi panel, bukan box terpisah yang
+// ngambang. Icon ShieldCheck + tone 'ok' karena "gak ada alert" = kondisi BAIK.
+import { AlertTriangle, ShieldCheck } from 'lucide-react';
+import { EmptyState } from './ui/empty-state';
 
 function AlertCard({ item }) {
   const isDanger = item.status === 'DANGER';
-
   return (
     <div
       className={
@@ -40,9 +45,13 @@ function CriticalAlertsPanel({ items = [] }) {
         </h2>
       </div>
       {items.length === 0 ? (
-        <div className="py-5.5 px-4 text-center text-[var(--text-faint)]">
-          Gak ada part yang butuh perhatian saat ini.
-        </div>
+        <EmptyState
+          icon={ShieldCheck}
+          tone="ok"
+          className="border-0 py-8"
+          title="Tidak ada alert kritis"
+          description="Semua part dalam kondisi aman. Alert muncul di sini saat ada part yang mendekati batas penggantian."
+        />
       ) : (
         items.map((item) => <AlertCard key={item.part_id} item={item} />)
       )}

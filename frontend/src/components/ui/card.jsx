@@ -3,26 +3,26 @@
 // Generic content container. Domain-agnostic per Component Inventory rules -
 // callers supply all content via children, this component knows nothing
 // about PM/Inventory/Line. Uses the same --color-card / --color-border
-// tokens already exposed to Tailwind in styles/tailwind.css (which in turn
-// point at tokens.css's --panel/--border - see docs/frontend/DESIGN-TOKENS.md
-// for the full reconciliation).
+// tokens already exposed to Tailwind in styles/tailwind.css.
 //
-// NOTE: no shadow by default. Verified against every existing hand-rolled
-// panel (KpiCard, DashboardPage sections, PmPartMonitoringPage's table
-// wrapper) - none use box-shadow; surfaces are separated by background
-// layering (--panel/--panel-2/--panel-3) instead, per DESIGN-TOKENS.md's
-// "Elevation rules" section. A first draft of this component defaulted to
-// shadow-sm (the common shadcn default) - caught during DashboardPage's
-// migration (Phase 6) because it would have introduced a shadow no other
-// panel in the app has. Callers that genuinely need an elevated look
-// (e.g. a Dialog/Drawer) can add shadow via className.
+// Fase 1 polish (A2/D1 - radius standar): rounded-lg -> rounded-xl. Ini
+// SUMBER radius buat SEMUA panel di app (Dashboard, Settings, Master Data,
+// dst pakai Card ATAU pola markup yang sama). Dinaikin ke rounded-xl biar
+// konsisten sama KpiCard/NeedsDataCard yang udah rounded-xl - ngilangin
+// kesan "campur generasi" (KPI rounded gede, panel rounded kecil).
+//
+// Elevation (A3/D2): TETAP no-shadow by default. Aturan yang di-LOCK -
+// surface pasif (panel isi, tabel) flat + dipisah pakai border/layering;
+// cuma surface "hero" (KpiCard) yang boleh shadow. Card = surface pasif,
+// jadi TIDAK dikasih shadow. Caller yang genuinely butuh elevated (Dialog/
+// Drawer) tetap bisa nambah shadow lewat className.
 import { cn } from '../../lib/utils';
 
 function Card({ className, ...props }) {
   return (
     <div
       className={cn(
-        'rounded-lg border border-border bg-card p-4.5 text-card-foreground',
+        'rounded-xl border border-border bg-card p-4.5 text-card-foreground',
         className
       )}
       {...props}
@@ -31,9 +31,6 @@ function Card({ className, ...props }) {
 }
 
 function CardHeader({ className, ...props }) {
-  // No own padding - the verified pattern puts padding on Card itself
-  // once, with header/content sharing it (mb-4 separates them), unlike
-  // the typical shadcn convention of independently-padded sections.
   return (
     <div className={cn('mb-4 flex items-center justify-between', className)} {...props} />
   );
@@ -42,10 +39,6 @@ function CardHeader({ className, ...props }) {
 function CardTitle({ className, ...props }) {
   return (
     <h2
-      // font-display/15px/semibold is the verified, established convention
-      // for section headers across DashboardPage's panels (Ketepatan PM,
-      // Ringkasan Status Line, Line Perlu Perhatian) - not a guess, read
-      // directly from the existing markup before setting this default.
       className={cn('m-0 font-[var(--font-display)] text-[15px] font-semibold', className)}
       {...props}
     />
@@ -59,7 +52,6 @@ function CardDescription({ className, ...props }) {
 }
 
 function CardContent({ className, ...props }) {
-  // No own padding either, for the same reason as CardHeader above.
   return <div className={cn(className)} {...props} />;
 }
 

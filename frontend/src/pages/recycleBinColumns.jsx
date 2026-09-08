@@ -1,10 +1,8 @@
 // src/pages/recycleBinColumns.jsx
-// New (docs/frontend/MIGRATION-PLAN.md Phase 11). Extracted from the
-// hand-rolled <table> in RecycleBinPage.jsx - same 5 columns, following
-// the pmLineHistoryColumns.jsx/userManagementColumns.jsx precedent
-// (co-located in pages/, single consumer, no domain folder case).
+// Fase 1 (A1/D3): kolom "Dihapus Pada" pakai formatDateTime().
 import { RotateCcw, Flame } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { formatDateTime } from '../utils/formatDate';
 
 function buildRecycleBinColumns({ onRestore, onPermanentDelete, restorePending, deletePending }) {
   return [
@@ -23,7 +21,7 @@ function buildRecycleBinColumns({ onRestore, onPermanentDelete, restorePending, 
       key: 'deleted_at',
       header: 'Dihapus Pada',
       className: 'font-[var(--font-mono)] text-xs text-[var(--text-dim)]',
-      render: (item) => new Date(item.deleted_at).toLocaleString('id-ID'),
+      render: (item) => formatDateTime(item.deleted_at),
     },
     {
       key: 'deleted_by_name',
@@ -36,26 +34,10 @@ function buildRecycleBinColumns({ onRestore, onPermanentDelete, restorePending, 
       header: 'Aksi',
       render: (item) => (
         <div className="flex gap-1">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7"
-            onClick={() => onRestore(item)}
-            disabled={restorePending}
-            title="Restore"
-          >
+          <Button type="button" variant="outline" size="sm" className="h-7" onClick={() => onRestore(item)} disabled={restorePending} title="Restore">
             <RotateCcw size={13} /> Restore
           </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => onPermanentDelete(item)}
-            disabled={deletePending}
-            title="Hapus Permanen"
-          >
+          <Button type="button" variant="destructive" size="icon" className="h-7 w-7" onClick={() => onPermanentDelete(item)} disabled={deletePending} title="Hapus Permanen">
             <Flame size={13} />
           </Button>
         </div>

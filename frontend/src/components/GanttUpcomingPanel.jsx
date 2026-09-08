@@ -1,11 +1,16 @@
 // src/components/GanttUpcomingPanel.jsx
 // Reskin: props (items) & output visual PERSIS sama - inline style diganti
-// utility Tailwind. Grid-template-columns tetap inline style karena jumlah
-// kolom dihitung dinamis (DAYS_AHEAD + 1), bukan angka tetap yang bisa jadi
-// utility class statis.
+// utility Tailwind. gridTemplateColumns tetap inline (kolom dinamis).
+//
+// Empty state: pakai EmptyState + `border-0 py-8` supaya nyatu jadi isi panel
+// (bukan kotak-dalam-kotak yang ngambang - EmptyState default-nya udah punya
+// border-dashed + py-12, dobel sama border panel ini). Icon CalendarCheck +
+// tone default (netral): "gak ada jadwal 7 hari" itu informasional, bukan
+// baik/buruk.
 import dayjs from 'dayjs';
 import 'dayjs/locale/id';
-
+import { CalendarCheck } from 'lucide-react';
+import { EmptyState } from './ui/empty-state';
 dayjs.locale('id');
 
 const DAYS_AHEAD = 7;
@@ -31,7 +36,6 @@ const STATUS_CLASS = { OK: 'bg-ok', WARNING: 'bg-warn', DANGER: 'bg-danger' };
 function GanttUpcomingPanel({ items = [] }) {
   const columns = buildColumns();
   const rows = groupByLine(items);
-
   return (
     <div className="rounded-lg border border-border bg-card p-4.5">
       <div className="mb-4 flex items-center justify-between">
@@ -39,11 +43,13 @@ function GanttUpcomingPanel({ items = [] }) {
           Upcoming PM (7 Hari ke Depan)
         </h2>
       </div>
-
       {rows.length === 0 ? (
-        <div className="py-5.5 px-4 text-center text-[var(--text-faint)]">
-          Gak ada jadwal PM dalam 7 hari ke depan.
-        </div>
+        <EmptyState
+          icon={CalendarCheck}
+          className="border-0 py-8"
+          title="Belum ada jadwal PM"
+          description="Tidak ada penggantian part terjadwal dalam 7 hari ke depan."
+        />
       ) : (
         <div className="overflow-x-auto" tabIndex="0" role="region" aria-label="Jadwal PM 7 hari ke depan (scroll horizontal)">
           <div
@@ -59,7 +65,6 @@ function GanttUpcomingPanel({ items = [] }) {
                 {col.label}
               </div>
             ))}
-
             {rows.map(([lineName, lineItems]) => (
               <RowContent key={lineName} lineName={lineName} lineItems={lineItems} columns={columns} />
             ))}

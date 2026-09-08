@@ -1,6 +1,9 @@
 // src/components/FooterStatusBar.jsx
+// Fase 1 (A1/D3): "terakhir sync" pakai formatDateTime() -> "04 Jul 2026, 14:30"
+// (bukan toLocaleString mentah).
 import { useQuery } from '@tanstack/react-query';
 import { fetchSyncStatus } from '../api/dashboardApi';
+import { formatDateTime } from '../utils/formatDate';
 
 function FooterStatusBar() {
   const { data } = useQuery({
@@ -11,7 +14,7 @@ function FooterStatusBar() {
 
   const label =
     data?.status === 'success'
-      ? `Database Sync: Optimal (terakhir ${new Date(data.last_synced_at).toLocaleString('id-ID')})`
+      ? `Database Sync: Optimal (terakhir ${formatDateTime(data.last_synced_at)})`
       : 'Database Sync: Belum ada data';
 
   return (

@@ -4,7 +4,17 @@
 // `.panel`/`.data-table`/`.error-state`/`.empty-state`/`.mono`/`.caption`/
 // inline style lama dilepas total, diganti Tailwind + shadcn ui (Select).
 // Data/logic (query, filter, pagination) TIDAK berubah sama sekali.
+//
+// Fase 1 polish (UI-CONSISTENCY-AUDIT.md):
+// - A1/D3: kolom Tanggal sebelumnya render `{item.tgl_ganti}` MENTAH (ISO
+//   string dari backend, mis. "2026-07-04T17:00:00.000Z"). Sekarang pakai
+//   formatDate() -> "05 Jul 2026". Backend TIDAK diubah (ISO tetap format
+//   transport yang benar) - ini murni presentational di FE.
+// - A5: empty state "Belum ada riwayat penggantian." sebelumnya teks polos
+//   di <div>. Sekarang pakai <EmptyState> primitive yang sudah dipakai di
+//   seluruh app (icon + title), konsisten sama Dashboard/panel lain.
 import { useState } from 'react';
+import { Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { usePmPartHistoryList } from '../hooks/usePmPartHistory';
 import { useLines } from '../hooks/useLines';
@@ -17,7 +27,9 @@ import OnTimeBadge from '../components/OnTimeBadge';
 import BulkDeleteBar from '../components/BulkDeleteBar';
 import SelectAllAcrossPagesBar from '../components/SelectAllAcrossPagesBar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { EmptyState } from '../components/ui/empty-state';
 import { JENIS_LABEL } from '../components/pm-part/constants';
+import { formatDate } from '../utils/formatDate';
 
 const LIMIT = 20;
 
@@ -114,7 +126,7 @@ function PmPartHistoryPage() {
         </Select>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-4.5">
+      <div className="rounded-xl border border-border bg-card p-4.5">
         {isError && (
           <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
             Gagal memuat riwayat. Coba lagi.
@@ -145,8 +157,14 @@ function PmPartHistoryPage() {
         )}
 
         {isLoading && !data && <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>}
+
         {data && data.items.length === 0 && (
-          <div className="py-8 text-center text-sm text-[var(--text-faint)]">Belum ada riwayat penggantian.</div>
+          <EmptyState
+            icon={Inbox}
+            className="border-0 py-8"
+            title="Belum ada riwayat penggantian"
+            description="Riwayat penggantian part akan muncul di sini setelah ada input PM."
+          />
         )}
 
         {data && data.items.length > 0 && (
@@ -190,7 +208,7 @@ function PmPartHistoryPage() {
                             className="h-3.5 w-3.5 accent-[var(--accent)]"
                           />
                         </td>
-                        <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{item.tgl_ganti}</td>
+                        <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{formatDate(item.tgl_ganti)}</td>
                         <td className="px-3 py-3">
                           <div className="font-[var(--font-mono)] text-[13px]">{item.line_name}</div>
                           <div className="text-xs text-[var(--text-dim)]">
@@ -224,3 +242,4 @@ function PmPartHistoryPage() {
 }
 
 export default PmPartHistoryPage;
+

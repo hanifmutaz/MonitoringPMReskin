@@ -1,13 +1,9 @@
 // src/pages/auditLogColumns.jsx
-// New (docs/frontend/MIGRATION-PLAN.md Phase 11 - Audit Log built new, per
-// OPEN-QUESTIONS.md Resolved #2). 6 columns: Waktu, Tabel, Aksi, Detail
-// (action_detail human-readable summary, backend gap fixed alongside this
-// - see auditLogQueries.js comment), Oleh, dan tombol buka modal diff
-// old_value/new_value mentah (JSONB) - action_detail cukup buat kebanyakan
-// kasus, tapi diff mentah tetap disediakan buat audit forensik yang
-// beneran butuh lihat before/after utuh (bukan cuma ringkasan).
+// Fase 1 (A1/D3): kolom Waktu pakai formatDateTime() -> "04 Jul 2026, 14:30"
+// (butuh jam buat audit forensik, jadi pakai formatDateTime bukan formatDate).
 import { Eye } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { formatDateTime } from '../utils/formatDate';
 
 const ACTION_BADGE_CLASS = {
   CREATE: 'bg-ok-dim text-ok',
@@ -37,7 +33,7 @@ function buildAuditLogColumns({ onViewDiff }) {
       key: 'created_at',
       header: 'Waktu',
       className: 'font-[var(--font-mono)] text-xs text-[var(--text-dim)]',
-      render: (a) => new Date(a.created_at).toLocaleString('id-ID'),
+      render: (a) => formatDateTime(a.created_at),
     },
     {
       key: 'table_name',

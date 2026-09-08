@@ -1,10 +1,7 @@
 // src/pages/inventoryHistoryColumns.jsx
-// New (docs/frontend/MIGRATION-PLAN.md Phase 10). Extracted from the
-// hand-rolled <table> in InventoryHistoryPage.jsx - same 6 columns,
-// following the pm-line/pm-part/masterdata columns-file precedent.
-// MOVEMENT_TYPE_LABEL/MOVEMENT_TYPE_BADGE_CLASS exported alongside since
-// the page's own <Select> filter needs MOVEMENT_TYPE_LABEL too (same
-// pattern as pmLineHistoryColumns.jsx exporting JENIS_LABEL).
+// Fase 1 (A1/D3): kolom Tanggal pakai formatDateTime().
+import { formatDateTime } from '../utils/formatDate';
+
 const MOVEMENT_TYPE_LABEL = {
   STOCK_IN: 'Stock In',
   STOCK_OUT: 'Stock Out',
@@ -22,7 +19,7 @@ const inventoryHistoryColumns = [
     key: 'created_at',
     header: 'Tanggal',
     className: 'font-[var(--font-mono)] text-xs text-[var(--text-dim)]',
-    render: (m) => new Date(m.created_at).toLocaleString('id-ID'),
+    render: (m) => formatDateTime(m.created_at),
   },
   {
     key: 'item',
