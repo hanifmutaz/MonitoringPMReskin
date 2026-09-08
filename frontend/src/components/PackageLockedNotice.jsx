@@ -35,7 +35,7 @@ function PackageLockedNotice({ featureName, features, compact = false }) {
       </div>
 
       {features && !compact && (
-        <div className="w-full max-w-md rounded-lg border border-border bg-card p-5 text-left">
+        <div className="w-full max-w-md rounded-xl border border-border bg-card p-5 text-left">
           <h2 className="mb-3 [font-family:var(--font-display)] text-sm font-semibold text-foreground">
             Yang didapat kalau upgrade ke Paket B
           </h2>

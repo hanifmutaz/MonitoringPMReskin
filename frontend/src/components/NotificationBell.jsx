@@ -74,7 +74,7 @@ function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[340px] rounded-lg border border-border bg-card shadow-lg">
+        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[340px] rounded-xl border border-border bg-card shadow-lg">
           <div className="border-b border-border px-4 py-3">
             <h2 className="m-0 font-[var(--font-display)] text-sm font-semibold">Notifikasi</h2>
             <p className="m-0 mt-0.5 text-xs text-muted-foreground">

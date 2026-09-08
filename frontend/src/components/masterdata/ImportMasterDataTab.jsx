@@ -113,7 +113,7 @@ function ImportMasterDataTab() {
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
         className={cn(
-          'mb-4 flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors',
+          'mb-4 flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors',
           isDragging ? 'border-primary bg-[var(--accent-dim)]' : 'border-border hover:border-primary/60 hover:bg-secondary'
         )}
       >
@@ -189,7 +189,7 @@ function ImportMasterDataTab() {
             <p className="mb-3 text-xs italic text-muted-foreground">Catatan: {preview.ignored_columns.join('; ')}</p>
           )}
 
-          <div className="max-h-[480px] overflow-auto rounded-lg border border-border">
+          <div className="max-h-[480px] overflow-auto rounded-xl border border-border">
             <table className="w-full border-collapse">
               <thead className="sticky top-0 bg-card">
                 <tr className="border-b border-border">

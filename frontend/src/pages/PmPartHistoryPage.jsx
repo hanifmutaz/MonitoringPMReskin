@@ -169,7 +169,7 @@ function PmPartHistoryPage() {
 
         {data && data.items.length > 0 && (
           <>
-            <div className="overflow-hidden rounded-lg border border-border">
+            <div className="overflow-hidden rounded-xl border border-border">
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>

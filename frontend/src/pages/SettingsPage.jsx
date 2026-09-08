@@ -9,7 +9,7 @@ import { Input } from '../components/ui/input';
 // Reskin (checklist §6b, halaman utama terakhir yang masih tampilan lama):
 // `.panel`/`.panel-header`/`.panel-title`/`.form-input` dilepas TOTAL
 // (§7.3), diganti Tailwind murni - style ngikutin pattern yang udah
-// established di LinesTab.jsx/DashboardPage.jsx (rounded-lg border-border
+// established di LinesTab.jsx/DashboardPage.jsx (rounded-xl border-border
 // bg-card p-4.5, judul text-[15px] font-semibold, mb-4 antara header &
 // konten).
 //
@@ -149,7 +149,7 @@ function CategoryCard({ categoryKey, settings }) {
   const meta = CATEGORY_META[categoryKey] || { no: '-', title: categoryKey, icon: Sliders };
   const Icon = meta.icon;
   return (
-    <div className="rounded-lg border border-border bg-card p-4.5">
+    <div className="rounded-xl border border-border bg-card p-4.5">
       <h2 className="m-0 mb-1 flex items-center gap-2 font-[var(--font-display)] text-[15px] font-semibold">
         <Icon size={16} />
         <span className="font-[var(--font-mono)] text-[var(--text-faint)]">{String(meta.no).padStart(2, '0')}</span>

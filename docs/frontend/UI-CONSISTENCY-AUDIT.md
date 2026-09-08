@@ -30,8 +30,9 @@
 ### 🔴 A2 — Radius nyampur (rounded-lg vs rounded-xl)
 - **Masalah:** `KpiCard` = `rounded-xl` + shadow. `card.jsx` (semua panel) = `rounded-lg` + flat. Di satu halaman ada 2 "bahasa". Ini akar rasa "50% redesign".
 - **Sebar:** SETIAP halaman yang punya KPI + panel (Dashboard, PM Part, PM Line).
-- **Keputusan (usulan):** pilih SATU radius jadi standar. Rekomendasi gua: **`rounded-xl` buat semua surface** (Card + Kpi + NeedsData + panel), karena lu udah suka look KPI. Update `card.jsx` sekali → semua panel ikut. Alternatif hemat: turunin KpiCard ke `rounded-lg` (lebih sedikit propagasi).
-- **Status:** ⬜ belum — **butuh keputusan lu**
+- **Keputusan (LOCKED, D1):** `rounded-xl` buat semua surface (Card, KpiCard, NeedsDataCard, DataTable wrapper, EmptyState, Dialog/AlertDialog, panel hand-rolled). `ui/card.jsx` jadi sumber, semua Card-clone hand-rolled (pola `rounded-lg border border-border bg-card p-4.5`) ikut disamain manual karena banyak halaman bikin panel sendiri tanpa pakai komponen `Card`.
+- **Status:** ✅ selesai — migrasi menyeluruh 08 Sep 2026. Cakupan: `card.jsx`, `DataTable.jsx` (wrapper + table container), `empty-state.jsx`, `dialog.jsx`, `alert-dialog.jsx`, `NotificationBell`, `GanttUpcomingPanel`, `KetepatanPerLinePanel`, `PmPartHistoryForm`/`PmLineHistoryForm` (panel standalone), dropzone `ImportMasterDataTab`, table-wrapper `PmPartHistoryPage`, + 19 panel hand-rolled di `CriticalAlertsPanel`, `PackageLockedNotice`, `ProfilePage`, `DashboardPmLineWeeklyPage`, `MasterDataPage`, `InventoryPage`, `SettingsPage`, `UserManagementPage`, `DashboardPmPartPage`. Build diverifikasi lolos (`npm run build`), bundle utama tetap ~130KB (nol bloat).
+  - **Exception (LOCKED juga, biar eksplisit):** elemen kecil non-"surface" TETAP `rounded-lg` — inline alert/message strip (danger/warn/accent/ok-dim, pola `ui/alert.jsx`), nav item `Sidebar`, blok `<pre>` log/JSON di `AuditLogPage`, banner tipis (`BulkDeleteBar`, `SelectAllAcrossPagesBar`, `RecycleBinPage`). Ini bukan pelanggaran D1 — mereka bukan "surface" panel, melainkan atom yang secara sengaja beda kelas visual (lebih kecil, lebih ringan).
 
 ### 🔴 A3 — Elevation policy nggak jelas (shadow vs flat)
 - **Masalah:** `DESIGN-TOKENS.md` bilang "no shadow, layering only". Tapi KpiCard sekarang pakai shadow + hover lift (pengecualian yang belum didokumentasi resmi). Panel lain flat.
@@ -50,12 +51,12 @@
 ### 🟡 A5 — Empty state belum konsisten di luar dashboard
 - **Masalah:** dashboard udah pakai `<EmptyState>` (abis fix kemarin). Tapi halaman lain (Monitoring "Semua Line OK", tabel kosong lain) mungkin masih teks polos.
 - **Keputusan (usulan):** audit semua kondisi kosong → wajib `<EmptyState>` (icon + title + description). Primitive udah ada, tinggal dipakai.
-- **Status:** ⬜ belum (perlu cek per halaman)
+- **Status:** ✅ selesai — audit 08 Sep 2026. Nemuin 1 kasus persis: "Semua Line dalam status OK" (`DashboardPmLineWeeklyPage.jsx`, tabel "Line Butuh Perhatian") masih teks polos → diganti `<EmptyState icon={ShieldCheck} tone="ok">`. Sekalian nemuin & benerin bug laten: `CriticalAlertsPanel.jsx` udah manggil `tone="ok"` dari dulu tapi `empty-state.jsx` belum punya tone itu → silently fallback ke neutral (nggak ijo). Ditambahin `ok: 'bg-ok-dim text-ok'` ke `TONE_CLASS`, sekarang 2 tempat ini beneran render ijo. Sisa halaman (Dashboard, PmPartHistoryPage, GanttUpcomingPanel, CriticalAlertsPanel, DataTable no-result) udah pakai `<EmptyState>` dari awal. **Exception disengaja (bukan pelanggaran):** `NotificationBell` dropdown (340px, terlalu kecil buat layout icon+title+desc, tetep teks ringkas biar sama sama state "Memuat...") dan hint inline di form `PartSupplierModal` (helper text di bawah Select, bukan empty-state block).
 
 ### 🟡 A6 — KPI badge glow masih agak dominan
 - **Masalah:** badge biru/kuning/merah masih sedikit lebih narik mata dari value. Udah membaik pas ada data, tapi belum ideal.
 - **Keputusan (usulan):** turunin shadow badge (`0_4px_12px_-5px`) + pastiin value `text-[30px]` tetap fokus utama.
-- **Status:** ⬜ belum
+- **Status:** ✅ selesai — 08 Sep 2026. Shadow geometri ditarik lebih rapat: `0_4px_12px_-5px` → `0_3px_8px_-6px` (blur & offset-y turun, spread lebih negatif/tertarik). Warna tetap dari token (`--accent`/`--ok`/`--warn`/`--danger`), `tokens.css` TIDAK disentuh (itu kontrak tampilan, ada larangan eksplisit ubah nilai di file itu). Value `text-[30px] font-semibold` udah dominan dari awal, nggak perlu diubah.
 
 ### 🟢 A7 — Typography scale kurang tegas
 - **Masalah:** lompatan ukuran antar-level (heading 15px / value 30px / label 11px) agak flat. Hierarki bisa lebih dramatis.
@@ -124,7 +125,7 @@ Perbaiki di sumber, propagasi otomatis:
 
 | ID | Pertanyaan | Opsi | Keputusan | Tgl |
 |----|------------|------|-----------|-----|
-| D1 | Radius standar semua surface? | rounded-lg / **rounded-xl** | _pending_ | — |
+| D1 | Radius standar semua surface? | rounded-lg / **rounded-xl** | **rounded-xl** | 08 Sep 2026 |
 | D2 | Shadow default? | flat-only / **hero boleh shadow** | _pending_ | — |
 | D3 | Format tanggal? | `DD MMM YYYY` / lain | _pending_ | — |
 | D4 | Ketepatan di tabel Monitoring? | inline badge / baris-2 | _pending_ | — |
@@ -174,6 +175,8 @@ Sistem gerak baku — semua transisi WAJIB ambil dari sini, jangan ad-hoc.
 |-----|-----------|
 | 2026-09-08 | Dok dibuat (Fase 0). Audit awal 9 temuan (A1–A9), 6 item "sudah bagus", rencana 3 fase. |
 | 2026-09-08 | +A10 (Motion system, P1) & +A11 (data-viz, P2). Tambah §6 Motion Scale. Diskusi MUI vs polish → keputusan: TETAP stack, all-in polish. |
+| 2026-09-08 | A2/D1 LOCKED & selesai: `rounded-xl` semua surface. Migrasi menyeluruh (bukan cuma `card.jsx`) — nemuin 19 panel hand-rolled di 9 file yang niru pola Card tapi belum ikut standar. Semua disamain, build diverifikasi (`npm run build` lolos, bundle tetap ~130KB). Exception atom kecil (alert strip, nav item, `<pre>` log) di-lock eksplisit sebagai bukan pelanggaran D1. **Catatan:** ditemukan duplikat isi dokumen ini di bagian bawah (±baris 190+, format plain-text) — belum dibersihkan, di luar scope perubahan ini. |
+| 2026-09-08 | A6 selesai: shadow badge KPI ditarik lebih rapat (`0_3px_8px_-6px`), lokal di `KpiCard.jsx`, `tokens.css` nggak disentuh. A5 selesai: 1 empty-state polos dibenerin ("Semua Line dalam status OK") + bug laten `tone="ok"` di `empty-state.jsx` yang selama ini nggak kepake ikut dibenerin. Build diverifikasi. |
 
 UI Consistency Audit — Monitoring PM Web
 Status: Living document. Dibuat sebagai Fase 0 dari "rapiin seluruh UI". Prinsip: Design-system-first. Perbaiki PRIMITIVE (ui/) sekali → propagasi ke semua halaman otomatis. JANGAN poles per-halaman satu-satu. Aturan main: setiap keputusan (kolom "Keputusan") harus di-LOCK sebelum ngoding. Sekali lock, jadi sumber kebenaran — halaman baru wajib ikut.

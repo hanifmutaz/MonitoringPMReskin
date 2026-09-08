@@ -3,7 +3,7 @@
 // yang udah duluan): `.panel`/`.panel-header`/`.panel-title`/`.data-table`/
 // `.kpi-grid`/`.empty-state`/`.error-state`/inline style color:var(--ok|warn|
 // danger) lama dilepas TOTAL, diganti Tailwind murni (text-ok/text-warn/
-// text-danger). Layout persis NGIKUTIN pola DashboardPage.jsx (rounded-lg
+// text-danger). Layout persis NGIKUTIN pola DashboardPage.jsx (rounded-xl
 // border-border bg-card p-4.5, judul text-[15px] font-semibold). Data/logic
 // (hook, multi-site switching, permission gating) TIDAK berubah sama sekali.
 import { useState } from 'react';
@@ -64,7 +64,7 @@ function DashboardPmPartPage() {
                     {[1, 2, 3, 4].map((i) => (
                         <div
                             key={i}
-                            className="flex h-[148px] items-center justify-center rounded-lg border border-border bg-card text-[var(--text-faint)]"
+                            className="flex h-[148px] items-center justify-center rounded-xl border border-border bg-card text-[var(--text-faint)]"
                         >
                             ...
                         </div>
@@ -99,7 +99,7 @@ function DashboardPmPartPage() {
                 </div>
             )}
 
-            <div className="rounded-lg border border-border bg-card p-4.5">
+            <div className="rounded-xl border border-border bg-card p-4.5">
                 <div className="mb-4 flex items-center justify-between">
                     <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Ringkasan Status Part</h2>
                 </div>
@@ -114,7 +114,7 @@ function DashboardPmPartPage() {
             </div>
 
             {!isLoading && data.per_line.length > 0 && (
-                <div className="rounded-lg border border-border bg-card p-4.5">
+                <div className="rounded-xl border border-border bg-card p-4.5">
                     <div className="mb-4 flex items-center justify-between">
                         <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Breakdown per Line</h2>
                     </div>

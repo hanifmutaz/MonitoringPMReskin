@@ -12,9 +12,12 @@
 // render TETAP SAMA: dipanggil bare di dalam Modal (isPrefilled=true, dari
 // PmLineStatusPage - Modal/DialogContent udah kasih padding sendiri) VS
 // dipanggil standalone di PmLineHistoryPage (isPrefilled=false, butuh
-// panel-nya sendiri: rounded-lg border-border bg-card p-4.5, ngikutin
+// panel-nya sendiri: rounded-xl border-border bg-card p-4.5, ngikutin
 // pola Master Data/Dashboard). Logic create/preset/reset-hint TIDAK
 // berubah sama sekali.
+//
+// polish: A2/D1 (rounded-xl) - radius panel standalone naik dari
+// rounded-lg. Lihat docs/frontend/UI-CONSISTENCY-AUDIT.md A2.
 import { useState } from 'react';
 import { useLines } from '../../hooks/useLines';
 import { useCreatePmLineHistory } from '../../hooks/usePmLineHistory';
@@ -83,7 +86,7 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className={isPrefilled ? undefined : 'rounded-lg border border-border bg-card p-4.5'}>
+    <form onSubmit={handleSubmit} className={isPrefilled ? undefined : 'rounded-xl border border-border bg-card p-4.5'}>
       {!isPrefilled && (
         <div className="mb-4">
           <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Input PM Monthly / Weekly</h2>

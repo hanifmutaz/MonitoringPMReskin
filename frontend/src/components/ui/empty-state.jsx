@@ -15,10 +15,19 @@
 // against. tone lets a caller opt into the semantic color without
 // hardcoding it as the only option (most Empty/No-Result cases genuinely
 // are neutral, per the same verified DataTable default usage).
+//
+// polish: A2/D1 (rounded-xl) - naik dari rounded-lg biar 1 bahasa radius
+// sama Card/DataTable. Lihat docs/frontend/UI-CONSISTENCY-AUDIT.md A2.
 import { cn } from '../../lib/utils';
 
+// polish: A5 (08 Sep 2026) - tambah tone `ok` (bg-ok-dim/text-ok). Sebelum
+// ini CriticalAlertsPanel.jsx udah manggil tone="ok" tapi diem-diem
+// fallback ke neutral karena "ok" belum ada di TONE_CLASS - baru sekarang
+// beneran render ijo. Dipakai juga buat empty-state "semua OK" lain
+// (mis. DashboardPmLineWeeklyPage "Line Butuh Perhatian").
 const TONE_CLASS = {
   neutral: 'bg-secondary text-muted-foreground',
+  ok: 'bg-ok-dim text-ok',
   danger: 'bg-danger-dim text-danger',
   warning: 'bg-warn-dim text-warn',
 };
@@ -27,7 +36,7 @@ function EmptyState({ icon: Icon, title, description, action, tone = 'neutral', 
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border px-6 py-12 text-center',
+        'flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border px-6 py-12 text-center',
         className
       )}
       {...props}

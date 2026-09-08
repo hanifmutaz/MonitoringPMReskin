@@ -35,7 +35,7 @@ function MasterDataPage() {
   const { hasPackage } = useAuth();
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4.5">
+    <div className="rounded-xl border border-border bg-card p-4.5">
       <div className="mb-5 flex gap-1 border-b border-border">
         {TABS.map((tab) => {
           const active = activeTab === tab.key;

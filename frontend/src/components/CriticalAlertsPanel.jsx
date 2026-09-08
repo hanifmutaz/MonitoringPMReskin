@@ -37,7 +37,7 @@ function AlertCard({ item }) {
 
 function CriticalAlertsPanel({ items = [] }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-4.5">
+    <div className="rounded-xl border border-border bg-card p-4.5">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">
           <AlertTriangle size={16} style={{ verticalAlign: -3, marginRight: 6 }} />

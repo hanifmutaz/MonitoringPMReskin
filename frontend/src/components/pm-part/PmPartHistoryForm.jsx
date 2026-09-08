@@ -160,7 +160,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
   // maupun di dalam Modal dari Monitoring (Modal sudah kasih panel + judul,
   // jadi wrapper di sini dilewatin biar gak dobel border/padding).
   return (
-    <form onSubmit={handleSubmit} className={isPrefilled ? undefined : 'rounded-lg border border-border bg-card p-4.5'}>
+    <form onSubmit={handleSubmit} className={isPrefilled ? undefined : 'rounded-xl border border-border bg-card p-4.5'}>
       {!isPrefilled && (
         <div className="mb-4">
           <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Input Penggantian Part</h2>

@@ -37,7 +37,7 @@ function GanttUpcomingPanel({ items = [] }) {
   const columns = buildColumns();
   const rows = groupByLine(items);
   return (
-    <div className="rounded-lg border border-border bg-card p-4.5">
+    <div className="rounded-xl border border-border bg-card p-4.5">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">
           Upcoming PM (7 Hari ke Depan)

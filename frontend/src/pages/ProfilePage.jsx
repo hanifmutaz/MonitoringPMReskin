@@ -190,7 +190,7 @@ function ProfilePage() {
           di sini SATU-SATUNYA yang bukan bagian dari 2 form di bawah -
           upload/hapus langsung ke-submit begitu dipilih/diklik, gak nunggu
           tombol "Simpan Perubahan". */}
-      <div className="flex items-center gap-4 rounded-lg border border-border bg-card p-4.5 lg:sticky lg:top-4 lg:flex-col lg:items-start lg:text-left">
+      <div className="flex items-center gap-4 rounded-xl border border-border bg-card p-4.5 lg:sticky lg:top-4 lg:flex-col lg:items-start lg:text-left">
         <div className="flex flex-col items-center gap-1.5">
           {/* Revisi (feedback via screenshot referensi Mantis): SELURUH
               lingkaran foto sekarang jadi 1 <button> yang clickable (bukan
@@ -270,7 +270,7 @@ function ProfilePage() {
         {/* Form 1: Update Profil */}
         <form
           onSubmit={handleProfileSubmit}
-          className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4.5"
+          className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4.5"
         >
           <h2 className="m-0 flex items-center gap-1.5 font-[var(--font-display)] text-[15px] font-semibold">
             <User size={16} />
@@ -317,7 +317,7 @@ function ProfilePage() {
         {/* Form 2: Ganti Password */}
         <form
           onSubmit={handlePasswordSubmit}
-          className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4.5"
+          className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4.5"
         >
           <h2 className="m-0 flex items-center gap-1.5 font-[var(--font-display)] text-[15px] font-semibold">
             <KeyRound size={16} />

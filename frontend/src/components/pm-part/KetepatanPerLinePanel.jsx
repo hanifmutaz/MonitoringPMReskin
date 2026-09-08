@@ -33,7 +33,7 @@ function KetepatanPerLinePanel() {
   if (isLoading || !data || data.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-border bg-card p-3.5">
+    <div className="rounded-xl border border-border bg-card p-3.5">
       <div className="mb-2.5 text-xs text-muted-foreground">Ketepatan PM Part per Line (tahun berjalan)</div>
       <div className="flex flex-wrap gap-2.5">
         {data.map((l) => (

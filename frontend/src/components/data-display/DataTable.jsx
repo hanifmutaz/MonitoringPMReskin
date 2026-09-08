@@ -9,6 +9,10 @@
 // all caller-supplied) - per §11's rule that primitives must not know
 // business domains, DataTable has zero PM/Inventory/Line knowledge.
 //
+// polish: A2/D1 (rounded-xl) - wrapper & table container naik dari
+// rounded-lg -> rounded-xl biar konsisten sama card.jsx (semua "surface"
+// pasif satu radius). Lihat docs/frontend/UI-CONSISTENCY-AUDIT.md A2.
+//
 // Markup/tokens follow the exact pattern already established by hand-rolled
 // tables in PmPartMonitoringPage.jsx / MasterDataPage.jsx (border-collapse,
 // font-mono uppercase header, border-[var(--border-soft)] row dividers,
@@ -106,7 +110,7 @@ function DataTable({
   const showPagination = typeof total === 'number' && typeof limit === 'number' && onPageChange && (hasRows || total > 0);
 
   return (
-    <div className={cn('rounded-lg border border-border bg-card p-4.5', className)}>
+    <div className={cn('rounded-xl border border-border bg-card p-4.5', className)}>
       {isError ? (
         errorState || (
           <EmptyState
@@ -124,7 +128,7 @@ function DataTable({
         <>
           <div
             className={cn(
-              'overflow-hidden rounded-lg border border-border transition-opacity',
+              'overflow-hidden rounded-xl border border-border transition-opacity',
               isRefreshing && 'opacity-60'
             )}
           >
@@ -211,7 +215,7 @@ function DataTable({
 
 function DataTableSkeleton({ columns, rows, withSelection }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border">
+    <div className="overflow-hidden rounded-xl border border-border">
       <div className="overflow-x-auto" tabIndex="0" role="region" aria-label="Memuat data tabel">
         <table className="w-full border-collapse">
           <thead>

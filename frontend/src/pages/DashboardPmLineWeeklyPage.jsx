@@ -3,11 +3,11 @@
 // yang udah duluan): `.panel`/`.panel-header`/`.panel-title`/`.data-table`/
 // `.kpi-grid`/`.empty-state`/`.error-state` lama dilepas TOTAL, diganti
 // Tailwind murni. Layout persis NGIKUTIN pola yang udah dipakai di
-// DashboardPage.jsx (rounded-lg border-border bg-card p-4.5, judul
+// DashboardPage.jsx (rounded-xl border-border bg-card p-4.5, judul
 // text-[15px] font-semibold) - bukan pola baru. Data/logic (hook,
 // multi-site switching, permission gating) TIDAK berubah sama sekali.
 import { useState } from 'react';
-import { Factory, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Factory, AlertTriangle, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboardLineSummary, useDashboardMultiSite } from '../hooks/useDashboardExtras';
@@ -15,6 +15,7 @@ import KpiCard from '../components/KpiCard';
 import LineStatusDonut from '../components/LineStatusDonut';
 import StatusBadge from '../components/StatusBadge';
 import SiteSwitcher from '../components/SiteSwitcher';
+import { EmptyState } from '../components/ui/empty-state';
 
 function DashboardPmLineWeeklyPage() {
     usePageHeader({ title: 'Dashboard PM Monthly and Weekly' });
@@ -64,7 +65,7 @@ function DashboardPmLineWeeklyPage() {
                     {[1, 2, 3].map((i) => (
                         <div
                             key={i}
-                            className="flex h-[148px] items-center justify-center rounded-lg border border-border bg-card text-[var(--text-faint)]"
+                            className="flex h-[148px] items-center justify-center rounded-xl border border-border bg-card text-[var(--text-faint)]"
                         >
                             ...
                         </div>
@@ -91,7 +92,7 @@ function DashboardPmLineWeeklyPage() {
             )}
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="rounded-lg border border-border bg-card p-4.5">
+                <div className="rounded-xl border border-border bg-card p-4.5">
                     <div className="mb-4 flex items-center justify-between">
                         <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Status Monthly</h2>
                     </div>
@@ -105,7 +106,7 @@ function DashboardPmLineWeeklyPage() {
                     )}
                 </div>
 
-                <div className="rounded-lg border border-border bg-card p-4.5">
+                <div className="rounded-xl border border-border bg-card p-4.5">
                     <div className="mb-4 flex items-center justify-between">
                         <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Status Weekly</h2>
                     </div>
@@ -121,14 +122,18 @@ function DashboardPmLineWeeklyPage() {
             </div>
 
             {!isLoading && (
-                <div className="rounded-lg border border-border bg-card p-4.5">
+                <div className="rounded-xl border border-border bg-card p-4.5">
                     <div className="mb-4 flex items-center justify-between">
                         <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Line Butuh Perhatian</h2>
                     </div>
                     {data.attention.length === 0 ? (
-                        <div className="px-4 py-5.5 text-center text-[var(--text-faint)]">
-                            Semua Line dalam status OK.
-                        </div>
+                        <EmptyState
+                            icon={ShieldCheck}
+                            tone="ok"
+                            className="border-0 py-8"
+                            title="Semua Line dalam status OK"
+                            description="Tidak ada Line yang butuh perhatian untuk Monthly/Weekly saat ini."
+                        />
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full border-collapse">

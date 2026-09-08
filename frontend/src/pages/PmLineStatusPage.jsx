@@ -2,7 +2,7 @@
 // Reskin (checklist §3 item 6 "PM pages", batch 2/N): `.panel`/`.data-table`/
 // `.error-state`/`.empty-state`/`.caption`/`.btn`/`.mono` lama dilepas
 // total, diganti Tailwind + shadcn ui (Button), ngikutin pola tabel Master
-// Data (rounded-lg border border-border, thead uppercase text-[var(--text-
+// Data (rounded-xl border border-border, thead uppercase text-[var(--text-
 // faint)]). Data/logic (query, target input modal) TIDAK berubah sama
 // sekali.
 //

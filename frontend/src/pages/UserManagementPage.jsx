@@ -4,7 +4,7 @@
 // `.form-label`/`.btn`/`.btn-primary`/`.btn-secondary`/`.error-state`/
 // `.empty-state`/`.caption`/inline style lama dilepas TOTAL, diganti
 // Tailwind + shadcn ui murni, ngikutin pola yang udah dipakai di Master
-// Data (PartsTab dkk) & Dashboard (rounded-lg border-border bg-card p-4.5).
+// Data (PartsTab dkk) & Dashboard (rounded-xl border-border bg-card p-4.5).
 // `ToggleSwitch.jsx` SENGAJA TIDAK diikutkan reskin ini - dia komponen
 // shared yang juga dipakai SettingsPage.jsx (di luar cakupan Master
 // Data/PM/admin pages), dan secara fungsional udah aman (ada cursor
@@ -198,7 +198,7 @@ function PendingApprovalSection() {
   });
 
   return (
-    <div className="mb-4 rounded-lg border border-border bg-card p-4.5">
+    <div className="mb-4 rounded-xl border border-border bg-card p-4.5">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">
           Menunggu Persetujuan{' '}
@@ -308,7 +308,7 @@ function RoleManagementSection() {
   });
 
   return (
-    <div className="mb-4 rounded-lg border border-border bg-card p-4.5">
+    <div className="mb-4 rounded-xl border border-border bg-card p-4.5">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Role & Permission</h2>
       </div>
@@ -418,7 +418,7 @@ function UserManagementPage() {
       <RoleManagementSection />
       <PendingApprovalSection />
 
-      <div className="rounded-lg border border-border bg-card p-4.5">
+      <div className="rounded-xl border border-border bg-card p-4.5">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Daftar User</h2>
           <Button type="button" onClick={() => setModalState({ mode: 'create' })}>

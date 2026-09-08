@@ -1,9 +1,16 @@
 // src/components/KpiCard.jsx
+//
+// polish: A6 (KPI badge glow tuning, 08 Sep 2026) - shadow geometri
+// ditarik lebih kecil/rapat (blur 12px->8px, spread -5px->-6px, offset-y
+// 4px->3px) biar glow badge nggak lebih narik mata dari value. Warna
+// TETAP dari token (--accent/--ok/--warn/--danger) - cuma geometri lokal
+// yang diubah, tokens.css nggak disentuh (itu "kontrak tampilan").
+// Lihat docs/frontend/UI-CONSISTENCY-AUDIT.md A6.
 const ICON_BADGE_CLASS = {
-  accent: 'bg-[var(--accent)] shadow-[0_4px_12px_-5px_var(--accent)]',
-  ok: 'bg-ok shadow-[0_4px_12px_-5px_var(--ok)]',
-  warn: 'bg-warn shadow-[0_4px_12px_-5px_var(--warn)]',
-  danger: 'bg-danger shadow-[0_4px_12px_-5px_var(--danger)]',
+  accent: 'bg-[var(--accent)] shadow-[0_3px_8px_-6px_var(--accent)]',
+  ok: 'bg-ok shadow-[0_3px_8px_-6px_var(--ok)]',
+  warn: 'bg-warn shadow-[0_3px_8px_-6px_var(--warn)]',
+  danger: 'bg-danger shadow-[0_3px_8px_-6px_var(--danger)]',
   muted: 'bg-[var(--panel-3)] text-[var(--text-faint)] shadow-none',
 };
 
