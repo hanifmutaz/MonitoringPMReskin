@@ -198,7 +198,7 @@ function ImportMasterDataTab() {
                       <th
                         key={i}
                         className={cn(
-                          'whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]',
+                          'whitespace-nowrap px-2.5 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]',
                           h === 'Target Shot' && 'text-right'
                         )}
                       >
@@ -215,7 +215,7 @@ function ImportMasterDataTab() {
                   const Icon = badge.Icon;
                   return (
                     <tr key={row.row_number} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                      <td className="px-3 py-2.5">
+                      <td className="px-2.5 py-2.5">
                         <input
                           type="checkbox"
                           checked={row.include}
@@ -223,18 +223,18 @@ function ImportMasterDataTab() {
                           className="h-3.5 w-3.5 accent-[var(--accent)]"
                         />
                       </td>
-                      <td className="px-3 py-2.5 font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
+                      <td className="px-2.5 py-2.5 font-[var(--font-mono)] text-xs text-[var(--text-dim)]">
                         {row.row_number}
                       </td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-2.5 py-2.5">
                         <span className={cn('inline-flex items-center gap-1 text-xs font-medium', badge.textClass)}>
                           <Icon size={12} /> {badge.label}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 font-[var(--font-mono)] text-[13px]">{row.line_no}</td>
-                      <td className="px-3 py-2.5 font-[var(--font-mono)] text-[13px]">{row.cl_no}</td>
-                      <td className="px-3 py-2.5 text-[13px]">{row.jig_name}</td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-2.5 py-2.5 font-[var(--font-mono)] text-[13px]">{row.line_no}</td>
+                      <td className="px-2.5 py-2.5 font-[var(--font-mono)] text-[13px]">{row.cl_no}</td>
+                      <td className="px-2.5 py-2.5 text-[13px]">{row.jig_name}</td>
+                      <td className="px-2.5 py-2.5">
                         <Input
                           className="h-7 w-[160px] font-[var(--font-mono)] text-xs"
                           value={row.drawing_no}
@@ -246,11 +246,11 @@ function ImportMasterDataTab() {
                           </div>
                         )}
                       </td>
-                      <td className="px-3 py-2.5 text-[13px]">{row.part_name}</td>
-                      <td className="px-3 py-2.5 text-right font-[var(--font-mono)] text-[13px]">
+                      <td className="px-2.5 py-2.5 text-[13px]">{row.part_name}</td>
+                      <td className="px-2.5 py-2.5 text-right font-[var(--font-mono)] text-[13px]">
                         {row.target_shot?.toLocaleString('id-ID') ?? '-'}
                       </td>
-                      <td className="max-w-[220px] px-3 py-2.5 text-[11px] text-muted-foreground">
+                      <td className="max-w-[220px] px-2.5 py-2.5 text-[11px] text-muted-foreground">
                         {row.errors?.join('; ')}
                         {!row.line_exists && !row.errors?.length && ' Line baru akan dibuat.'}
                         {row.line_exists && !row.part_exists && !row.errors?.length && ' Part baru di Line ini.'}

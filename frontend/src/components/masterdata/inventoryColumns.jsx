@@ -9,8 +9,13 @@
 // it's only ever used inside these columns (the item list's Status column
 // and ItemDetailModal's ROP summary card), same reasoning as
 // StatusWithKetepatan in pm-line/pmLineColumns.jsx.
+// polish: A1 (08 Sep 2026) - kolom "Tanggal" (movement history) tadinya
+// `new Date(...).toLocaleString('id-ID')`, diganti `formatDateTime()`
+// biar 1 bahasa sama tabel lain (LOCK format `DD MMM YYYY, HH:mm`). Lihat
+// docs/frontend/UI-CONSISTENCY-AUDIT.md A1.
 import { ArrowDownCircle, ArrowUpCircle, History, Pencil, ShoppingCart, Trash2 } from 'lucide-react';
 import { Button } from '../ui/button';
+import { formatDateTime } from '../../utils/formatDate';
 
 function RopBadge({ rop }) {
   if (!rop || rop.status === 'NOT_CONFIGURED') {
@@ -92,7 +97,7 @@ const inventoryMovementColumns = [
     key: 'created_at',
     header: 'Tanggal',
     className: 'font-[var(--font-mono)] text-xs text-[var(--text-dim)]',
-    render: (m) => new Date(m.created_at).toLocaleString('id-ID'),
+    render: (m) => formatDateTime(m.created_at),
   },
   {
     key: 'movement_type',

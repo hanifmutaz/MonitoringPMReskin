@@ -78,7 +78,12 @@ Confirmed via `StatusBadge.jsx`: `OK` (green/`--ok`), `WARNING` (amber/`--warn`)
 
 ## Elevation rules
 
-`Unknown` — no `box-shadow` tokens found in `tokens.css`. Production currently distinguishes surfaces by background color layering (`--panel` → `--panel-2` → `--panel-3`) rather than shadow. Brief §10 says "shadow only for genuinely elevated surfaces" — this is consistent with the existing no-shadow-by-default approach; only add shadow tokens if a genuinely elevated surface (e.g. a Dialog/Drawer) needs one and doesn't already have layering-based separation.
+**LOCKED (D2, 08 Sep 2026 — closes A2/A3 di `UI-CONSISTENCY-AUDIT.md`):**
+- **Surface pasif** (Card, panel isi, tabel, dialog/alert-dialog, empty-state) → **flat, no shadow**. Dipisahkan via `border` + background layering (`--panel` → `--panel-2` → `--panel-3`), bukan shadow. Ini yang tadinya ditulis "Unknown" di atas — sekarang eksplisit: `ui/card.jsx` TIDAK punya shadow class sama sekali.
+- **Surface hero/interaktif** (KpiCard — satu-satunya exception saat ini) → BOLEH `shadow-sm` default + `hover:shadow-md` + `hover:-translate-y-0.5` (lift). Ini pengecualian yang disengaja, bukan inkonsistensi — KPI adalah titik fokus visual utama tiap halaman dashboard, beda kelas dari panel isi.
+- Icon badge di dalam KpiCard (bulatan ikon accent/ok/warn/danger) punya shadow warna sendiri (`shadow-[0_3px_8px_-6px_var(--warna-status)]`, ditarik rapat per A6 — lihat `UI-CONSISTENCY-AUDIT.md` A6) — ini glow lokal buat badge, bukan elevation surface, jangan dicampur konsepnya sama shadow Card di atas.
+- Kalau nanti ada surface hero baru (misal komponen sejenis KPI di halaman lain), ikutin pola KpiCard: `shadow-sm` default + `hover:shadow-md`, JANGAN bikin varian shadow baru sendiri.
+- Brief §10 ("shadow only for genuinely elevated surfaces") konsisten sama keputusan ini — no-shadow-by-default tetap jadi aturan, KpiCard cuma exception yang sekarang didokumentasikan eksplisit, bukan lagi "belum dokumentasi resmi" (lihat A3 di audit).
 
 ## Responsive breakpoints
 

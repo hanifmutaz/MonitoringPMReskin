@@ -14,7 +14,10 @@ function AlertDialogOverlay({ className, ...props }) {
   return (
     <AlertDialogPrimitive.Overlay
       className={cn(
-        'fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+        // polish: A10 (motion, 08 Sep 2026) - sama kayak dialog.jsx, pakai
+        // token duration-[var(--duration-slow)] + easing enter/exit berbeda. Lihat
+        // docs/frontend/UI-CONSISTENCY-AUDIT.md §6.
+        'fixed inset-0 z-50 bg-black/50 duration-[var(--duration-slow)] data-[state=open]:animate-in data-[state=open]:ease-decelerate data-[state=closed]:animate-out data-[state=closed]:ease-accelerate data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
         className
       )}
       {...props}
@@ -28,7 +31,9 @@ function AlertDialogContent({ className, ...props }) {
       <AlertDialogOverlay />
       <AlertDialogPrimitive.Content
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 border border-border bg-card p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 rounded-xl',
+          // polish: A10 (motion, 08 Sep 2026) - `duration-200` mentah -> token
+          // `duration-[var(--duration-slow)]` (300ms), easing dibedain enter/exit.
+          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 border border-border bg-card p-6 shadow-lg duration-[var(--duration-slow)] data-[state=open]:animate-in data-[state=open]:ease-decelerate data-[state=closed]:animate-out data-[state=closed]:ease-accelerate data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 rounded-xl',
           className
         )}
         {...props}

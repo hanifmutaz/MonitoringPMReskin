@@ -13,6 +13,13 @@
 // - A5: empty state "Belum ada riwayat penggantian." sebelumnya teks polos
 //   di <div>. Sekarang pakai <EmptyState> primitive yang sudah dipakai di
 //   seluruh app (icon + title), konsisten sama Dashboard/panel lain.
+//
+// Fase 2 polish (grup Monitoring, UI-CONSISTENCY-AUDIT.md §3):
+// - Filter row (Select Line + Select Jenis) sebelumnya hand-rolled
+//   `<div className="flex flex-wrap gap-2">`, beda dari FilterBar yang
+//   dipakai PmPartMonitoringPage.jsx (`gap-3` + `items-center`). Sekarang
+//   pakai <FilterBar> yang sama biar 1 bahasa layout filter se-grup
+//   Monitoring. Nol behavior change - FilterBar cuma wrapper layout.
 import { useState } from 'react';
 import { Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
@@ -28,6 +35,7 @@ import BulkDeleteBar from '../components/BulkDeleteBar';
 import SelectAllAcrossPagesBar from '../components/SelectAllAcrossPagesBar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { EmptyState } from '../components/ui/empty-state';
+import { FilterBar } from '../components/data-display/FilterBar';
 import { JENIS_LABEL } from '../components/pm-part/constants';
 import { formatDate } from '../utils/formatDate';
 
@@ -84,7 +92,7 @@ function PmPartHistoryPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
+      <FilterBar>
         <Select
           value={lineId}
           onValueChange={(v) => {
@@ -124,7 +132,7 @@ function PmPartHistoryPage() {
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
 
       <div className="rounded-xl border border-border bg-card p-4.5">
         {isError && (
@@ -174,7 +182,7 @@ function PmPartHistoryPage() {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="w-[36px] px-3 py-2">
+                      <th className="w-[36px] px-2.5 py-2">
                         <input
                           type="checkbox"
                           checked={selection.allOnPageSelected}
@@ -189,7 +197,7 @@ function PmPartHistoryPage() {
                         (h) => (
                           <th
                             key={h}
-                            className="whitespace-nowrap px-3 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
+                            className="whitespace-nowrap px-2.5 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
                           >
                             {h}
                           </th>
@@ -200,7 +208,7 @@ function PmPartHistoryPage() {
                   <tbody>
                     {data.items.map((item) => (
                       <tr key={item.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                        <td className="px-3 py-3">
+                        <td className="px-2.5 py-2.5">
                           <input
                             type="checkbox"
                             checked={selection.isSelected(item.id)}
@@ -208,24 +216,24 @@ function PmPartHistoryPage() {
                             className="h-3.5 w-3.5 accent-[var(--accent)]"
                           />
                         </td>
-                        <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{formatDate(item.tgl_ganti)}</td>
-                        <td className="px-3 py-3">
+                        <td className="px-2.5 py-2.5 font-[var(--font-mono)] text-[13px]">{formatDate(item.tgl_ganti)}</td>
+                        <td className="px-2.5 py-2.5">
                           <div className="font-[var(--font-mono)] text-[13px]">{item.line_name}</div>
                           <div className="text-xs text-[var(--text-dim)]">
                             {item.part_name} ({item.drawing_no} — {item.jig_name})
                           </div>
                         </td>
-                        <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">{item.shift || '-'}</td>
-                        <td className="px-3 py-3 font-[var(--font-mono)] text-[13px]">
+                        <td className="px-2.5 py-2.5 font-[var(--font-mono)] text-[13px]">{item.shift || '-'}</td>
+                        <td className="px-2.5 py-2.5 font-[var(--font-mono)] text-[13px]">
                           {Number(item.counter_saat_diganti).toLocaleString('id-ID')}
                         </td>
-                        <td className="px-3 py-3 text-[13px]">{JENIS_LABEL[item.jenis_penggantian]}</td>
-                        <td className="px-3 py-3 text-[13px]">{item.pic_name || '-'}</td>
-                        <td className="px-3 py-3">
+                        <td className="px-2.5 py-2.5 text-[13px]">{JENIS_LABEL[item.jenis_penggantian]}</td>
+                        <td className="px-2.5 py-2.5 text-[13px]">{item.pic_name || '-'}</td>
+                        <td className="px-2.5 py-2.5">
                           <OnTimeBadge onTime={item.on_time} />
                         </td>
-                        <td className="max-w-[200px] px-3 py-3 text-xs text-[var(--text-dim)]">{item.remark || '-'}</td>
-                        <td className="px-3 py-3 text-xs text-[var(--text-dim)]">{item.user_full_name}</td>
+                        <td className="max-w-[200px] px-2.5 py-2.5 text-xs text-[var(--text-dim)]">{item.remark || '-'}</td>
+                        <td className="px-2.5 py-2.5 text-xs text-[var(--text-dim)]">{item.user_full_name}</td>
                       </tr>
                     ))}
                   </tbody>

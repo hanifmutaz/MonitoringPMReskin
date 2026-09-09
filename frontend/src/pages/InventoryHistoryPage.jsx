@@ -19,6 +19,12 @@
 // gak ada komponen lain yang perlu digabung ke domain folder baru,
 // sama alasan ClMappingModal.jsx tetap mendefinisikan kolomnya sendiri).
 // Semua state/query/pagination/handler TIDAK berubah.
+//
+// Fase 2 polish (grup History, UI-CONSISTENCY-AUDIT.md §3): filter row
+// (Select Item + Select Jenis) sebelumnya hand-rolled
+// `<div className="flex flex-wrap gap-2">`, beda dari <FilterBar> yang
+// dipakai grup Monitoring (`gap-3` + `items-center`). Disamain jadi 1
+// bahasa layout filter lintas grup halaman. Nol behavior change.
 import { useState } from 'react';
 import { Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
@@ -33,6 +39,7 @@ import SelectAllAcrossPagesBar from '../components/SelectAllAcrossPagesBar';
 import { DataTable, DataTableNoResult } from '../components/data-display/DataTable';
 import { EmptyState } from '../components/ui/empty-state';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { FilterBar } from '../components/data-display/FilterBar';
 import inventoryHistoryColumns, { MOVEMENT_TYPE_LABEL } from './inventoryHistoryColumns';
 
 const LIMIT = 20;
@@ -98,7 +105,7 @@ function InventoryHistoryPage() {
 
     return (
         <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap gap-2">
+            <FilterBar>
                 <Select
                     value={itemId}
                     onValueChange={(v) => {
@@ -138,7 +145,7 @@ function InventoryHistoryPage() {
                         ))}
                     </SelectContent>
                 </Select>
-            </div>
+            </FilterBar>
 
             {bulkError && (
                 <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">

@@ -278,3 +278,24 @@ input[type='password']::-webkit-strong-password-auto-fill-button {
     overflow-x: auto;
   }
 }
+
+/* ================= Motion: prefers-reduced-motion (Fase 3, A10) =================
+   WAJIB - docs/frontend/UI-CONSISTENCY-AUDIT.md §6.4 "Respect prefers-reduced-
+   motion". Kalau user set reduce motion di OS-nya, SEMUA transisi/animasi
+   non-esensial dimatiin (durasi ditarik ke ~0, animasi di-skip ke end state
+   langsung) - accessibility requirement, bukan opsional. Pola universal:
+   override * (bukan per-komponen), jadi otomatis nge-cover transisi baru
+   yang ditambahin di komponen manapun ke depannya, nol maintenance tambahan.
+   `!important` sengaja dipakai - ini SATU-SATUNYA tempat yang boleh, karena
+   tujuannya emang buat nge-override semua transition/animation apa pun
+   durasi/timing yang di-set component-level. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -18,9 +18,22 @@ function KpiCard({ icon, label, value, caption, status = 'accent' }) {
   const iconClass = ICON_BADGE_CLASS[status] || ICON_BADGE_CLASS.accent;
 
   return (
-    <div className="group relative overflow-visible rounded-xl border border-border bg-card p-4.5 pt-7 shadow-sm transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-md">
+    <div
+      // polish: A10 (motion, 08 Sep 2026) - fade-in-on-mount (opacity 0->1 +
+      // translate-y kecil), LOCK duration-slow + ease-decelerate ("elemen
+      // MASUK") per UI-CONSISTENCY-AUDIT.md §6. KpiCard dipakai di ~14
+      // halaman jadi fix ini di primitive otomatis nempel ke semua KPI grid
+      // tanpa nyentuh consumer-nya. Stagger antar-kartu (40ms) BELUM
+      // diimplementasi sesi ini - butuh index/posisi kartu yang nggak
+      // tersedia di primitive generik ini (consumer manggil KpiCard manual,
+      // bukan lewat .map()) - dicatat sebagai kerjaan lanjutan di plan.
+      // `duration-200` mentah di transisi hover juga disamain ke token
+      // `duration-[var(--duration-base)]` sekalian (sama nilai, sekarang
+      // eksplisit dari 1 sumber).
+      className="group relative animate-in fade-in slide-in-from-bottom-2 overflow-visible rounded-xl border border-border bg-card p-4.5 pt-7 shadow-sm duration-[var(--duration-slow)] ease-decelerate transition-[transform,box-shadow,border-color] hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-md hover:duration-[var(--duration-base)]"
+    >
       <div
-        className={`absolute -top-3.5 right-4 flex h-11 w-11 items-center justify-center rounded-xl text-white transition-transform duration-200 group-hover:scale-[1.03] ${iconClass}`}
+        className={`absolute -top-3.5 right-4 flex h-11 w-11 items-center justify-center rounded-xl text-white transition-transform duration-[var(--duration-base)] group-hover:scale-[1.03] ${iconClass}`}
       >
         {icon}
       </div>

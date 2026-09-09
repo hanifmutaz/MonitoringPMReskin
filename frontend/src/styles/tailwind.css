@@ -75,4 +75,34 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Motion scale - easing (Fase 3, A10 - docs/frontend/UI-CONSISTENCY-AUDIT.md
+     §6). LOCKED - SEMUA transisi baru WAJIB pakai token ini
+     (ease-standard/decelerate/accelerate), jangan easing default/ad-hoc.
+     Tailwind v4 otomatis bikin utility class dari namespace --ease-* ini
+     (ease-standard, dst) - nol config tambahan, diverifikasi di CSS
+     output build. Durasi (duration-fast/base/slow/data) TIDAK bisa lewat
+     jalur yang sama - lihat blok :root di bawah buat kenapa & caranya. */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);    /* mayoritas (masuk & keluar) */
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);    /* elemen MASUK (enter) */
+  --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);    /* elemen KELUAR (exit) */
+}
+
+/* Motion scale - durasi (LOCKED, sama seperti easing di atas). Sengaja
+   TIDAK ditaro di @theme inline: dicoba (`--duration-*`) tapi Tailwind v4
+   CUMA generate utility dari theme namespace yang dia kenal - --ease-*
+   termasuk yang dikenal (makanya di atas beneran jadi class `.ease-*`),
+   tapi `--duration-*` custom BUKAN namespace yang didukung buat generate
+   `duration-*` utility. Kalau dipaksa taro di @theme, di-drop diam-diam
+   (nggak error/warning, cuma nggak nongol di output - baru ketauan pas
+   grep CSS hasil build kosong). Solusinya: plain CSS var (:root, di luar
+   @theme), dipakai component via arbitrary value Tailwind:
+   `duration-[var(--duration-slow)]`. TETAP 1 sumber kebenaran (ganti
+   nilai di sini, semua consumer ikut) - cuma beda mekanisme dari ease-*.
+   `prefers-reduced-motion` WAJIB dihormati - lihat global.css. */
+:root {
+  --duration-fast: 150ms;   /* hover warna, focus ring, tooltip */
+  --duration-base: 200ms;   /* hover lift, tab switch, badge, button press */
+  --duration-slow: 300ms;   /* modal/drawer enter, page fade, expand/collapse */
+  --duration-data: 400ms;   /* angka count-up, bar/donut grow on load */
 }

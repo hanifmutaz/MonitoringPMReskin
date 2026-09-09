@@ -28,6 +28,12 @@
 // tidak. Sekarang DataTable otomatis membedakan "belum ada data sama
 // sekali" vs "ada data, tapi filter yang aktif tidak match" (dengan
 // tombol Reset Filter) - sama seperti PmPartMonitoringPage.jsx.
+//
+// Fase 2 polish (grup Monitoring, UI-CONSISTENCY-AUDIT.md §3): filter row
+// (Select Line + Select Jenis) sebelumnya hand-rolled
+// `<div className="flex flex-wrap gap-2">`, beda dari <FilterBar> yang
+// dipakai PmPartMonitoringPage.jsx (`gap-3` + `items-center`). Disamain,
+// nol behavior change.
 import { useState } from 'react';
 import { Plus, X, Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
@@ -45,6 +51,7 @@ import { DataTable, DataTableNoResult } from '../components/data-display/DataTab
 import { EmptyState } from '../components/ui/empty-state';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { FilterBar } from '../components/data-display/FilterBar';
 
 const LIMIT = 20;
 
@@ -133,7 +140,7 @@ function PmLineHistoryPage() {
         />
       )}
 
-      <div className="flex flex-wrap gap-2">
+      <FilterBar>
         <Select
           value={lineId}
           onValueChange={(v) => {
@@ -173,7 +180,7 @@ function PmLineHistoryPage() {
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
 
       {bulkError && (
         <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{bulkError}</div>

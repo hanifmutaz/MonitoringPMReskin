@@ -142,7 +142,7 @@ function DataTable({
                 <thead>
                   <tr className="border-b border-border">
                     {selection && (
-                      <th className="w-[36px] px-3 py-2">
+                      <th className="w-[36px] px-2.5 py-2">
                         <input
                           type="checkbox"
                           checked={selection.allOnPageSelected}
@@ -159,7 +159,7 @@ function DataTable({
                       <th
                         key={col.key}
                         className={cn(
-                          'whitespace-nowrap px-3 py-2 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]',
+                          'whitespace-nowrap px-2.5 py-2 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]',
                           col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
                         )}
                       >
@@ -174,7 +174,7 @@ function DataTable({
                     return (
                       <tr key={rowKey} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
                         {selection && (
-                          <td className="px-3 py-3">
+                          <td className="px-2.5 py-2.5">
                             {(!selection.isSelectable || selection.isSelectable(rowKey)) && (
                               <input
                                 type="checkbox"
@@ -190,7 +190,7 @@ function DataTable({
                           <td
                             key={col.key}
                             className={cn(
-                              'px-3 py-3 text-[13px]',
+                              'px-2.5 py-2.5 text-[13px]',
                               col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left',
                               col.className
                             )}
@@ -221,12 +221,12 @@ function DataTableSkeleton({ columns, rows, withSelection }) {
           <thead>
             <tr className="border-b border-border">
               {withSelection && (
-                <th className="w-[36px] px-3 py-2">
+                <th className="w-[36px] px-2.5 py-2">
                   <Skeleton className="h-3.5 w-3.5" />
                 </th>
               )}
               {columns.map((col) => (
-                <th key={col.key} className="px-3 py-2 text-left">
+                <th key={col.key} className="px-2.5 py-2 text-left">
                   <Skeleton className="h-3 w-16" />
                 </th>
               ))}
@@ -236,12 +236,12 @@ function DataTableSkeleton({ columns, rows, withSelection }) {
             {Array.from({ length: rows }).map((_, i) => (
               <tr key={i} className="border-b border-[var(--border-soft)] last:border-b-0">
                 {withSelection && (
-                  <td className="px-3 py-3">
+                  <td className="px-2.5 py-2.5">
                     <Skeleton className="h-3.5 w-3.5" />
                   </td>
                 )}
                 {columns.map((col) => (
-                  <td key={col.key} className="px-3 py-3">
+                  <td key={col.key} className="px-2.5 py-2.5">
                     <Skeleton className="h-4 w-full max-w-32" />
                   </td>
                 ))}

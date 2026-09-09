@@ -1,4 +1,11 @@
 // src/pages/userManagementColumns.jsx
+//
+// polish: A1 (08 Sep 2026) - kolom "Daftar Sejak" & "Last Login" tadinya
+// `new Date(...).toLocaleString('id-ID')` (format beda-beda tergantung
+// browser locale, nggak konsisten sama util terpusat). Diganti
+// `formatDateTime()` -> LOCK format `DD MMM YYYY, HH:mm`, null-safe
+// otomatis (nggak perlu manual `? : '-'` lagi). Lihat
+// docs/frontend/UI-CONSISTENCY-AUDIT.md A1.
 // New (docs/frontend/MIGRATION-PLAN.md Phase 11). Extracted from the three
 // hand-rolled <table>s in UserManagementPage.jsx (PendingApprovalSection,
 // the main "Daftar User" table, RoleManagementSection) - one file since
@@ -15,6 +22,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import ToggleSwitch from '../components/ToggleSwitch';
+import { formatDateTime } from '../utils/formatDate';
 
 function buildPendingApprovalColumns({ roles, roleSelections, onRoleSelect, onApprove, onReject, approvePending, rejectPending }) {
   return [
@@ -25,7 +33,7 @@ function buildPendingApprovalColumns({ roles, roleSelections, onRoleSelect, onAp
       key: 'created_at',
       header: 'Daftar Sejak',
       className: 'font-[var(--font-mono)] text-xs text-[var(--text-dim)]',
-      render: (u) => new Date(u.created_at).toLocaleString('id-ID'),
+      render: (u) => formatDateTime(u.created_at),
     },
     {
       key: 'role',
@@ -101,7 +109,7 @@ function buildUserColumns({ currentUser, onEdit, onToggleActive }) {
       key: 'last_login',
       header: 'Last Login',
       className: 'font-[var(--font-mono)] text-xs text-[var(--text-dim)]',
-      render: (u) => (u.last_login ? new Date(u.last_login).toLocaleString('id-ID') : '-'),
+      render: (u) => formatDateTime(u.last_login),
     },
     {
       key: 'actions',
