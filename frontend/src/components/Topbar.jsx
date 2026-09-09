@@ -87,7 +87,8 @@ function Topbar() {
             strokeWidth={1.8}
           />
         </button>
-        <h1 className="m-0 [font-family:var(--font-display)] text-[22px] font-semibold">{title}</h1>
+        {/* polish: A7 typography scale — page-title tier (24px/text-2xl), samain sama h1 LoginPage/RegisterPage (sebelumnya text-[22px] custom, numpuk sama tier angka data "display-secondary" 22px di KetepatanPerLinePanel/InventoryTab) */}
+        <h1 className="m-0 [font-family:var(--font-display)] text-2xl font-semibold">{title}</h1>
       </div>
       {/* Bell notifikasi (checklist §7, fitur baru) SELALU tampil (beda
           dari `actions` yang page-specific) - ditaro bareng actions dalam

@@ -33,7 +33,8 @@ function KetepatanPerLinePanel() {
   if (isLoading || !data || data.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-3.5">
+    // polish: A8 spacing rhythm — samain padding ke standar panel (18px/p-4.5), sebelumnya p-3.5 (14px) beda sendiri dari panel dashboard lain (GanttUpcomingPanel/CriticalAlertsPanel) tanpa alasan struktural
+    <div className="rounded-xl border border-border bg-card p-4.5">
       <div className="mb-2.5 text-xs text-muted-foreground">Ketepatan PM Part per Line (tahun berjalan)</div>
       <div className="flex flex-wrap gap-2.5">
         {data.map((l) => (

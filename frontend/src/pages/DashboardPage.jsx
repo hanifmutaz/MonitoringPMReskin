@@ -63,7 +63,8 @@ function NeedsDataCard({ icon, label, note }) {
       </span>
       <div className="mt-2">
         <div className="mb-1 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">{label}</div>
-        <div className="font-[var(--font-display)] text-[17px] font-semibold text-muted-foreground">Belum tersedia</div>
+        {/* polish: A7 typography scale — turun ke body-tier (13px), sebelumnya text-[17px] font-display ikut kelas angka padahal ini teks kalimat, bukan value */}
+        <div className="text-[13px] font-medium text-muted-foreground">Belum tersedia</div>
         <div className="mt-1.5 max-w-lg text-xs leading-relaxed text-muted-foreground">{note}</div>
       </div>
     </div>
@@ -80,7 +81,8 @@ function HealthStat({ value, label, tone }) {
   const cfg = HEALTH_STAT_CLASS[tone];
   return (
     <div className={`flex min-h-[92px] flex-1 flex-col items-center justify-center rounded-xl border p-4 text-center ${cfg.bg} ${cfg.border}`}>
-      <div className={`font-[var(--font-display)] text-[28px] font-semibold leading-none tracking-tight ${cfg.text}`}>{value}</div>
+      {/* polish: A7 typography scale — samain ke display-tier standar (30px, sama kayak KpiCard), sebelumnya text-[28px] beda 2px tanpa alasan jelas */}
+      <div className={`font-[var(--font-display)] text-[30px] font-semibold leading-none tracking-tight ${cfg.text}`}>{value}</div>
       <div className="mt-2 text-xs font-medium text-muted-foreground">{label}</div>
     </div>
   );
