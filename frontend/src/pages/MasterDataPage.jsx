@@ -11,11 +11,18 @@
 // ini bagian dari MasterDataPage yang tab lain-lainnya (Lines/Parts/Import)
 // TETAP kebuka normal, jadi gatingnya di level tab (badge lock + konten
 // PackageLockedNotice compact), bukan nge-lock seluruh halaman.
+//
+// polish: A10 (motion, 08 Sep 2026) - underline tab yang tadinya
+// border-bottom per-tombol (nyala/mati instan pas ganti tab) diganti 1
+// indicator <span> yang GESER (§6.3 pola #5, "Tab indicator slide").
+// Lihat hooks/useTabIndicator.js buat mekanisme pengukurannya - shared
+// sama RecycleBinPage.jsx (consumer ke-2 pola tab yang sama persis).
 import { useState } from 'react';
 import { Lock } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
+import useTabIndicator from '../hooks/useTabIndicator';
 import LinesTab from '../components/masterdata/LinesTab';
 import PartsTab from '../components/masterdata/PartsTab';
 import SuppliersTab from '../components/masterdata/SuppliersTab';
@@ -33,27 +40,30 @@ function MasterDataPage() {
   usePageHeader({ title: 'Master Data Part' });
   const [activeTab, setActiveTab] = useState('lines');
   const { hasPackage } = useAuth();
+  // polish: A10 (motion) - sliding tab indicator, lihat hooks/useTabIndicator.js
+  const { containerRef, itemRef, indicatorStyle } = useTabIndicator(activeTab);
 
   return (
     <div className="rounded-xl border border-border bg-card p-4.5">
-      <div className="mb-5 flex gap-1 border-b border-border">
+      <div ref={containerRef} className="relative mb-5 flex gap-1 border-b border-border">
         {TABS.map((tab) => {
           const active = activeTab === tab.key;
           const locked = tab.packageRequired && !hasPackage(tab.packageRequired);
           return (
             <button
               key={tab.key}
+              ref={itemRef(tab.key)}
               type="button"
               onClick={() => setActiveTab(tab.key)}
               className={cn(
-                'flex cursor-pointer items-center gap-1.5 border-b-2 px-4 py-2.5 text-[13px] font-medium transition-colors',
+                'flex cursor-pointer items-center gap-1.5 px-4 py-2.5 text-[13px] font-medium transition-colors',
                 active
                   ? locked
-                    ? 'border-[var(--text-faint)] text-[var(--text-faint)]'
-                    : 'border-primary text-primary'
+                    ? 'text-[var(--text-faint)]'
+                    : 'text-primary'
                   : locked
-                    ? 'border-transparent text-[var(--text-faint)] hover:text-[var(--text-dim)]'
-                    : 'border-transparent text-[var(--text-dim)] hover:text-foreground'
+                    ? 'text-[var(--text-faint)] hover:text-[var(--text-dim)]'
+                    : 'text-[var(--text-dim)] hover:text-foreground'
               )}
             >
               {tab.label}
@@ -61,6 +71,23 @@ function MasterDataPage() {
             </button>
           );
         })}
+        {/* polish: A10 (motion) - 1 garis bawah yang GESER (translate/width
+            animasi), gantiin tiap tombol nyalain border-bottom sendiri
+            (dulu "muncul-hilang" instan). Warna abu-abu di tab locked
+            biar konsisten sama teksnya. */}
+        <span
+          aria-hidden="true"
+          className="absolute bottom-0 h-0.5 bg-primary transition-[left,width] duration-[var(--duration-base)] ease-standard"
+          style={{
+            left: indicatorStyle.left,
+            width: indicatorStyle.width,
+            opacity: indicatorStyle.ready ? 1 : 0,
+            backgroundColor:
+              TABS.find((t) => t.key === activeTab)?.packageRequired && !hasPackage('B')
+                ? 'var(--text-faint)'
+                : undefined,
+          }}
+        />
       </div>
 
       {activeTab === 'lines' && <LinesTab />}

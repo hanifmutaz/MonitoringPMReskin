@@ -17,6 +17,11 @@
 // pindah ke recycleBinColumns.jsx. `RecycleBinBulkBar` (custom, BUKAN
 // BulkDeleteBar generik - ada 2 aksi: Restore + Hapus Permanen) TIDAK
 // disentuh, tetap page-level component di atas DataTable.
+//
+// polish: A10 (motion, 08 Sep 2026) - underline tab (border-b-2 per-tombol,
+// nyala/mati instan) diganti 1 indicator <span> yang GESER. Sama mekanisme
+// & sama hook (hooks/useTabIndicator.js) kayak MasterDataPage.jsx - 2
+// consumer pola tab yang PERSIS sama, sekarang share logic pengukurannya.
 import { useState } from 'react';
 import { Trash2, RotateCcw, Flame, X, Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
@@ -30,6 +35,7 @@ import {
 } from '../hooks/useRecycleBin';
 import { useConfirm } from '../contexts/ConfirmDialogContext';
 import { useRowSelection } from '../hooks/useRowSelection';
+import useTabIndicator from '../hooks/useTabIndicator';
 import { cn } from '../lib/utils';
 import buildRecycleBinColumns from './recycleBinColumns';
 import { DataTable } from '../components/data-display/DataTable';
@@ -193,6 +199,8 @@ function RecycleBinPage() {
   const [activeEntity, setActiveEntity] = useState(null);
 
   const current = activeEntity || entities[0]?.key;
+  // polish: A10 (motion) - sliding tab indicator, lihat hooks/useTabIndicator.js
+  const { containerRef, itemRef, indicatorStyle } = useTabIndicator(current);
 
   return (
     <div>
@@ -201,23 +209,34 @@ function RecycleBinPage() {
         selamanya, tidak bisa dibatalkan.
       </p>
 
-      <div className="mb-4 flex flex-wrap gap-1 border-b border-border">
+      <div ref={containerRef} className="relative mb-4 flex flex-wrap gap-1 border-b border-border">
         {entities.map((e) => (
           <button
             key={e.key}
+            ref={itemRef(e.key)}
             type="button"
             onClick={() => setActiveEntity(e.key)}
             className={cn(
               'flex cursor-pointer items-center gap-1.5 rounded-t-md px-3 py-2 text-[13px] font-medium transition-colors',
-              current === e.key
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-[var(--text-dim)] hover:bg-secondary'
+              current === e.key ? 'text-primary' : 'text-[var(--text-dim)] hover:bg-secondary'
             )}
           >
             <Trash2 size={13} />
             {e.label}
           </button>
         ))}
+        {/* polish: A10 (motion) - 1 garis bawah yang GESER, gantiin
+            border-b-2 per-tombol (dulu "muncul-hilang" instan). Sama
+            mekanisme kayak MasterDataPage.jsx. */}
+        <span
+          aria-hidden="true"
+          className="absolute bottom-0 h-0.5 bg-primary transition-[left,width] duration-[var(--duration-base)] ease-standard"
+          style={{
+            left: indicatorStyle.left,
+            width: indicatorStyle.width,
+            opacity: indicatorStyle.ready ? 1 : 0,
+          }}
+        />
       </div>
 
       {current && <RecycleBinList key={current} entityKey={current} />}

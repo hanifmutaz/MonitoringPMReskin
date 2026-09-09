@@ -105,4 +105,19 @@
   --duration-base: 200ms;   /* hover lift, tab switch, badge, button press */
   --duration-slow: 300ms;   /* modal/drawer enter, page fade, expand/collapse */
   --duration-data: 400ms;   /* angka count-up, bar/donut grow on load */
+
+  /* Easing juga dimirror ke sini (nilai HARUS SAMA PERSIS kayak --ease-*
+     di @theme inline atas) - bukan duplikasi tanpa alasan: utility class
+     `.ease-standard` dkk dari @theme cuma bisa dipakai sebagai className
+     biasa (`className="ease-standard"`), TIDAK bisa direferensi via
+     `var(--ease-standard)` di tempat yang butuh CSS value literal, kayak
+     arbitrary value Tailwind (`animate-[name_duration_var(--ease-standard)_1]`
+     dipakai di StatusBadge.jsx buat pattern #7 "status flash"). @theme
+     TIDAK nge-emit custom property mentahnya secara global (cuma dipakai
+     internal buat generate utility class) - diverifikasi sama kayak
+     temuan --duration-* sebelumnya (grep CSS build, nol match tanpa
+     mirror ini). Kalau ubah easing, WAJIB ubah di 2 tempat: sini & atas. */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
 }

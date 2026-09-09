@@ -6,6 +6,8 @@
 // TETAP dari token (--accent/--ok/--warn/--danger) - cuma geometri lokal
 // yang diubah, tokens.css nggak disentuh (itu "kontrak tampilan").
 // Lihat docs/frontend/UI-CONSISTENCY-AUDIT.md A6.
+import useCountUp from '../hooks/useCountUp';
+
 const ICON_BADGE_CLASS = {
   accent: 'bg-[var(--accent)] shadow-[0_3px_8px_-6px_var(--accent)]',
   ok: 'bg-ok shadow-[0_3px_8px_-6px_var(--ok)]',
@@ -16,6 +18,12 @@ const ICON_BADGE_CLASS = {
 
 function KpiCard({ icon, label, value, caption, status = 'accent' }) {
   const iconClass = ICON_BADGE_CLASS[status] || ICON_BADGE_CLASS.accent;
+  // polish: A10 (motion) - pattern #4 count-up, lihat hooks/useCountUp.js
+  // buat penjelasan lengkap (parsing, disambiguasi format, kenapa cuma
+  // sekali di mount). `value` asli tetap dikirim sebagai fallback/final
+  // state - hook ini nggak pernah nampilin sesuatu selain `value` di
+  // akhir animasi atau kalau parse gagal.
+  const displayValue = useCountUp(value);
 
   return (
     <div
@@ -41,7 +49,7 @@ function KpiCard({ icon, label, value, caption, status = 'accent' }) {
         {label}
       </div>
       <div className="font-[var(--font-display)] text-[30px] font-semibold leading-none tracking-tight">
-        {value}
+        {displayValue}
       </div>
       {caption && <div className="mt-1.5 text-xs text-muted-foreground">{caption}</div>}
     </div>

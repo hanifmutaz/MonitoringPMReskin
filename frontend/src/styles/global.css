@@ -279,6 +279,24 @@ input[type='password']::-webkit-strong-password-auto-fill-button {
   }
 }
 
+/* ================= Motion: status-flash keyframe (Fase 3, A10) =================
+   Motion pattern #7 (§6.3 UI-CONSISTENCY-AUDIT.md): "pas data berubah (mis.
+   jadi DANGER), badge flash/pulse 1x buat narik perhatian". Dipakai di
+   StatusBadge.jsx via arbitrary Tailwind animate value
+   (`animate-[status-flash_var(--duration-data)_ease-standard_1]`) - CSS
+   animation biasa (bukan JS/requestAnimationFrame), jadi otomatis kena
+   proteksi @media (prefers-reduced-motion) di bawah, nol kode tambahan
+   buat itu (beda dari useCountUp.js yang JS-driven, harus cek manual). */
+@keyframes status-flash {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.12);
+  }
+}
+
 /* ================= Motion: prefers-reduced-motion (Fase 3, A10) =================
    WAJIB - docs/frontend/UI-CONSISTENCY-AUDIT.md §6.4 "Respect prefers-reduced-
    motion". Kalau user set reduce motion di OS-nya, SEMUA transisi/animasi
