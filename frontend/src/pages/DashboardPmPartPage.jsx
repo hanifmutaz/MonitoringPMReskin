@@ -125,6 +125,7 @@ function DashboardPmPartPage() {
                                     {['Line', 'OK', 'Warning', 'Danger'].map((h) => (
                                         <th
                                             key={h}
+                                            scope="col"
                                             className="border-b border-border px-2.5 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
                                         >
                                             {h}

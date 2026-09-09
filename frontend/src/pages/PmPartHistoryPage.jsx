@@ -182,7 +182,7 @@ function PmPartHistoryPage() {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="w-[36px] px-2.5 py-2">
+                      <th scope="col" className="w-[36px] px-2.5 py-2">
                         <input
                           type="checkbox"
                           checked={selection.allOnPageSelected}
@@ -190,6 +190,7 @@ function PmPartHistoryPage() {
                             if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
                           }}
                           onChange={selection.toggleAllOnPage}
+                          aria-label="Pilih semua baris di halaman ini"
                           className="h-3.5 w-3.5 accent-[var(--accent)]"
                         />
                       </th>
@@ -197,6 +198,7 @@ function PmPartHistoryPage() {
                         (h) => (
                           <th
                             key={h}
+                            scope="col"
                             className="whitespace-nowrap px-2.5 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]"
                           >
                             {h}
@@ -213,6 +215,7 @@ function PmPartHistoryPage() {
                             type="checkbox"
                             checked={selection.isSelected(item.id)}
                             onChange={() => selection.toggle(item.id)}
+                            aria-label={`Pilih riwayat ${item.line_name} - ${item.part_name}`}
                             className="h-3.5 w-3.5 accent-[var(--accent)]"
                           />
                         </td>

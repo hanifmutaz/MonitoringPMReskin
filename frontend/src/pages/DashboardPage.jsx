@@ -58,7 +58,8 @@ function NeedsDataCard({ icon, label, note }) {
       <div className="absolute -top-3.5 left-4 flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-[var(--panel-3)] text-[var(--text-faint)] shadow-sm">
         {icon}
       </div>
-      <span className="absolute right-4 top-3.5 rounded-full bg-[var(--panel-3)] px-2 py-1 font-[var(--font-mono)] text-[9px] font-bold uppercase tracking-[0.5px] text-[var(--text-faint)]">
+      {/* polish: A7 cross-check (09 Sep 2026) — 9px -> 10px, samain ke tier micro-badge yang dipakai konsisten di Sidebar/NotificationBell/masterdata hints/SettingsPage key */}
+      <span className="absolute right-4 top-3.5 rounded-full bg-[var(--panel-3)] px-2 py-1 font-[var(--font-mono)] text-[10px] font-bold uppercase tracking-[0.5px] text-[var(--text-faint)]">
         Needs Data
       </span>
       <div className="mt-2">
@@ -126,7 +127,7 @@ function KetepatanAttentionPanel({ data = [], isLoading }) {
           <table className="w-full border-collapse">
             <thead><tr>
               {['Line', 'Ketepatan PM Part', 'Ketepatan Monthly', 'Ketepatan Weekly'].map((h) => (
-                <th key={h} className="border-b border-border px-2.5 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">{h}</th>
+                <th key={h} scope="col" className="border-b border-border px-2.5 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">{h}</th>
               ))}
             </tr></thead>
             <tbody>

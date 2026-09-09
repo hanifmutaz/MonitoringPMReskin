@@ -197,6 +197,7 @@ function ImportMasterDataTab() {
                     (h, i) => (
                       <th
                         key={i}
+                        scope="col"
                         className={cn(
                           'whitespace-nowrap px-2.5 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]',
                           h === 'Target Shot' && 'text-right'
