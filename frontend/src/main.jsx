@@ -9,17 +9,20 @@ import { ConfirmDialogProvider } from './contexts/ConfirmDialogContext';
 import { queryClient } from './api/queryClient';
 import './styles/global.css';
 import './styles/tailwind.css';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <ConfirmDialogProvider>
-            <App />
-          </ConfirmDialogProvider>
-        </AuthProvider>
-      </QueryClientProvider>
-    </BrowserRouter>
+<BrowserRouter>
+  <QueryClientProvider client={queryClient}>
+    <ThemeProvider>
+      <AuthProvider>
+        <ConfirmDialogProvider>
+          <App />
+        </ConfirmDialogProvider>
+      </AuthProvider>
+    </ThemeProvider>
+  </QueryClientProvider>
+</BrowserRouter>
   </React.StrictMode>
 );

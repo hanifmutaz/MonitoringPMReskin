@@ -1,11 +1,61 @@
 /* src/styles/tokens.css
  *
  * Design tokens diambil PERSIS dari 05_UI_UX_SPECIFICATION.md Bagian 2.
- * Ini kontrak tampilan - JANGAN ubah nilai di sini tanpa persetujuan
+ * Ini kontrak tampilan - JANGAN ubah NILAI dark di sini tanpa persetujuan
  * eksplisit (lihat §9 "Yang TIDAK boleh dilakukan AI/developer frontend").
+ *
+ * -----------------------------------------------------------------------------
+ * PERUBAHAN BERIZIN (10 Sep 2026) - semua atas persetujuan eksplisit Mutaz:
+ *   1. Restrukturisasi dark + light  ("Izin restrukturisasi - Ya. Default - OS")
+ *   2. Spacing dirapikan ke rhythm blueprint (Opsi A - additive)
+ *   3. Fix warna warning light + tambah token neutral (badge Nonaktif)
+ *
+ * Yang TIDAK berubah: semua NAMA token, semua NILAI WARNA DARK (kontrak §2),
+ *   font, radius. tailwind.css (@theme inline) & komponen existing otomatis ikut.
+ *
+ * ⚠️  JANGAN bungkus file ini dalam @layer apa pun (harus unlayered).
+ * -----------------------------------------------------------------------------
  */
 
 :root {
+  /* ============================================================
+   * TOKEN NETRAL TEMA (nilai sama di dark & light)
+   * ============================================================ */
+
+  /* 2.2 Tipografi */
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  /* 2.3 Radius */
+  --radius: 12px;
+  --radius-sm: 8px;
+
+  /* -- Spacing --  CANONICAL RHYTHM (blueprint): 4·8·12·16·20·24·32.
+   * Pakai canonical buat kode BARU. Legacy (14/18) DIBIARIN (additive) tapi
+   * DEPRECATED - migrasi bertahap pas nyentuh komponennya. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;   /* DIRAPIKAN 22 -> 20 (masuk rhythm) */
+  --space-6: 24px;   /* NEW - canonical */
+  --space-8: 32px;   /* NEW - canonical */
+  --space-3-5: 14px; /* DEPRECATED -> pakai --space-3/4 */
+  --space-4-5: 18px; /* DEPRECATED -> pakai --space-4/5 */
+
+  --sidebar-width: 300px;
+  --content-max-width: 1400px;
+}
+
+/* ==============================================================
+ * TEMA GELAP (DEFAULT / fallback juga dark -> anti-FOUC)
+ * NILAI PERSIS spec §2 - JANGAN diubah tanpa izin.
+ * ============================================================== */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
   /* 2.1 Warna */
   --bg: #0d1117;
   --panel: #151b23;
@@ -28,27 +78,44 @@
   --danger: #f5484b;
   --danger-dim: rgba(245, 72, 75, 0.14);
 
-  /* 2.2 Tipografi */
-  --font-display: 'Space Grotesk', sans-serif;
-  --font-body: 'Inter', sans-serif;
-  --font-mono: 'IBM Plex Mono', monospace;
+  /* NEW - neutral buat badge non-status (mis. "Nonaktif"). Beda dari muted
+     lama (text-faint di panel-3, kontras 2.49:1 = gagal WCAG per
+     OPEN-QUESTIONS.md). Neutral ini tegas & lulus AA, tapi tetap "diam"
+     (bukan warna status) biar gak nyuri fokus dari OK/Warn/Danger. */
+  --neutral: #8d97a6;
+  --neutral-dim: rgba(141, 151, 166, 0.16);
+}
 
-  /* 2.3 Radius & Spacing */
-  --radius: 12px;
-  --radius-sm: 8px;
+/* ==============================================================
+ * TEMA TERANG (BARU)
+ * accent/ok/warn/danger sengaja DIGELAPKAN dari versi dark: warna cerah
+ * gagal kontras di background terang. Hue sama, cuma diturunin gelapnya.
+ * ============================================================== */
+:root[data-theme='light'] {
+  color-scheme: light;
 
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-3-5: 14px;
-  --space-4: 16px;
-  --space-4-5: 18px;
-  --space-5: 22px;
+  --bg: #f4f6fa;
+  --panel: #ffffff;
+  --panel-2: #f7f9fc;
+  --panel-3: #eef2f7;
+  --border: #e3e8f0;
+  --border-soft: #eef1f6;
 
-  /* 300px (naik dari 280px, sebelumnya dari 230px) - perubahan token ini
-     EKSPLISIT diminta lewat chat (bukan keputusan sepihak AI). 280px masih
-     bikin sub-item terpanjang ("Monitoring PM Monthly and Weekly") wrap ke
-     baris kedua. Lihat riwayat percakapan reskin Sidebar. */
-  --sidebar-width: 300px;
-  --content-max-width: 1400px;
+  --text: #0f1b2d;
+  --text-dim: #5a6a7b;
+  --text-faint: #94a2b4;
+
+  --accent: #2f6fe0;
+  --accent-dim: rgba(47, 111, 224, 0.10);
+
+  --ok: #15a35a;
+  --ok-dim: rgba(21, 163, 90, 0.11);
+  /* FIX warning muddy: #b45309 (cokelat kusam) -> #c2680a (lebih hidup, tetap AA) */
+  --warn: #c2680a;
+  --warn-dim: rgba(194, 104, 10, 0.12);
+  --danger: #d63a3d;
+  --danger-dim: rgba(214, 58, 61, 0.10);
+
+  --neutral: #64748b;
+  --neutral-dim: rgba(100, 116, 139, 0.12);
 }

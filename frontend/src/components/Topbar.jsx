@@ -3,7 +3,7 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useCurrentPageHeader } from '../contexts/PageHeaderContext';
 import { useSidebar } from '../contexts/SidebarContext';
 import NotificationBell from './NotificationBell';
-
+import ThemeToggle from './ThemeToggle';
 // Tombol toggle sidebar pindah ke sini dari Sidebar.jsx (feedback via chat +
 // referensi Mantis - hamburger-nya emang di topbar). Style-nya beda dari
 // yang tadinya di Sidebar (dulu kotak bordered): di sini icon-only tanpa
@@ -61,7 +61,6 @@ import NotificationBell from './NotificationBell';
 function Topbar() {
   const { title, actions } = useCurrentPageHeader();
   const { collapsed, toggleCollapsed } = useSidebar();
-
   return (
     <header
       className="sticky top-0 z-40 flex h-[60px] shrink-0 items-center justify-between border-b border-border bg-background pr-8"
@@ -92,13 +91,15 @@ function Topbar() {
       </div>
       {/* Bell notifikasi (checklist §7, fitur baru) SELALU tampil (beda
           dari `actions` yang page-specific) - ditaro bareng actions dalam
-          1 wrapper flex kanan, bukan gantiin. */}
+          1 wrapper flex kanan, bukan gantiin.
+          ThemeToggle (dark/light, 10 Sep 2026) ditaro SEBELUM bell - selalu
+          tampil juga (bukan page-specific). Urutan kanan: [actions][🌙][🔔]. */}
       <div className="flex items-center gap-2">
         {actions}
+        <ThemeToggle />
         <NotificationBell />
       </div>
     </header>
   );
 }
-
 export default Topbar;

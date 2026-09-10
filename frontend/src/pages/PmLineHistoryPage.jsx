@@ -34,7 +34,7 @@
 // `<div className="flex flex-wrap gap-2">`, beda dari <FilterBar> yang
 // dipakai PmPartMonitoringPage.jsx (`gap-3` + `items-center`). Disamain,
 // nol behavior change.
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Plus, X, Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { usePmLineHistoryList } from '../hooks/usePmLineHistory';
@@ -63,9 +63,18 @@ function PmLineHistoryPage() {
   const [bulkError, setBulkError] = useState('');
   const confirm = useConfirm();
 
-  usePageHeader({
-    title: 'History PM Line',
-    actions: (
+  // FIX BUG (infinite render loop): `actions` sebelumnya JSX inline yang
+  // dibikin ULANG tiap render (referensi objek baru terus), sementara
+  // `usePageHeader` di PageHeaderContext.jsx punya useEffect ber-dependency
+  // [title, actions, setHeader]. Referensi `actions` yang selalu "berubah"
+  // bikin effect itu jalan tiap render -> setHeader -> provider re-render ->
+  // page re-render -> actions baru lagi -> loop tanpa henti ("Maximum
+  // update depth exceeded"). Efeknya: halaman ini gak pernah selesai
+  // render, jadi navigasi KELUAR dari halaman ini (ke menu manapun) ikut
+  // nyangkut - Outlet gak sempet swap ke route baru. Fix: `useMemo` biar
+  // referensi `actions` cuma ganti kalau `showForm` beneran berubah.
+  const actions = useMemo(
+    () => (
       <Button type="button" onClick={() => setShowForm((v) => !v)}>
         {showForm ? (
           <>
@@ -78,7 +87,10 @@ function PmLineHistoryPage() {
         )}
       </Button>
     ),
-  });
+    [showForm]
+  );
+
+  usePageHeader({ title: 'History PM Line', actions });
 
   const { data: lines = [] } = useLines({ isActive: true });
   const params = {

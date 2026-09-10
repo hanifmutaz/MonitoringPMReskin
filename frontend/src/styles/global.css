@@ -18,6 +18,11 @@ body {
   font-family: var(--font-body);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  /* POLISH (typography): kerning halus + ligatur Inter. Bikin body text lebih
+     "rapi" tanpa ganti apa pun secara struktural. Tidak menyentuh angka
+     (tabular diatur per-elemen di bawah lewat .tnum/.mono/.kpi-value). */
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.006em;
 }
 
 a {
@@ -43,31 +48,14 @@ a {
   textarea {
     font-family: inherit;
     color: inherit;
-    /* background-color/border/appearance native browser TIDAK direset di
-       sini sebelumnya - ketahuan pas kotak putih native <button> browser
-       (ButtonFace) nongol di belakang tab/pill LinesTab, soalnya elemen itu
-       Tailwind-only dan gak set bg-* apapun (sengaja transparan). Class
-       lama (.tab-item/.btn di components.css) selama ini AMAN karena
-       masing-masing eksplisit nulis `background: none`/`border: none`
-       sendiri (unlayered, menang lepas dari fix ini). Reset appearance di
-       sini scoped ke @layer base juga, jadi elemen manapun yang emang mau
-       background/border sendiri (button.btn-primary, Input/Select shadcn
-       lewat Tailwind bg-secondary dst) tetap menang seperti biasa. */
     background-color: transparent;
     border: none;
     appearance: none;
   }
 
   /* BUG (ketahuan pas checklist bulk-delete): rule di atas kena juga ke
-     input[type=checkbox]/[type=radio] - appearance:none + border:none +
-     background transparent = checkbox jadi kotak KOSONG TOTAL, checked
-     ataupun tidak (bukan cuma "warnanya kurang keliatan"). `accent-color`
-     yang dipasang tiap checkbox (mis. `accent-[var(--accent)]` di
-     LinesTab/PartsTab/dst) gak ngaruh sama sekali karena accent-color cuma
-     berlaku selama browser masih gambar tampilan native-nya, sedangkan di
-     sini appearance-nya keburu dimatiin duluan oleh rule generik di atas.
-     Kembalikan appearance native checkbox/radio supaya accent-color yang
-     sudah dipasang di tiap pemakaian bisa kepakai lagi. */
+     input[type=checkbox]/[type=radio] - kembalikan appearance native supaya
+     accent-color yang dipasang di tiap pemakaian bisa kepakai lagi. */
   input[type='checkbox'],
   input[type='radio'] {
     appearance: auto;
@@ -82,12 +70,7 @@ a {
   outline-offset: 2px;
 }
 
-/* Matiin ikon reveal-password/clear bawaan browser - nongol sebagai kotak
-   abu-abu/putih nabrak sama tombol eye custom kita di LoginPage/RegisterPage
-   (lihat komponen yang toggle showPassword).
-   ::-ms-reveal/::-ms-clear = Edge legacy (EdgeHTML).
-   ::-webkit-credentials-auto-fill-button/::-webkit-strong-password-auto-fill-button
-   = Chrome & Edge Chromium (yang ternyata ini biang keladinya, bukan yang di atas). */
+/* Matiin ikon reveal-password/clear bawaan browser */
 input[type='password']::-ms-reveal,
 input[type='password']::-ms-clear {
   display: none;
@@ -102,19 +85,7 @@ input[type='password']::-webkit-strong-password-auto-fill-button {
   right: 0;
 }
 
-/* ================= Scrollbar tipis GLOBAL =================
-   Feedback: scrollbar dokumen (browser default) gede & kotak, gak
-   matching desain gelap ini. Beda dari .overlay-scroll di bawah (yang
-   auto-hide pas idle, butuh JS toggle class `.is-scrolling` - dipakai
-   KHUSUS di nav Sidebar): di sini scrollbar SELALU tipis+redup tanpa JS
-   sama sekali, berlaku ke SEMUA elemen yang bisa discroll di seluruh app
-   (dokumen/halaman, tabel dengan overflow-x-auto, modal, dst) - gak
-   worth pasang scroll-listener JS di tiap tempat cuma buat efek
-   auto-hide, thin+redup permanen udah jauh lebih baik dari default
-   browser. Selector `*` sengaja dipilih (bukan cuma `html`/`body`) biar
-   ke-cover semua container overflow-y/x-auto yang udah ada di seluruh
-   halaman (Master Data, tabel history, dst) tanpa perlu nambahin class
-   satu-satu ke tiap elemen. */
+/* ================= Scrollbar tipis GLOBAL ================= */
 * {
   scrollbar-width: thin; /* Firefox */
   scrollbar-color: var(--border) transparent;
@@ -134,16 +105,9 @@ input[type='password']::-webkit-strong-password-auto-fill-button {
   background-color: var(--text-faint);
 }
 
-/* ================= Overlay scrollbar tipis (auto-hide) =================
-   Dipakai di nav Sidebar (referensi Mantis: scrollbar tipis, cuma nongol
-   pas discroll, transparan lagi setelah idle - state idle-nya diatur dari
-   JS (lihat Sidebar.jsx, class `.is-scrolling` ditoggle via timer 3 detik),
-   CSS di sini cuma nentuin TAMPILANNYA (lebar & fade transition). Track
-   selalu transparan (gak makan tempat/gak ada background kotak). LEBIH
-   SPESIFIK dari aturan global `*` di atas (class selector menang lawan
-   universal selector), jadi override-nya jalan normal di elemen nav ini.*/
+/* ================= Overlay scrollbar tipis (auto-hide) ================= */
 .overlay-scroll {
-  scrollbar-width: thin; /* Firefox - lebar tipis, warnanya sendiri diatur scrollbar-color */
+  scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
 .overlay-scroll.is-scrolling {
@@ -164,11 +128,25 @@ input[type='password']::-webkit-strong-password-auto-fill-button {
   background-color: var(--border);
 }
 
-
+/* =====================================================================
+ * TYPOGRAPHY SCALE (POLISH - 10 Sep 2026)
+ * ---------------------------------------------------------------------
+ * Tujuan: hierarki lebih TAJAM + angka gak "geser-geser".
+ * Perubahan vs sebelumnya:
+ *   - Tambah `letter-spacing` negatif tipis di tier display (Space Grotesk
+ *     kelihatan lebih "solid"/berwibawa di ukuran besar).
+ *   - `font-variant-numeric: tabular-nums` di SEMUA teks angka
+ *     (.kpi-value, .mono, + helper .tnum) -> kolom angka rata, gak goyang
+ *     pas nilai berubah (counter, shot count, dst). Ini fix visual paling
+ *     kerasa "pro" dgn effort paling kecil.
+ * TIDAK mengubah ukuran font yang sudah dipakai (biar layout gak geser) -
+ * kecuali penambahan letter-spacing (sub-pixel, aman). Nama class SAMA.
+ * ===================================================================== */
 .page-title {
   font-family: var(--font-display);
   font-size: 22px;
   font-weight: 600;
+  letter-spacing: -0.02em;   /* POLISH */
   margin: 0;
 }
 
@@ -176,6 +154,7 @@ input[type='password']::-webkit-strong-password-auto-fill-button {
   font-family: var(--font-display);
   font-size: 15px;
   font-weight: 600;
+  letter-spacing: -0.01em;   /* POLISH */
   margin: 0;
 }
 
@@ -183,6 +162,8 @@ input[type='password']::-webkit-strong-password-auto-fill-button {
   font-family: var(--font-display);
   font-size: 30px;
   font-weight: 600;
+  letter-spacing: -0.02em;         /* POLISH */
+  font-variant-numeric: tabular-nums; /* POLISH - angka rata, anti goyang */
 }
 
 .table-header-text {
@@ -201,6 +182,14 @@ input[type='password']::-webkit-strong-password-auto-fill-button {
 
 .mono {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums; /* POLISH - drawing no / kode / angka rata */
+}
+
+/* Helper baru: tempel di elemen angka apa pun yang bukan .kpi-value/.mono
+   (mis. sel tabel numerik, badge count, sisa-hari) biar ikut rata.
+   Contoh: <td className="tnum">291.500</td> */
+.tnum {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ================= Layout Shell (UI Spec §3.1) ================= */
@@ -241,18 +230,11 @@ input[type='password']::-webkit-strong-password-auto-fill-button {
 .content-area {
   flex: 1;
   max-width: var(--content-max-width);
-  /* BUG (feedback via screenshot): pas sidebar collapsed, area kerja
-     (.main-column) jadi lebih lebar dari --content-max-width (1400px).
-     Tanpa margin auto, box yang kena max-width itu nempel ke KIRI (default
-     block alignment), bukan di tengah - jadi gap kanan jauh lebih gede
-     daripada gap kiri. Kejadian di SEMUA halaman (bukan cuma satu page)
-     karena .content-area ini shared wrapper buat <Outlet/> di
-     MainLayout.jsx. margin:0 auto bikin box-nya rata tengah begitu lebar
-     parent-nya ngelebihin max-width, jadi gap kiri-kanan selalu SAMA
-     berapa pun lebar sidebar (collapsed/expanded). */
+  /* margin auto biar konten rata tengah pas parent > max-width (sidebar
+     collapsed) - gap kiri-kanan selalu sama. */
   margin: 0 auto;
   width: 100%;
-  padding: 26px 32px;
+  padding: var(--space-6) 32px; /* POLISH: 26px -> 24px (space-6), masuk rhythm */
 }
 
 .footer-status-bar {
@@ -279,14 +261,7 @@ input[type='password']::-webkit-strong-password-auto-fill-button {
   }
 }
 
-/* ================= Motion: status-flash keyframe (Fase 3, A10) =================
-   Motion pattern #7 (§6.3 UI-CONSISTENCY-AUDIT.md): "pas data berubah (mis.
-   jadi DANGER), badge flash/pulse 1x buat narik perhatian". Dipakai di
-   StatusBadge.jsx via arbitrary Tailwind animate value
-   (`animate-[status-flash_var(--duration-data)_ease-standard_1]`) - CSS
-   animation biasa (bukan JS/requestAnimationFrame), jadi otomatis kena
-   proteksi @media (prefers-reduced-motion) di bawah, nol kode tambahan
-   buat itu (beda dari useCountUp.js yang JS-driven, harus cek manual). */
+/* ================= Motion: status-flash keyframe (Fase 3, A10) ================= */
 @keyframes status-flash {
   0%,
   100% {
@@ -297,21 +272,33 @@ input[type='password']::-webkit-strong-password-auto-fill-button {
   }
 }
 
-/* ================= Motion: prefers-reduced-motion (Fase 3, A10) =================
-   WAJIB - docs/frontend/UI-CONSISTENCY-AUDIT.md §6.4 "Respect prefers-reduced-
-   motion". Kalau user set reduce motion di OS-nya, SEMUA transisi/animasi
-   non-esensial dimatiin (durasi ditarik ke ~0, animasi di-skip ke end state
-   langsung) - accessibility requirement, bukan opsional. Pola universal:
-   override * (bukan per-komponen), jadi otomatis nge-cover transisi baru
-   yang ditambahin di komponen manapun ke depannya, nol maintenance tambahan.
-   `!important` sengaja dipakai - ini SATU-SATUNYA tempat yang boleh, karena
-   tujuannya emang buat nge-override semua transition/animation apa pun
-   durasi/timing yang di-set component-level. */
+/* ================= Motion: kpi-card stagger (Fase 3, A10 susulan) ================= */
+.kpi-card {
+  animation-fill-mode: backwards;
+}
+.kpi-card:nth-child(2) {
+  animation-delay: 40ms;
+}
+.kpi-card:nth-child(3) {
+  animation-delay: 80ms;
+}
+.kpi-card:nth-child(4) {
+  animation-delay: 120ms;
+}
+.kpi-card:nth-child(5) {
+  animation-delay: 160ms;
+}
+.kpi-card:nth-child(6) {
+  animation-delay: 200ms;
+}
+
+/* ================= Motion: prefers-reduced-motion (Fase 3, A10) ================= */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
