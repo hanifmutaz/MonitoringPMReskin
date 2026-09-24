@@ -28,13 +28,14 @@ import { Input } from '../components/ui/input';
 const CATEGORY_META = {
   threshold_pm_part: { no: 1, title: 'Threshold PM Part', icon: Sliders },
   skema_poin_monthly: { no: 2, title: 'Skema Poin PM Monthly', icon: Award },
-  threshold_monthly_weekly: { no: 3, title: 'Threshold Monthly & Weekly', icon: CalendarClock },
-  relasi_monthly_weekly: { no: 4, title: 'Relasi Monthly ↔ Weekly', icon: Repeat },
-  sync_data_produksi: { no: 5, title: 'Sync Data Produksi', icon: RefreshCw },
-  dashboard_tampilan: { no: 6, title: 'Dashboard & Tampilan', icon: LayoutGrid },
-  user_role: { no: 7, title: 'User & Role', icon: Users },
-  notifikasi: { no: 8, title: 'Notifikasi Email', icon: Mail },
-  inventory: { no: 9, title: 'Inventory (ROP & Safety Stock)', icon: Package },
+  skema_poin_weekly: { no: 3, title: 'Skema Poin PM Weekly', icon: Award },
+  threshold_monthly_weekly: { no: 4, title: 'Threshold Monthly & Weekly', icon: CalendarClock },
+  relasi_monthly_weekly: { no: 5, title: 'Relasi Monthly ↔ Weekly', icon: Repeat },
+  sync_data_produksi: { no: 6, title: 'Sync Data Produksi', icon: RefreshCw },
+  dashboard_tampilan: { no: 7, title: 'Dashboard & Tampilan', icon: LayoutGrid },
+  user_role: { no: 8, title: 'User & Role', icon: Users },
+  notifikasi: { no: 9, title: 'Notifikasi Email', icon: Mail },
+  inventory: { no: 10, title: 'Inventory (ROP & Safety Stock)', icon: Package },
 };
 
 // Label manusiawi per setting key — settingnya sendiri fixed catalog dari
@@ -47,9 +48,9 @@ const SETTING_LABELS = {
   pm_part_counter_include_reject: 'Reject Dihitung sebagai Shot Terpakai',
   // Skema Poin PM Monthly
   pm_monthly_point_full_run: 'Poin Full Run',
-  pm_monthly_point_half_run: 'Poin Half Run',
   pm_monthly_point_cap: 'Batas Maksimal Poin',
-  pm_monthly_min_run_count_full: 'Ambang Running untuk Full Poin',
+  // Skema Poin PM Weekly
+  pm_weekly_point_full_run: 'Poin Full Run',
   // Threshold Monthly & Weekly
   pm_monthly_danger_days: 'Batas Hari Danger (Monthly)',
   pm_monthly_warning_days: 'Batas Hari Warning (Monthly)',

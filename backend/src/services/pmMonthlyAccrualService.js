@@ -19,8 +19,9 @@
 //   akumulasi dihitung dari (Tgl PM Monthly Terakhir, hari ini], di-cap
 //
 // pm_monthly_min_run_count_full & pm_monthly_point_half_run TIDAK dipakai
-// lagi oleh formula ini (dibiarkan ada di app_settings untuk kompatibilitas
-// data lama, tapi tidak lagi dibaca di sini).
+// lagi oleh formula ini, dan sudah DIHAPUS dari app_settings (lihat
+// migration 1700000023000) supaya Settings page tidak menampilkan kontrol
+// yang keliatan bisa diubah tapi sebenarnya tidak ngefek.
 //
 // STRATEGI: full RECOMPUTE tiap kali job jalan (bukan increment harian).
 // Sengaja dipilih karena idempotent — aman dijalankan berkali-kali
