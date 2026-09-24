@@ -18,6 +18,10 @@ function validateCreateLine(body) {
     errors.auto_reset_weekly_on_monthly = 'Harus boolean atau null';
   }
 
+  if (body && body.jumlah_shift !== undefined && ![2, 3].includes(body.jumlah_shift)) {
+    errors.jumlah_shift = 'Jumlah Shift harus 2 atau 3';
+  }
+
   return { valid: Object.keys(errors).length === 0, errors };
 }
 
@@ -42,6 +46,10 @@ function validateUpdateLine(body) {
     typeof body.auto_reset_weekly_on_monthly !== 'boolean'
   ) {
     errors.auto_reset_weekly_on_monthly = 'Harus boolean atau null';
+  }
+
+  if (body.jumlah_shift !== undefined && ![2, 3].includes(body.jumlah_shift)) {
+    errors.jumlah_shift = 'Jumlah Shift harus 2 atau 3';
   }
 
   if (Object.keys(body || {}).length === 0) {

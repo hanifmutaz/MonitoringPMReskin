@@ -7,11 +7,20 @@
 // view_report_25415 per Line+tanggal yang punya output > 0 di slot
 // manapun (lihat conmasQueries.fetchDailyRunCounts).
 //
-// Formula MASTER DOCUMENT Bagian 2.B — TIDAK DIUBAH:
-//   running >= pm_monthly_min_run_count_full (default 2) -> full point
-//   running == 1                                          -> half point
-//   running == 0 (tidak ada baris)                        -> 0 poin
+// Formula DIUBAH (24 Sep 2026) - lihat migration 1700000022000. Versi lama
+// pakai threshold binary full/half GLOBAL (pm_monthly_min_run_count_full),
+// jadi Line 3-shift yang jalan penuh (running=3) dapet poin sama persis
+// dengan Line 2-shift yang jalan penuh (running=2) - keausan Line 3-shift
+// under-counted. Formula baru PROPORSIONAL ke jumlah_shift Line itu sendiri:
+//
+//   poin_hari_itu = MIN(running / line.jumlah_shift, 1) * pm_monthly_point_full_run
+//   (running == 0 -> 0 poin, tidak ada baris di ConMas hari itu)
+//
 //   akumulasi dihitung dari (Tgl PM Monthly Terakhir, hari ini], di-cap
+//
+// pm_monthly_min_run_count_full & pm_monthly_point_half_run TIDAK dipakai
+// lagi oleh formula ini (dibiarkan ada di app_settings untuk kompatibilitas
+// data lama, tapi tidak lagi dibaca di sini).
 //
 // STRATEGI: full RECOMPUTE tiap kali job jalan (bukan increment harian).
 // Sengaja dipilih karena idempotent — aman dijalankan berkali-kali
@@ -27,6 +36,7 @@ const pmLineQueries = require('../sql/pmLineQueries');
 const settingsService = require('./settingsService');
 const dateUtils = require('../utils/dateUtils');
 const logger = require('../utils/logger');
+const { computeDailyPoints } = require('../utils/pmPointFormula');
 
 async function recomputeAllLines() {
   if (!conmasDb.isConfigured()) {
@@ -38,8 +48,6 @@ async function recomputeAllLines() {
     'sync_lookback_days',
     'pm_monthly_point_cap',
     'pm_monthly_point_full_run',
-    'pm_monthly_point_half_run',
-    'pm_monthly_min_run_count_full',
   ]);
 
   let runCountRows;
@@ -74,6 +82,8 @@ async function recomputeAllLines() {
     const baseline = dateUtils.parseDbDate(helper.tgl_pm_monthly_terakhir);
     const today = dateUtils.today();
     const lineRunCounts = byLine.get(line.line_name) || new Map();
+    const jumlahShift = line.jumlah_shift || 2;
+    const pointFullRun = settings.pm_monthly_point_full_run ?? 1;
 
     let totalPoints = 0;
     let cursor = baseline.add(1, 'day');
@@ -81,11 +91,9 @@ async function recomputeAllLines() {
       const dateStr = cursor.format('YYYY-MM-DD');
       const runCount = lineRunCounts.get(dateStr) || 0;
 
-      if (runCount >= (settings.pm_monthly_min_run_count_full || 2)) {
-        totalPoints += settings.pm_monthly_point_full_run ?? 1;
-      } else if (runCount === 1) {
-        totalPoints += settings.pm_monthly_point_half_run ?? 0.5;
-      }
+      // Proporsional: running penuh sesuai jumlah_shift Line -> full point;
+      // running sebagian -> pecahan sebanding (bukan lagi binary full/half).
+      totalPoints += computeDailyPoints(runCount, jumlahShift, pointFullRun);
       cursor = cursor.add(1, 'day');
     }
 

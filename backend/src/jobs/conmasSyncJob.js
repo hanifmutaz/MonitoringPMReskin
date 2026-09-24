@@ -14,6 +14,7 @@
 const cron = require('node-cron');
 const conmasSyncService = require('../services/conmasSyncService');
 const pmMonthlyAccrualService = require('../services/pmMonthlyAccrualService');
+const pmWeeklyAccrualService = require('../services/pmWeeklyAccrualService');
 const pmPartSnapshotService = require('../services/pmPartSnapshotService');
 const settingsService = require('../services/settingsService');
 const logger = require('../utils/logger');
@@ -23,6 +24,10 @@ let scheduledTask = null;
 async function runOnce() {
   await conmasSyncService.runSync();
   await pmMonthlyAccrualService.recomputeAllLines();
+  // FIX 24 Sep 2026: akumulasi_poin_weekly sebelumnya nggak pernah
+  // ke-recompute otomatis (lihat pmWeeklyAccrualService.js header) -
+  // sekarang jalan bareng Monthly, pakai production_cache yang sama.
+  await pmWeeklyAccrualService.recomputeAllLines();
 
   // Sengaja TIDAK di-skip walau conmasDb belum configured (beda dari
   // pmMonthlyAccrualService di atas) - snapshot status PM Part tidak

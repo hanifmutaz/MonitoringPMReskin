@@ -45,7 +45,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
-const emptyForm = { line_name: '', auto_reset_weekly_on_monthly: '' };
+const emptyForm = { line_name: '', jumlah_shift: '2', auto_reset_weekly_on_monthly: '' };
 
 const FILTERS = [
   { key: 'all', label: 'Semua' },
@@ -64,6 +64,7 @@ function LineFormModal({ initial, onClose }) {
     initial
       ? {
           ...initial,
+          jumlah_shift: String(initial.jumlah_shift || 2),
           auto_reset_weekly_on_monthly:
             initial.auto_reset_weekly_on_monthly === null ? '' : String(initial.auto_reset_weekly_on_monthly),
         }
@@ -78,6 +79,7 @@ function LineFormModal({ initial, onClose }) {
     setError('');
     const payload = {
       line_name: form.line_name,
+      jumlah_shift: Number(form.jumlah_shift),
       auto_reset_weekly_on_monthly:
         form.auto_reset_weekly_on_monthly === '' ? null : form.auto_reset_weekly_on_monthly === 'true',
     };
@@ -103,6 +105,22 @@ function LineFormModal({ initial, onClose }) {
             onChange={(e) => setForm({ ...form, line_name: e.target.value })}
             required
           />
+        </div>
+
+        <div>
+          <Label className="mb-1.5">Jumlah Shift/Hari</Label>
+          <Select value={form.jumlah_shift} onValueChange={(v) => setForm({ ...form, jumlah_shift: v })}>
+            <SelectTrigger aria-label="Pilih Jumlah Shift per Hari">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="2">2 Shift</SelectItem>
+              <SelectItem value="3">3 Shift</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="mt-1 text-xs text-[var(--text-faint)]">
+            Dipakai buat hitung poin PM Monthly/Weekly proporsional ke pemakaian real Line ini.
+          </p>
         </div>
 
         <div>

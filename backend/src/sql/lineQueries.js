@@ -2,7 +2,7 @@
 const db = require('../config/db');
 
 const BASE_SELECT = `
-  SELECT id, line_name, is_active, auto_reset_weekly_on_monthly, created_at
+  SELECT id, line_name, is_active, jumlah_shift, auto_reset_weekly_on_monthly, created_at
   FROM lines
 `;
 
@@ -33,12 +33,12 @@ async function findByName(lineName, runner = db) {
   return result.rows[0] || null;
 }
 
-async function create({ line_name, auto_reset_weekly_on_monthly = null }, runner = db) {
+async function create({ line_name, jumlah_shift = 2, auto_reset_weekly_on_monthly = null }, runner = db) {
   const result = await runner.query(
-    `INSERT INTO lines (line_name, auto_reset_weekly_on_monthly)
-     VALUES ($1, $2)
-     RETURNING id, line_name, is_active, auto_reset_weekly_on_monthly, created_at`,
-    [line_name, auto_reset_weekly_on_monthly]
+    `INSERT INTO lines (line_name, jumlah_shift, auto_reset_weekly_on_monthly)
+     VALUES ($1, $2, $3)
+     RETURNING id, line_name, is_active, jumlah_shift, auto_reset_weekly_on_monthly, created_at`,
+    [line_name, jumlah_shift, auto_reset_weekly_on_monthly]
   );
   return result.rows[0];
 }
@@ -55,7 +55,7 @@ async function update(id, fields, runner = db) {
 
   const result = await runner.query(
     `UPDATE lines SET ${setClauses.join(', ')} WHERE id = $${params.length}
-     RETURNING id, line_name, is_active, auto_reset_weekly_on_monthly, created_at`,
+     RETURNING id, line_name, is_active, jumlah_shift, auto_reset_weekly_on_monthly, created_at`,
     params
   );
   return result.rows[0] || null;

@@ -31,6 +31,12 @@ function buildLinesColumns({ onToggleActive, onEdit, onDelete }) {
       ),
     },
     {
+      key: 'jumlah_shift',
+      header: 'Jumlah Shift',
+      className: 'text-xs text-[var(--text-dim)]',
+      render: (line) => `${line.jumlah_shift || 2} Shift`,
+    },
+    {
       key: 'auto_reset',
       header: 'Auto-Reset Override',
       className: 'text-xs text-[var(--text-dim)]',
