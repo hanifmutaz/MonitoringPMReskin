@@ -8,12 +8,29 @@
 // segera setelah login pertama kali di production.
 
 const bcrypt = require('bcrypt');
+const { validatePassword } = require('../src/utils/passwordPolicy');
 
 const BCRYPT_ROUNDS = 10;
 
 exports.up = async (pgm) => {
   const username = process.env.ADMIN_DEFAULT_USERNAME || 'admin';
+  const isProduction = process.env.NODE_ENV === 'production';
+  // Di production, password admin WAJIB di-set eksplisit & lolos password
+  // policy — tidak ada fallback default yang bisa ditebak. Di dev/test tetap
+  // fallback ke 'ChangeMe123!' supaya setup lokal & CI gak ribet.
+  if (isProduction && !process.env.ADMIN_DEFAULT_PASSWORD) {
+    throw new Error(
+      '[MIGRATION seed-admin-user] ADMIN_DEFAULT_PASSWORD wajib di-set saat NODE_ENV=production ' +
+        '(tidak ada default password di production).'
+    );
+  }
   const password = process.env.ADMIN_DEFAULT_PASSWORD || 'ChangeMe123!';
+  if (isProduction) {
+    const check = validatePassword(password, username);
+    if (!check.valid) {
+      throw new Error(`[MIGRATION seed-admin-user] ADMIN_DEFAULT_PASSWORD ditolak password policy: ${check.error}`);
+    }
+  }
   const fullName = process.env.ADMIN_DEFAULT_FULLNAME || 'Administrator';
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);

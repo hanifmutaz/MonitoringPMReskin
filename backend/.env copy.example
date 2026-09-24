@@ -1,6 +1,6 @@
 # Server
 NODE_ENV=development
-PORT=4000
+PORT=5050
 
 # Database aplikasi (PM Monitoring)
 DATABASE_URL=postgresql://pm_app_user:xxxxx@localhost:5432/pm_monitoring
@@ -17,15 +17,8 @@ CONMAS_DB_PASSWORD=xxxxx
 
 # Auth
 # Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-# Production: WAJIB >= 32 karakter & bukan placeholder, kalau tidak app menolak start.
 JWT_SECRET=xxxxx
 JWT_EXPIRES_IN=8h
-
-# Reverse proxy & cookie
-# TRUST_PROXY_HOPS = jumlah proxy di depan app (nginx=1; nginx + LB/Caddy di depannya=2; tanpa proxy=0)
-TRUST_PROXY_HOPS=1
-# Default Secure=true di production (wajib HTTPS). Set false HANYA untuk LAN tanpa HTTPS.
-# COOKIE_SECURE=true
 
 # CORS
 CORS_ORIGIN=http://localhost:5173
@@ -80,20 +73,9 @@ REPORTING_API_KEY=
 # yang lemot/down gak nge-hang seluruh request /dashboard/multi-site.
 # REMOTE_SITE_FETCH_TIMEOUT_MS=5000
 
-# Seed Admin pertama (dipakai oleh migration seed-admin-user, HAPUS/ganti setelah migration jalan sekali).
-# Production: ADMIN_DEFAULT_PASSWORD WAJIB diisi (min 12 karakter, lolos password policy);
-# migration akan gagal kalau kosong. Di dev/test fallback ke 'ChangeMe123!'.
+# Seed Admin pertama (dipakai oleh migration seed-admin-user, HAPUS/ganti setelah migration jalan sekali)
 ADMIN_DEFAULT_USERNAME=admin
 ADMIN_DEFAULT_PASSWORD=xxxxx
 ADMIN_DEFAULT_FULLNAME=Administrator
 
-# --- Tuning DB pool (semua opsional) ---
-# DB_POOL_MAX=10
-# DB_POOL_IDLE_MS=30000
-# DB_POOL_CONN_TIMEOUT_MS=5000
-# DB_STATEMENT_TIMEOUT_MS=          # kosong = tanpa timeout (job recompute/import bisa lama)
-# DB_SSL=true                       # DB remote/managed yang mewajibkan TLS
-# DB_SSL_REJECT_UNAUTHORIZED=true   # false HANYA untuk sertifikat self-signed
-
-# --- Graceful shutdown ---
-# SHUTDOWN_TIMEOUT_MS=20000
+LICENSE_PACKAGE=A

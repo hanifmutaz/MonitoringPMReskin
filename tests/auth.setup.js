@@ -1,5 +1,6 @@
-const TEST_USERNAME = 'admin';
-const TEST_PASSWORD = 'admin1234567';
+// Kredensial bisa di-override via env (CI pakai E2E_USERNAME/E2E_PASSWORD).
+const TEST_USERNAME = process.env.E2E_USERNAME || 'admin';
+const TEST_PASSWORD = process.env.E2E_PASSWORD || 'admin1234567';
 
 import { test as setup } from '@playwright/test';
 

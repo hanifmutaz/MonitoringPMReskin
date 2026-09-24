@@ -20,12 +20,33 @@
 // dibuka via `npx playwright show-report`.
 import { defineConfig, devices } from '@playwright/test';
 
+// Di CI (env CI=true) Playwright menyalakan backend + frontend sendiri.
+// Backend butuh DATABASE_URL/JWT_SECRET dari environment job (lihat
+// .github/workflows/e2e.yml). Lokal: jalankan manual seperti di atas.
+const webServer = process.env.CI
+  ? [
+      {
+        command: 'npm --prefix backend start',
+        url: 'http://localhost:4000/health/ready',
+        timeout: 60_000,
+        reuseExistingServer: false,
+      },
+      {
+        command: 'npm --prefix frontend run dev',
+        url: 'http://localhost:5173',
+        timeout: 60_000,
+        reuseExistingServer: false,
+      },
+    ]
+  : undefined;
+
 export default defineConfig({
   testDir: './tests',
   fullyParallel: false, // sequential - biar gampang baca report per halaman
     workers: 1,
-      retries: 1,
+  retries: 1,
   reporter: [['html', { open: 'never' }], ['list']],
+  webServer,
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'retain-on-failure',

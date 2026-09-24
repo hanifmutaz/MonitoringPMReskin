@@ -98,11 +98,20 @@ httpOnly ter-set, token TIDAK ada di body"*.
   password adalah lewat Admin (User Management) atau akses langsung ke
   DB. Untuk jumlah user kecil ini wajar, tapi jadi beban operasional
   kalau user bertambah banyak.
-- **`ADMIN_DEFAULT_PASSWORD`** kalau tidak di-set lewat environment
-  variable saat migration pertama kali jalan, fallback ke default
-  `ChangeMe123!` yang predictable — wajib diganti segera setelah deploy
-  pertama (sudah diingatkan di komentar migration `1700000001000`, tapi
-  tidak ada enforcement teknis yang memaksa penggantian ini).
+- **`ADMIN_DEFAULT_PASSWORD`** — *(diperbarui)* di `NODE_ENV=production`
+  migration `1700000001000` sekarang **gagal** kalau env ini kosong atau tidak
+  lolos password policy (min 12 karakter), jadi tidak ada lagi default
+  `ChangeMe123!` di production. Di dev/test fallback default tetap ada.
+  Tetap disarankan: ganti password admin setelah login pertama dan hapus
+  `ADMIN_DEFAULT_PASSWORD` dari `.env`.
+- **Script ops** (`backend/scripts/`) — `reset-password.js`, `diagnose-login.js`,
+  `seed-dashboard-dummy.js` menolak jalan di production kecuali flag
+  `ALLOW_*` di-set eksplisit dan tidak ikut ke Docker image. Reset password
+  lewat script **tidak** masuk `audit_log` aplikasi.
+- **Cookie `Secure`** butuh HTTPS. `COOKIE_SECURE=false` tersedia untuk LAN
+  tanpa HTTPS, tapi token jadi bisa disadap di jaringan.
+- **Cron job berjalan in-process** (ConMas sync & notifikasi): jalankan
+  **satu** instance backend saja, atau job akan jalan ganda.
 
 ## Dokumen terkait
 

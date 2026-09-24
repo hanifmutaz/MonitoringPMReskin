@@ -110,7 +110,6 @@ function useCountUp(value) {
     return () => {
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   return display;

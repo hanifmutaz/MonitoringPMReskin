@@ -5,6 +5,12 @@ const logger = require('../utils/logger');
 
 const pool = new Pool({
   connectionString: env.databaseUrl,
+  max: env.dbPool.max,
+  idleTimeoutMillis: env.dbPool.idleTimeoutMillis,
+  connectionTimeoutMillis: env.dbPool.connectionTimeoutMillis,
+  // Query yang nge-hang jangan menahan koneksi pool selamanya.
+  statement_timeout: env.dbPool.statementTimeoutMs,
+  ssl: env.dbPool.ssl,
 });
 
 pool.on('error', (err) => {

@@ -1,4 +1,4 @@
-// seed-dashboard-dummy.js
+// scripts/seed-dashboard-dummy.js
 // ============================================================
 // DUMMY DATA SEEDER buat Dashboard Management - DEV/DEMO ONLY.
 //
@@ -13,9 +13,9 @@
 // Deterministik (seeded RNG) - jalan berkali-kali hasilnya sama.
 // Idempotent-ish: --clean dulu baru seed lagi kalau mau ulang.
 //
-// PAKAI:
-//   node seed-dashboard-dummy.js          -> isi dummy
-//   node seed-dashboard-dummy.js --clean  -> hapus SEMUA dummy (by prefix line)
+// PAKAI (dari folder backend/):
+//   node scripts/seed-dashboard-dummy.js          -> isi dummy
+//   node scripts/seed-dashboard-dummy.js --clean  -> hapus SEMUA dummy (by prefix line)
 //
 // KONEKSI DB: pakai DATABASE_URL kalau ada, atau PGHOST/PGUSER/PGPASSWORD/
 // PGDATABASE/PGPORT. Sama kayak app lu. (kalau ada dotenv, otomatis ke-load)
@@ -27,7 +27,14 @@
 
 'use strict';
 
-try { require('dotenv').config(); } catch (_) { /* dotenv opsional */ }
+try { require('dotenv').config(); } catch { /* dotenv opsional */ }
+
+// GUARD: seeder ini nyuntik data palsu (dan --clean menghapus data by prefix
+// line). Jangan pernah kejalan di production tanpa sengaja.
+if (process.env.NODE_ENV === 'production' && process.env.ALLOW_SEED_DUMMY !== 'true') {
+  console.error('[DITOLAK] NODE_ENV=production. Set ALLOW_SEED_DUMMY=true kalau memang sengaja (JANGAN di DB asli).');
+  process.exit(1);
+}
 
 const { Pool } = require('pg');
 
@@ -285,7 +292,7 @@ async function main() {
     console.log(`  Lines   : total ${CFG.N_LINES} | healthy ${cntLinesH} | warning ${cntLinesW} | critical ${cntLinesC}`);
     console.log(`  Parts   : OK ${cntPartsOK} | warning ${cntPartsW} | danger ${cntPartsD} (total ${cntPartsOK + cntPartsW + cntPartsD})`);
     console.log('  Buka Dashboard Management buat lihat hasilnya.');
-    console.log('  Kosongin lagi: node seed-dashboard-dummy.js --clean');
+    console.log('  Kosongin lagi: node scripts/seed-dashboard-dummy.js --clean');
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('✗ GAGAL, rollback. Error:', err.message);

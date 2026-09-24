@@ -11,7 +11,7 @@ const COOKIE_NAME = 'token';
 function cookieOptions() {
   return {
     httpOnly: true,
-    secure: env.nodeEnv === 'production',
+    secure: env.cookieSecure,
     sameSite: 'strict',
     path: '/',
     maxAge: 8 * 60 * 60 * 1000, // 8 jam, selaras dengan JWT_EXPIRES_IN default

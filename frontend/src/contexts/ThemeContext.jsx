@@ -24,7 +24,7 @@ function getInitialTheme() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved === 'dark' || saved === 'light') return saved;
-  } catch (_) { /* localStorage bisa keblok di beberapa lingkungan; abaikan */ }
+  } catch { /* localStorage bisa keblok di beberapa lingkungan; abaikan */ }
   return getSystemTheme();
 }
 
@@ -32,7 +32,7 @@ export function ThemeProvider({ children }) {
   const [theme, setThemeState] = useState(getInitialTheme);
   // isManual = user udah pernah override; kalau false, kita terus ngikutin OS.
   const [isManual, setIsManual] = useState(() => {
-    try { return localStorage.getItem(STORAGE_KEY) != null; } catch (_) { return false; }
+    try { return localStorage.getItem(STORAGE_KEY) != null; } catch { return false; }
   });
 
   // Terapkan ke <html> tiap theme berubah.
@@ -52,7 +52,7 @@ export function ThemeProvider({ children }) {
   const setTheme = useCallback((next) => {
     setThemeState(next);
     setIsManual(true);
-    try { localStorage.setItem(STORAGE_KEY, next); } catch (_) { /* noop */ }
+    try { localStorage.setItem(STORAGE_KEY, next); } catch { /* noop */ }
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -61,7 +61,7 @@ export function ThemeProvider({ children }) {
 
   // Balik ikut OS (hapus override manual) — opsional, buat menu "System".
   const useSystemTheme = useCallback(() => {
-    try { localStorage.removeItem(STORAGE_KEY); } catch (_) { /* noop */ }
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* noop */ }
     setIsManual(false);
     setThemeState(getSystemTheme());
   }, []);

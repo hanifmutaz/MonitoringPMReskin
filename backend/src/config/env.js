@@ -11,6 +11,33 @@ for (const key of REQUIRED_VARS) {
   }
 }
 
+// Guard production: JWT_SECRET yang pendek/placeholder = token bisa dipalsukan
+// lewat brute-force offline. Di production wajib >= 32 karakter (generate
+// pakai `openssl rand -hex 32`). Di dev/test dibiarkan bebas.
+if ((process.env.NODE_ENV || 'development') === 'production') {
+  const secret = process.env.JWT_SECRET;
+  if (secret.length < 32 || /^(x+|changeme|secret|test)/i.test(secret)) {
+    throw new Error(
+      '[CONFIG] JWT_SECRET terlalu lemah untuk production (minimal 32 karakter & bukan placeholder). ' +
+        "Generate: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
+    );
+  }
+}
+
+// LICENSE_PACKAGE sengaja FAIL OPEN ke 'B' (lihat komentar di export bawah),
+// tapi nilai yang salah ketik (mis. 'a ' / 'C') jangan diam-diam dianggap 'B'
+// tanpa jejak — logger belum bisa dipakai di sini (logger.js require env.js,
+// circular), jadi pakai console.warn.
+{
+  const raw = process.env.LICENSE_PACKAGE;
+  const normalized = (raw || '').trim().toUpperCase();
+  if (raw !== undefined && raw !== '' && !['A', 'B'].includes(normalized)) {
+    console.warn(`[CONFIG] LICENSE_PACKAGE="${raw}" tidak dikenali (harus 'A' atau 'B') -> fallback 'B' (full akses).`);
+  } else if (!raw && (process.env.NODE_ENV || 'development') === 'production') {
+    console.warn("[CONFIG] LICENSE_PACKAGE kosong di production -> default 'B' (full akses). Set eksplisit 'A' atau 'B'.");
+  }
+}
+
 // Baca REMOTE_SITE_<N>_* dari env buat konfigurasi multi-site reporting.
 // Cuma dipakai sama instance Internal buat narik data dari Subcont 1 & 2 -
 // instance Subcont sendiri gak perlu isi ini sama sekali (array kosong,
@@ -49,6 +76,20 @@ module.exports = {
 
   databaseUrl: process.env.DATABASE_URL,
 
+  // Tuning pool Postgres (semua opsional, default aman). DB_SSL=true buat DB
+  // managed/remote yang mewajibkan TLS; DB_SSL_REJECT_UNAUTHORIZED=false
+  // hanya kalau sertifikat self-signed (pahami risikonya).
+  dbPool: {
+    max: parseInt(process.env.DB_POOL_MAX, 10) || 10,
+    idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_MS, 10) || 30000,
+    connectionTimeoutMillis: parseInt(process.env.DB_POOL_CONN_TIMEOUT_MS, 10) || 5000,
+    statementTimeoutMs: parseInt(process.env.DB_STATEMENT_TIMEOUT_MS, 10) || undefined, // default: tanpa timeout (job recompute/import bisa lama)
+    ssl:
+      process.env.DB_SSL === 'true'
+        ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' }
+        : undefined,
+  },
+
   // Kredensial DB ConMas TIDAK di-require saat startup (§REQUIRED_VARS) -
   // supaya app tetap bisa jalan buat development/testing walau ConMas
   // belum/gak bisa diakses. Sync job (src/jobs/conmasSyncJob.js) yang
@@ -79,6 +120,21 @@ module.exports = {
     from: process.env.SMTP_FROM || 'PM Monitoring <no-reply@hirose.local>',
   },
 
+  // Jumlah hop reverse proxy di depan app (nginx/Caddy/LB) — dipakai Express
+  // buat baca IP asli klien (req.ip), yang dipakai rate limiter login &
+  // login audit log. Salah set = semua klien kelihatan satu IP (rate limit
+  // salah sasaran) atau IP bisa dipalsukan lewat X-Forwarded-For.
+  trustProxyHops: parseInt(process.env.TRUST_PROXY_HOPS, 10) >= 0 ? parseInt(process.env.TRUST_PROXY_HOPS, 10) : 1,
+
+  // Flag Secure di cookie auth. Default: true di production (butuh HTTPS —
+  // browser TIDAK menyimpan cookie Secure di http:// selain localhost).
+  // COOKIE_SECURE=false hanya buat deployment LAN internal tanpa HTTPS;
+  // token jadi bisa disadap di jaringan, jadi pahami risikonya.
+  cookieSecure:
+    process.env.COOKIE_SECURE !== undefined && process.env.COOKIE_SECURE !== ''
+      ? process.env.COOKIE_SECURE === 'true'
+      : (process.env.NODE_ENV || 'development') === 'production',
+
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
 
   logLevel: process.env.LOG_LEVEL || 'info',
@@ -98,8 +154,8 @@ module.exports = {
   // Cek requireLicensePackage() di licenseMiddleware.js (backend enforcement)
   // dan AuthContext.jsx/hasPackage() (frontend gating: sidebar grayed-out +
   // UpgradePage) buat pemakaiannya.
-  licensePackage: ['A', 'B'].includes((process.env.LICENSE_PACKAGE || '').toUpperCase())
-    ? process.env.LICENSE_PACKAGE.toUpperCase()
+  licensePackage: ['A', 'B'].includes((process.env.LICENSE_PACKAGE || '').trim().toUpperCase())
+    ? process.env.LICENSE_PACKAGE.trim().toUpperCase()
     : 'B',
 
   reporting: {

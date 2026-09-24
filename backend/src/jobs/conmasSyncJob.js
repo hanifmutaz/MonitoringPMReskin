@@ -62,4 +62,11 @@ async function start() {
   runOnce().catch((err) => logger.error('ConMas sync job (initial run) crashed', err));
 }
 
-module.exports = { start, runOnce };
+function stop() {
+  if (scheduledTask) {
+    scheduledTask.stop();
+    scheduledTask = null;
+  }
+}
+
+module.exports = { start, stop, runOnce };

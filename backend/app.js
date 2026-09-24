@@ -7,13 +7,14 @@ const cookieParser = require('cookie-parser');
 const pinoHttp = require('pino-http');
 const crypto = require('crypto');
 const env = require('./src/config/env');
+const db = require('./src/config/db');
 const routes = require('./src/routes');
 const logger = require('./src/utils/logger');
 const { errorHandler, notFoundHandler } = require('./src/middlewares/errorHandler');
 
 const app = express();
 
-app.set('trust proxy', 1);
+app.set('trust proxy', env.trustProxyHops);
 
 app.use(helmet());
 
@@ -57,6 +58,17 @@ app.use(cookieParser());
 
 app.get('/health', (req, res) => {
   res.status(200).json({ success: true, message: 'OK' });
+});
+
+// Readiness: cek DB beneran reachable (dipakai healthcheck Docker/LB). /health
+// di atas cuma liveness (process hidup), gak nyentuh DB.
+app.get('/health/ready', async (req, res) => {
+  try {
+    await db.query('SELECT 1');
+    res.status(200).json({ success: true, message: 'READY' });
+  } catch {
+    res.status(503).json({ success: false, message: 'DB NOT READY' });
+  }
 });
 
 // Serve foto profil (fitur avatar - profileService.js/authRoutes.js).

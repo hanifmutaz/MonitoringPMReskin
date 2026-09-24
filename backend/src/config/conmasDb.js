@@ -29,6 +29,7 @@ function getPool() {
       password: env.conmas.password,
       // Sync job jalan berkala (bukan per-request) - koneksi minim cukup
       max: 3,
+      connectionTimeoutMillis: 10000,
     });
     pool.on('error', (err) => logger.error('Unexpected error on ConMas DB idle client', err));
   }
@@ -39,4 +40,13 @@ async function query(text, params) {
   return getPool().query(text, params);
 }
 
-module.exports = { query, isConfigured };
+// Dipanggil saat graceful shutdown; aman dipanggil walau pool belum pernah dibuat.
+async function close() {
+  if (pool) {
+    const p = pool;
+    pool = null;
+    await p.end();
+  }
+}
+
+module.exports = { query, isConfigured, close };

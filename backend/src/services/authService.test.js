@@ -18,7 +18,6 @@ const userQueries = require('../sql/userQueries');
 const permissionQueries = require('../sql/permissionQueries');
 const loginAuditQueries = require('../sql/loginAuditQueries');
 const db = require('../config/db');
-const { signToken } = require('../utils/jwt');
 
 const authService = require('./authService');
 
