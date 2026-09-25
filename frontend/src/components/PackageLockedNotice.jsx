@@ -14,7 +14,7 @@ import { Lock, CircleCheck } from 'lucide-react';
 
 function PackageLockedNotice({ featureName, features, compact = false }) {
   return (
-    <div className={`flex flex-col items-center justify-center gap-4 p-4 text-center ${compact ? 'py-10' : 'min-h-[70vh] gap-6'}`}>
+    <div className={`flex flex-col items-center justify-center gap-4 p-4 text-center ${compact ? 'py-10' : 'min-h-[70dvh] gap-6'}`}>
       <div
         className={`flex items-center justify-center rounded-full bg-primary/10 text-primary ${compact ? 'h-14 w-14' : 'h-24 w-24'}`}
       >

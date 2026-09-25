@@ -59,7 +59,18 @@ function buildInitialForm(presetPart) {
   };
 }
 
-function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
+// `standalone` (BUKAN `isPrefilled`) yang nentuin form nampilin heading +
+// panel bordernya sendiri. FIX BUG (sama seperti PmLineHistoryForm.jsx):
+// `isPrefilled` (Boolean(presetPart)) sebelumnya dipakai juga buat ini -
+// kebetulan match di 2 dari 3 pemanggil, tapi tombol toolbar "+ Input
+// Penggantian Part" (PmPartMonitoringPage, tanpa presetPart) tetap render
+// DI DALAM Modal, jadi ikut kena `isPrefilled=false` -> heading "Input
+// Penggantian Part" dobel + box ketumpuk (dilaporkan user). `isPrefilled`
+// tetap dipakai apa adanya buat hal lain yang genuinely soal preset ada/
+// kosong (disable Select, tampil-gak-nya tombol Scan Barcode, hint "Part
+// dikunci dari Monitoring") - itu bukan bug, cuma chrome panel-nya yang
+// salah pakai variable.
+function PmPartHistoryForm({ onSuccess, onCancel, presetPart, standalone = false }) {
   const [form, setForm] = useState(() => buildInitialForm(presetPart));
   const [errors, setErrors] = useState({});
 
@@ -160,8 +171,8 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
   // maupun di dalam Modal dari Monitoring (Modal sudah kasih panel + judul,
   // jadi wrapper di sini dilewatin biar gak dobel border/padding).
   return (
-    <form onSubmit={handleSubmit} className={isPrefilled ? undefined : 'rounded-xl border border-border bg-card p-4.5'}>
-      {!isPrefilled && (
+    <form onSubmit={handleSubmit} className={standalone ? 'rounded-xl border border-border bg-card p-4.5' : undefined}>
+      {standalone && (
         <div className="mb-4">
           <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Input Penggantian Part</h2>
         </div>
@@ -216,7 +227,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
 
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         <div>
-          <Label className="mb-1.5">Line</Label>
+          <Label className="mb-2.5">Line</Label>
           <Select value={form.line_id} onValueChange={(v) => update('line_id', v)} disabled={isPrefilled || isLockedFromScan}>
             <SelectTrigger aria-label="Pilih Line">
               <SelectValue placeholder="Pilih Line" />
@@ -232,7 +243,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
         </div>
 
         <div>
-          <Label className="mb-1.5">Part (Drawing No / Nama)</Label>
+          <Label className="mb-2.5">Part (Drawing No / Nama)</Label>
           <Select value={form.part_id} onValueChange={(v) => update('part_id', v)} disabled={isPrefilled || isLockedFromScan}>
             <SelectTrigger aria-label="Pilih Part">
               <SelectValue placeholder="Pilih Part" />
@@ -254,7 +265,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
         </div>
 
         <div>
-          <Label className="mb-1.5">Tanggal Ganti</Label>
+          <Label className="mb-2.5">Tanggal Ganti</Label>
           <Input
             type="date"
             value={form.tgl_ganti}
@@ -266,7 +277,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
         </div>
 
         <div>
-          <Label className="mb-1.5">Shift</Label>
+          <Label className="mb-2.5">Shift</Label>
           <Select value={form.shift} onValueChange={(v) => update('shift', v)}>
             <SelectTrigger aria-label="Pilih Shift">
               <SelectValue />
@@ -281,7 +292,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
         </div>
 
         <div>
-          <Label className="mb-1.5">Counter Saat Diganti</Label>
+          <Label className="mb-2.5">Counter Saat Diganti</Label>
           <Input
             type="number"
             className="text-right font-[var(--font-mono)]"
@@ -296,7 +307,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
         </div>
 
         <div>
-          <Label className="mb-1.5">Jenis Penggantian</Label>
+          <Label className="mb-2.5">Jenis Penggantian</Label>
           <Select value={form.jenis_penggantian} onValueChange={(v) => update('jenis_penggantian', v)}>
             <SelectTrigger aria-label="Pilih Jenis Penggantian">
               <SelectValue />
@@ -312,7 +323,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
         </div>
 
         <div>
-          <Label className="mb-1.5">PIC</Label>
+          <Label className="mb-2.5">PIC</Label>
           <Input
             value={form.pic_name}
             onChange={(e) => update('pic_name', e.target.value)}
@@ -323,7 +334,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart }) {
         </div>
 
         <div className="sm:col-span-2">
-          <Label className="mb-1.5">Remark (opsional)</Label>
+          <Label className="mb-2.5">Remark (opsional)</Label>
           <Textarea className="min-h-[60px]" value={form.remark} onChange={(e) => update('remark', e.target.value)} />
         </div>
       </div>

@@ -25,6 +25,7 @@ function PmLineFormPage() {
             </Banner>
 
             <PmLineHistoryForm
+                standalone
                 onSuccess={() => {
                     navigate('/pm-line/history');
                 }}

@@ -199,17 +199,12 @@ input[type='password']::-webkit-strong-password-auto-fill-button {
   min-height: 100dvh; /* iOS Safari: 100vh > area kelihatan (bar alamat) */
 }
 
-.sidebar {
-  width: var(--sidebar-width);
-  flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  background: var(--panel);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-}
+/* `.sidebar` (position: sticky, height: 100vh) dihapus - dead CSS, class ini
+   udah gak dipakai (Sidebar.jsx pakai Tailwind, lihat komentar app-shell di
+   atas). Sama kategori sama `@media (max-width:900px)` yang dibuang
+   sebelumnya: sisa dari sebelum migrasi Tailwind, gak ke-notice karena
+   browser diem-diem aja ngabaiin selector yang gak match apa-apa.
+*/
 
 .main-column {
   flex: 1;

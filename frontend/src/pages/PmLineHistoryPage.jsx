@@ -145,6 +145,7 @@ function PmLineHistoryPage() {
     <div className="flex flex-col gap-4">
       {showForm && (
         <PmLineHistoryForm
+          standalone
           onSuccess={() => {
             setShowForm(false);
             setPage(1);

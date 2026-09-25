@@ -49,7 +49,20 @@ function buildInitialForm(presetLine, presetJenisPm) {
   };
 }
 
-function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm }) {
+// `standalone` (BUKAN `isPrefilled`) yang nentuin form nampilin heading +
+// panel bordernya sendiri. FIX BUG: sebelumnya dipakai `isPrefilled`
+// (Boolean(presetLine)) buat ini - kebetulan sama nilainya di 2 dari 3
+// pemanggil (History page: gak ada preset = butuh panel sendiri; Modal per-
+// baris Monitoring: ada preset = jangan). Tapi pemanggil ke-3 (tombol
+// toolbar "+ Input PM" tanpa preset di PmLineStatusPage) juga masuk Modal,
+// jadi ikut kena `isPrefilled=false` -> form render heading+panel bordernya
+// SENDIRI di DALAM <Modal> yang udah py sendiri -> heading dobel & box
+// ketumpuk (dilaporkan user - ss "Input PM Monthly/Weekly" nongol 2x).
+// `isPrefilled` sekarang cuma dipakai buat disable Select Line/Jenis PM
+// (concern yang beda - preset ada isinya atau kosong), TIDAK lagi
+// nentuin chrome. Kedua concern kebetulan sama-sama TRUE di modal per-
+// baris, makanya sebelumnya kepakein 1 variable buat 2 hal.
+function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm, standalone = false }) {
   const [form, setForm] = useState(() => buildInitialForm(presetLine, presetJenisPm));
   const [errors, setErrors] = useState({});
   const isPrefilled = Boolean(presetLine);
@@ -86,8 +99,8 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className={isPrefilled ? undefined : 'rounded-xl border border-border bg-card p-4.5'}>
-      {!isPrefilled && (
+    <form onSubmit={handleSubmit} className={standalone ? 'rounded-xl border border-border bg-card p-4.5' : undefined}>
+      {standalone && (
         <div className="mb-4">
           <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Input PM Monthly / Weekly</h2>
         </div>
@@ -97,7 +110,7 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm }) {
 
       <div className="mt-3.5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         <div>
-          <Label className="mb-1.5">Line</Label>
+          <Label className="mb-2.5">Line</Label>
           <Select value={form.line_id} onValueChange={(v) => update('line_id', v)} disabled={isPrefilled}>
             <SelectTrigger aria-label="Pilih Line">
               <SelectValue placeholder="Pilih Line" />
@@ -114,7 +127,7 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm }) {
         </div>
 
         <div>
-          <Label className="mb-1.5">Jenis PM</Label>
+          <Label className="mb-2.5">Jenis PM</Label>
           <Select value={form.jenis_pm} onValueChange={(v) => update('jenis_pm', v)} disabled={isPrefilled}>
             <SelectTrigger aria-label="Pilih Jenis PM">
               <SelectValue />
@@ -127,7 +140,7 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm }) {
         </div>
 
         <div>
-          <Label className="mb-1.5">Tanggal Input</Label>
+          <Label className="mb-2.5">Tanggal Input</Label>
           <Input
             type="date"
             value={form.tgl_input}
@@ -139,7 +152,7 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm }) {
         </div>
 
         <div>
-          <Label className="mb-1.5">PIC</Label>
+          <Label className="mb-2.5">PIC</Label>
           <Input
             value={form.pic_name}
             onChange={(e) => update('pic_name', e.target.value)}
@@ -150,7 +163,7 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm }) {
         </div>
 
         <div className="sm:col-span-2">
-          <Label className="mb-1.5">Keterangan (opsional)</Label>
+          <Label className="mb-2.5">Keterangan (opsional)</Label>
           <Textarea className="min-h-[60px]" value={form.keterangan} onChange={(e) => update('keterangan', e.target.value)} />
         </div>
       </div>

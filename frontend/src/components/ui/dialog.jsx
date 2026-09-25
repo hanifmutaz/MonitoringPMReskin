@@ -40,7 +40,16 @@ function DialogContent({ className, children, ...props }) {
           // diganti `duration-[var(--duration-slow)]` (300ms, LOCK §6), easing dibedain
           // enter (decelerate) vs exit (accelerate) - sebelumnya sama-sama
           // pakai easing default (nggak eksplisit).
-          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border border-border bg-card p-6 shadow-lg duration-[var(--duration-slow)] data-[state=open]:animate-in data-[state=open]:ease-decelerate data-[state=closed]:animate-out data-[state=closed]:ease-accelerate data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 rounded-xl max-h-[85vh] overflow-y-auto',
+          // FIX BUG (dilaporkan user - Simpan/Batal ketutup di luar layar
+          // pas modal panjang di iPad Safari): `max-h-[85vh]` pakai unit
+          // `vh` klasik, yang di Safari iOS dihitung dari tinggi viewport
+          // TERBESAR (pas address bar kehide) - bukan yang lagi beneran
+          // keliatan. Pas address bar masih nongol, ruang yang beneran ada
+          // lebih pendek dari 85vh yang dihitung, jadi bagian bawah modal
+          // overflow ke luar layar. `dvh` (dynamic viewport height) ngikutin
+          // tinggi yang BENERAN keliatan saat ini (sama fix yang dipakai di
+          // `.app-shell` - lihat global.css).
+          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border border-border bg-card p-6 shadow-lg duration-[var(--duration-slow)] data-[state=open]:animate-in data-[state=open]:ease-decelerate data-[state=closed]:animate-out data-[state=closed]:ease-accelerate data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 rounded-xl max-h-[85dvh] overflow-y-auto',
           className
         )}
         {...props}

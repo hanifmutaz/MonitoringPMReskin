@@ -48,7 +48,7 @@ function PmPartFormPage() {
                     </Button>
                 </div>
             ) : (
-                <PmPartHistoryForm onSuccess={handleSuccess} />
+                <PmPartHistoryForm standalone onSuccess={handleSuccess} />
             )}
         </div>
     );
