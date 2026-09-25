@@ -19,12 +19,11 @@
 // (dengan/tanpa preset Line), Banner penjelasan formula, dan query TIDAK
 // disentuh.
 import { useState } from 'react';
-import { Plus, Inbox } from 'lucide-react';
+import { Plus, X, Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { usePmLineStatus } from '../hooks/usePmLineStatus';
 import buildPmLineColumns from '../components/pm-line/pmLineColumns';
 import Banner from '../components/Banner';
-import Modal from '../components/Modal';
 import PmLineHistoryForm from '../components/pm-line/PmLineHistoryForm';
 import { DataTable } from '../components/data-display/DataTable';
 import { EmptyState } from '../components/ui/empty-state';
@@ -46,6 +45,20 @@ function PmLineStatusPage() {
     onInputWeekly: (line) => setInputTarget({ line, jenisPm: 'WEEKLY' }),
   });
 
+  // BUGFIX (iPad): form "Input PM" sebelumnya dibuka via Modal (Dialog)
+  // yang overlay-nya ga kebentuk bener di viewport iPad (lihat laporan -
+  // background gelap kepotong / form nyangkut di tengah). Diganti jadi
+  // inline form (toggle di halaman, sama persis pola PmLineHistoryPage.jsx
+  // - tombol "+ Input PM" <-> "Tutup Form"), bukan overlay lagi sama
+  // sekali. Berlaku baik buat form kosong (tombol atas) maupun form preset
+  // per-Line (link "Input Monthly"/"Input Weekly" di kolom tabel).
+  const anyFormOpen = Boolean(inputTarget) || showInputForm;
+
+  function closeAllForms() {
+    setInputTarget(null);
+    setShowInputForm(false);
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <Banner>
@@ -57,10 +70,41 @@ function PmLineStatusPage() {
       </Banner>
 
       <div className="flex justify-end">
-        <Button type="button" size="sm" onClick={() => setShowInputForm(true)}>
-          <Plus size={14} /> Input PM
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => (anyFormOpen ? closeAllForms() : setShowInputForm(true))}
+        >
+          {anyFormOpen ? (
+            <>
+              <X size={14} /> Tutup Form
+            </>
+          ) : (
+            <>
+              <Plus size={14} /> Input PM
+            </>
+          )}
         </Button>
       </div>
+
+      {showInputForm && <PmLineHistoryForm onCancel={closeAllForms} onSuccess={closeAllForms} />}
+
+      {inputTarget && (
+        <div className="rounded-xl border border-border bg-card p-4.5">
+          <div className="mb-4">
+            <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">
+              Input PM {inputTarget.jenisPm === 'MONTHLY' ? 'Monthly' : 'Weekly'} — {inputTarget.line.line_name}
+            </h2>
+          </div>
+          <PmLineHistoryForm
+            key={`${inputTarget.line.line_id}-${inputTarget.jenisPm}`}
+            presetLine={inputTarget.line}
+            presetJenisPm={inputTarget.jenisPm}
+            onCancel={closeAllForms}
+            onSuccess={closeAllForms}
+          />
+        </div>
+      )}
 
       <DataTable
         columns={columns}
@@ -71,27 +115,6 @@ function PmLineStatusPage() {
         isError={isError}
         emptyState={<EmptyState icon={Inbox} title="Belum ada Line aktif" />}
       />
-
-      {inputTarget && (
-        <Modal
-          title={`Input PM ${inputTarget.jenisPm === 'MONTHLY' ? 'Monthly' : 'Weekly'} — ${inputTarget.line.line_name}`}
-          onClose={() => setInputTarget(null)}
-        >
-          <PmLineHistoryForm
-            key={`${inputTarget.line.line_id}-${inputTarget.jenisPm}`}
-            presetLine={inputTarget.line}
-            presetJenisPm={inputTarget.jenisPm}
-            onCancel={() => setInputTarget(null)}
-            onSuccess={() => setInputTarget(null)}
-          />
-        </Modal>
-      )}
-
-      {showInputForm && (
-        <Modal title="Input PM Monthly/Weekly" onClose={() => setShowInputForm(false)}>
-          <PmLineHistoryForm onCancel={() => setShowInputForm(false)} onSuccess={() => setShowInputForm(false)} />
-        </Modal>
-      )}
     </div>
   );
 }

@@ -22,57 +22,30 @@
 // cleanup) TIDAK berubah sama sekali - cuma markup.
 import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import { DecodeHintType } from '@zxing/library';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
-import { Camera, ImagePlus, X } from 'lucide-react';
+import { Camera, X } from 'lucide-react';
 import { Button } from '../ui/button';
-
-// getUserMedia (kamera live) di Safari iOS HANYA jalan di secure context
-// (HTTPS atau localhost). App ini diakses iPad lewat http://<IP-LAN>, jadi
-// `navigator.mediaDevices` bahkan `undefined` di sana - scan live pasti
-// gagal, apa pun izin kameranya. Dicek SEKALI di module load (nilainya gak
-// berubah selama halaman hidup).
-const LIVE_CAMERA_SUPPORTED =
-  typeof window !== 'undefined' && window.isSecureContext && Boolean(navigator.mediaDevices?.getUserMedia);
-
-// Fallback tanpa HTTPS: <input type=file capture> buka aplikasi Kamera
-// bawaan iOS (gak butuh secure context), fotonya baru di-decode zxing.
-// Foto iPad ~8MP - di-downscale dulu biar decode cepat & gak berat di memori.
-const PHOTO_MAX_SIDE = 1600;
-
-async function decodeBarcodeFromPhoto(file) {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((resolve, reject) => {
-      const el = new Image();
-      el.onload = () => resolve(el);
-      el.onerror = reject;
-      el.src = url;
-    });
-    const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(img.naturalWidth * scale);
-    canvas.height = Math.round(img.naturalHeight * scale);
-    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    const hints = new Map([[DecodeHintType.TRY_HARDER, true]]);
-    return new BrowserMultiFormatReader(hints).decodeFromCanvas(canvas).getText();
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
 
 function BarcodeScannerModal({ open, onClose, onDetected }) {
   const videoRef = useRef(null);
   const readerRef = useRef(null);
   const controlsRef = useRef(null);
-  const fileInputRef = useRef(null);
   const [error, setError] = useState(null);
-  const [photoError, setPhotoError] = useState(null);
-  const [decoding, setDecoding] = useState(false);
+  // BUGFIX (iPad Safari): "kamera nyala tapi harus ditekan tombol dulu
+  // baru kebaca" - stream getUserMedia di-attach lewat effect ini (async,
+  // SETELAH gesture klik "Scan" selesai), bukan sinkron di dalam handler
+  // klik-nya sendiri. WebKit autoplay policy diam-diam nge-block
+  // video.play() dalam kondisi begini walau udah muted+playsInline -
+  // videonya ke-attach tapi BEKU di frame pertama (jadi kayak "foto"
+  // statis, bukan live). Deteksi kalau video ternyata masih paused abis
+  // di-attach, munculin overlay "Ketuk untuk mulai kamera" yang manggil
+  // .play() dari DALAM tap user itu sendiri (real user gesture) biar
+  // WebKit ngizinin. Browser lain (autoplay-nya gak diblokir) gak akan
+  // pernah lihat overlay ini sama sekali - videonya langsung "playing".
+  const [needsTapToPlay, setNeedsTapToPlay] = useState(false);
 
   useEffect(() => {
-    if (!open || !LIVE_CAMERA_SUPPORTED) return undefined;
+    if (!open) return undefined;
 
     let cancelled = false;
     const reader = new BrowserMultiFormatReader();
@@ -100,6 +73,10 @@ function BarcodeScannerModal({ open, onClose, onDetected }) {
           return;
         }
         controlsRef.current = controls;
+        // Cek beneran jalan apa beku - lihat komentar needsTapToPlay di atas.
+        if (videoRef.current?.paused) {
+          setNeedsTapToPlay(true);
+        }
       })
       .catch((err) => {
         if (cancelled) return;
@@ -119,27 +96,16 @@ function BarcodeScannerModal({ open, onClose, onDetected }) {
       controlsRef.current?.stop();
       controlsRef.current = null;
       setError(null);
+      setNeedsTapToPlay(false);
     };
   }, [open, onDetected]);
 
-  useEffect(() => () => setPhotoError(null), [open]);
-
-  async function handlePhotoChosen(e) {
-    const file = e.target.files?.[0];
-    e.target.value = ''; // biar foto yang sama bisa dipilih ulang
-    if (!file) return;
-    setDecoding(true);
-    setPhotoError(null);
-    try {
-      onDetected(await decodeBarcodeFromPhoto(file));
-    } catch {
-      setPhotoError('Barcode tidak terbaca. Foto lebih dekat, pastikan barcode fokus dan tidak silau, lalu coba lagi.');
-    } finally {
-      setDecoding(false);
-    }
+  function handleTapToPlay() {
+    // Manggil .play() LANGSUNG di dalam handler tap ini (bukan di effect)
+    // - inilah yang bikin WebKit ngizinin (real user activation).
+    videoRef.current?.play().catch(() => {});
+    setNeedsTapToPlay(false);
   }
-
-  const showPhotoFallback = !LIVE_CAMERA_SUPPORTED || Boolean(error);
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -151,48 +117,36 @@ function BarcodeScannerModal({ open, onClose, onDetected }) {
           </DialogTitle>
         </DialogHeader>
 
-        {!LIVE_CAMERA_SUPPORTED ? (
-          <div className="rounded-lg bg-[var(--warn-dim)] px-3.5 py-3.5 text-[13px] text-[var(--warn)]">
-            Scan kamera live diblokir browser karena halaman dibuka lewat HTTP (bukan HTTPS). Pakai tombol
-            &quot;Ambil Foto Barcode&quot; di bawah.
-          </div>
-        ) : error ? (
+        {error ? (
           <div className="rounded-lg bg-[var(--danger-dim)] px-3.5 py-3.5 text-[13px] text-[var(--danger)]">
             {error}
           </div>
         ) : (
           <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-black">
-            <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
+            <video
+              ref={videoRef}
+              className="h-full w-full object-cover"
+              muted
+              playsInline
+              onPlaying={() => setNeedsTapToPlay(false)}
+            />
             <div className="pointer-events-none absolute inset-[20%_12%] rounded-md border-2 border-primary shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
-          </div>
-        )}
-
-        {photoError && (
-          <div className="rounded-lg bg-[var(--danger-dim)] px-3.5 py-3 text-[13px] text-[var(--danger)]">
-            {photoError}
+            {needsTapToPlay && (
+              <button
+                type="button"
+                onClick={handleTapToPlay}
+                className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 text-white"
+              >
+                <Camera size={28} />
+                <span className="text-sm font-medium">Ketuk untuk mulai kamera</span>
+              </button>
+            )}
           </div>
         )}
 
         <span className="text-center text-xs text-muted-foreground">
           Arahkan kamera ke label barcode Drawing No pada part.
         </span>
-
-        {showPhotoFallback && (
-          <>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={handlePhotoChosen}
-            />
-            <Button type="button" disabled={decoding} onClick={() => fileInputRef.current?.click()}>
-              <ImagePlus size={14} />
-              {decoding ? 'Membaca barcode...' : 'Ambil Foto Barcode'}
-            </Button>
-          </>
-        )}
 
         <Button type="button" variant="outline" onClick={onClose} className="mt-1">
           <X size={14} />
