@@ -60,28 +60,30 @@ import ThemeToggle from './ThemeToggle';
 // paling akhir, jadi otomatis di atas tanpa perlu z-index ekstrem di sini).
 function Topbar() {
   const { title, actions } = useCurrentPageHeader();
-  const { collapsed, toggleCollapsed } = useSidebar();
+  const { collapsed, toggleCollapsed, isDesktop, drawerOpen } = useSidebar();
+  // Ikon toggle: desktop ikut state collapsed, layar sempit ikut state drawer.
+  const showOpenIcon = isDesktop ? collapsed : !drawerOpen;
   return (
     <header
-      className="sticky top-0 z-40 flex h-[60px] shrink-0 items-center justify-between border-b border-border bg-background pr-8"
-      style={{ paddingLeft: collapsed ? '16px' : '32px', transition: 'padding-left 250ms ease-in-out' }}
+      className="sticky top-0 z-40 flex h-[60px] shrink-0 items-center justify-between border-b border-border bg-background pr-4 lg:pr-8"
+      style={{ paddingLeft: isDesktop && !collapsed ? '32px' : '16px', transition: 'padding-left 250ms ease-in-out' }}
     >
       <div className="flex items-center gap-3.5">
         <button
           type="button"
           onClick={toggleCollapsed}
-          aria-label={collapsed ? 'Buka sidebar' : 'Tutup sidebar'}
+          aria-label={showOpenIcon ? 'Buka sidebar' : 'Tutup sidebar'}
           className="relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-muted-foreground transition-colors duration-200 hover:border-border hover:bg-accent hover:text-foreground"
         >
           <PanelLeftOpen
             className={`absolute h-[18px] w-[18px] shrink-0 transition-opacity duration-[250ms] ease-in-out ${
-              collapsed ? 'opacity-100' : 'opacity-0'
+              showOpenIcon ? 'opacity-100' : 'opacity-0'
             }`}
             strokeWidth={1.8}
           />
           <PanelLeftClose
             className={`absolute h-[18px] w-[18px] shrink-0 transition-opacity duration-[250ms] ease-in-out ${
-              collapsed ? 'opacity-0' : 'opacity-100'
+              showOpenIcon ? 'opacity-0' : 'opacity-100'
             }`}
             strokeWidth={1.8}
           />

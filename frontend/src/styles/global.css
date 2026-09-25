@@ -196,6 +196,7 @@ input[type='password']::-webkit-strong-password-auto-fill-button {
 .app-shell {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh; /* iOS Safari: 100vh > area kelihatan (bar alamat) */
 }
 
 .sidebar {
@@ -247,17 +248,21 @@ input[type='password']::-webkit-strong-password-auto-fill-button {
 }
 
 /* ================= Responsive (UI Spec §7) ================= */
-@media (max-width: 900px) {
-  .app-shell {
-    flex-direction: column;
+/* FIX (bug iPad portrait, 810px): blok lama `@media (max-width:900px)` di sini
+   nge-flip `.app-shell` jadi `flex-direction: column` buat sidebar versi lama
+   (class `.sidebar`, sekarang udah gak ada - Sidebar.jsx pakai Tailwind).
+   Sisa-sisa itu yang bikin sidebar (sticky, tinggi 1 layar) ketumpuk sama
+   konten. Sekarang sidebar jadi drawer off-canvas di < 1024px (lihat
+   Sidebar.jsx + SidebarContext.jsx), shell TETAP row - cuma padding konten
+   yang dirapatkan. */
+@media (max-width: 1023px) {
+  .content-area {
+    padding-left: 16px;
+    padding-right: 16px;
   }
-
-  .sidebar {
-    width: 100%;
-    height: auto;
-    position: static;
-    flex-direction: row;
-    overflow-x: auto;
+  .footer-status-bar {
+    padding-left: 16px;
+    padding-right: 16px;
   }
 }
 

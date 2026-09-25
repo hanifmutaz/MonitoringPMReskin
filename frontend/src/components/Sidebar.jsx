@@ -289,7 +289,7 @@ function Sidebar() {
 
   const [openGroups, setOpenGroups] = useState(() => new Set(activeGroupKey ? [activeGroupKey] : []));
 
-  const { collapsed, setCollapsed } = useSidebar();
+  const { collapsed, setCollapsed, drawerOpen, closeMobile } = useSidebar();
 
   function toggleGroup(key) {
     setOpenGroups((prev) => {
@@ -338,10 +338,20 @@ function Sidebar() {
 
   return (
     <TooltipProvider>
+      {/* Layar sempit (< lg, mis. iPad portrait): backdrop untuk drawer. */}
+      {drawerOpen && (
+        <div
+          aria-hidden="true"
+          onClick={closeMobile}
+          className="fixed inset-0 z-[45] bg-[rgba(0,0,0,0.5)] lg:hidden"
+        />
+      )}
       <aside
-        className={`sticky top-0 flex h-screen shrink-0 flex-col overflow-hidden border-r border-border bg-card transition-[width] duration-[250ms] ease-in-out ${
-          collapsed ? 'w-[76px]' : 'w-[var(--sidebar-width)]'
-        }`}
+        // Klik link nav di drawer -> drawer nutup (di desktop closeMobile no-op).
+        onClick={(e) => e.target.closest('a') && closeMobile()}
+        className={`fixed inset-y-0 left-0 z-50 flex h-dvh max-w-[85vw] shrink-0 flex-col overflow-hidden border-r border-border bg-card transition-[width,transform,visibility] duration-[250ms] ease-in-out lg:sticky lg:top-0 lg:z-auto lg:max-w-none lg:translate-x-0 lg:visible ${
+          drawerOpen ? 'translate-x-0' : 'invisible -translate-x-full'
+        } ${collapsed ? 'w-[76px]' : 'w-[var(--sidebar-width)]'}`}
       >
         <div
           className={`flex h-[60px] items-center gap-2.5 border-b border-border transition-[padding] duration-[250ms] ease-in-out ${collapsed ? 'justify-center px-2' : 'px-4'}`}
