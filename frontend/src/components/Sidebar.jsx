@@ -127,12 +127,17 @@ const NAV_GROUPS = [
     key: 'admin',
     label: 'Administrasi',
     icon: ShieldCheck,
-    adminOnly: true,
     items: [
+      // 'Settings' SENGAJA TIDAK adminOnly lagi (dulu 1 group ini semua
+      // adminOnly) - role non-Admin yang digrant akses lewat
+      // setting_role_access (migration 1700000022000) sekarang perlu bisa
+      // buka menu ini juga. 3 item lain (User Management/Recycle Bin/Audit
+      // Log) TETAP adminOnly: true, difilter per-item di bawah (bukan lagi
+      // per-group) - lihat NAV_GROUPS.map di bawah.
       { to: '/settings', label: 'Settings' },
-      { to: '/users', label: 'User Management' },
-      { to: '/recycle-bin', label: 'Recycle Bin' },
-      { to: '/audit-log', label: 'Audit Log' },
+      { to: '/users', label: 'User Management', adminOnly: true },
+      { to: '/recycle-bin', label: 'Recycle Bin', adminOnly: true },
+      { to: '/audit-log', label: 'Audit Log', adminOnly: true },
     ],
   },
 ];
@@ -382,7 +387,10 @@ function Sidebar() {
               bukan `mb-2.5` per-item lagi (dulu ada 2 tempat berbeda buat
               collapsed vs expanded, gampang drift - poin 10). */}
           <div className="space-y-2.5">
-            {NAV_GROUPS.filter((g) => !g.adminOnly || isAdmin).map((group) => (
+            {NAV_GROUPS.filter((g) => !g.adminOnly || isAdmin)
+              .map((group) => ({ ...group, items: group.items.filter((item) => !item.adminOnly || isAdmin) }))
+              .filter((group) => group.items.length > 0)
+              .map((group) => (
               <NavGroup
                 key={group.key}
                 group={group}

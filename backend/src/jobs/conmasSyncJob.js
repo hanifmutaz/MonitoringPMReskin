@@ -22,7 +22,7 @@ const logger = require('../utils/logger');
 let scheduledTask = null;
 
 async function runOnce() {
-  await conmasSyncService.runSync();
+  const syncResult = await conmasSyncService.runSync();
   await pmMonthlyAccrualService.recomputeAllLines();
   // FIX 24 Sep 2026: akumulasi_poin_weekly sebelumnya nggak pernah
   // ke-recompute otomatis (lihat pmWeeklyAccrualService.js header) -
@@ -42,6 +42,11 @@ async function runOnce() {
   } catch (err) {
     logger.error('Recompute PM Part status snapshot gagal', err);
   }
+
+  // Return value gak dipakai pemanggil cron (fire-and-forget), tapi
+  // dipakai trigger MANUAL (POST /settings/sync-conmas, settingsController.js)
+  // buat kasih feedback ke tombol "Sync Sekarang" di frontend.
+  return syncResult;
 }
 
 async function start() {

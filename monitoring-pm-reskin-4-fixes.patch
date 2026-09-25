@@ -1,0 +1,932 @@
+diff --git a/backend/migrations/1700000022000_add-setting-role-access.sql b/backend/migrations/1700000022000_add-setting-role-access.sql
+new file mode 100644
+index 0000000..333e700
+--- /dev/null
++++ b/backend/migrations/1700000022000_add-setting-role-access.sql
+@@ -0,0 +1,31 @@
++-- 1700000022000_add-setting-role-access.sql
++--
++-- Diminta lewat chat: "ada beberapa setting yang diperbolehkan untuk role
++-- lain, tapi ga semua settingnya" — Settings selama ini hardcode
++-- requireRole('Admin') TOTAL (lihat komentar migration 1700000011000 §
++-- "Settings & User Management tetap Admin-only hardcode... terlalu
++-- sensitif untuk dibuka granular di tahap ini"). Sekarang dibuka granular
++-- PER-KEY, pola yang sama dengan role_permissions (migration 1700000011000):
++-- Admin tetap selalu superuser (bypass total, TIDAK butuh row di sini -
++-- sama seperti Admin di role_permissions), role lain HARUS ada grant
++-- eksplisit per setting key baru boleh edit key itu. Default: TIDAK ADA
++-- grant sama sekali (tabel kosong) - behavior existing (Admin-only) tetap
++-- 100% sama sampai Admin eksplisit buka lewat UI baru.
++--
++-- Read (GET /settings) sengaja DIBUKA ke semua role yang sudah login (lihat
++-- perubahan settingsRoutes.js terkait) - supaya role yang dikasih akses
++-- edit ke sebagian setting tetap bisa lihat context 8 kategori lainnya
++-- (read-only), sama pola dengan pmLineRoutes/pmPartRoutes (view-only untuk
++-- semua role login). Write (PATCH) yang digranular di sini.
++
++CREATE TABLE setting_role_access (
++    setting_key     VARCHAR(100) NOT NULL REFERENCES app_settings(key) ON DELETE CASCADE,
++    role_id         INT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
++    granted_by      INT REFERENCES users(id) ON DELETE SET NULL,
++    granted_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
++    PRIMARY KEY (setting_key, role_id)
++);
++
++COMMENT ON TABLE setting_role_access IS 'Grant akses EDIT (bukan read) per app_settings.key ke role non-Admin. Admin tidak butuh row (superuser, sama seperti role_permissions). Role "Operator" tetap ikut aturan ini juga (bukan default free-access) - konsisten dgn role custom lain.';
++
++CREATE INDEX idx_setting_role_access_role ON setting_role_access(role_id);
+diff --git a/backend/src/controllers/settingsController.js b/backend/src/controllers/settingsController.js
+index 270bfd5..1e8890e 100644
+--- a/backend/src/controllers/settingsController.js
++++ b/backend/src/controllers/settingsController.js
+@@ -1,5 +1,6 @@
+ // src/controllers/settingsController.js
+ const settingsService = require('../services/settingsService');
++const conmasSyncJob = require('../jobs/conmasSyncJob');
+ const asyncHandler = require('../utils/asyncHandler');
+ const AppError = require('../utils/AppError');
+ 
+@@ -12,8 +13,30 @@ const update = asyncHandler(async (req, res) => {
+   if (req.body === undefined || req.body.value === undefined) {
+     throw AppError.badRequest('Validasi gagal', { value: 'Value wajib diisi' });
+   }
+-  const data = await settingsService.updateSetting(req.params.key, req.body.value, req.user.id);
++  const data = await settingsService.updateSetting(req.params.key, req.body.value, req.user);
+   res.status(200).json({ success: true, message: 'Success', data });
+ });
+ 
+-module.exports = { list, update };
++// PATCH /settings/:key/access - Admin only (roleMiddleware di route),
++// body { role_ids: [1, 2, ...] } - role NON-Admin yang boleh edit key ini.
++const updateAccess = asyncHandler(async (req, res) => {
++  const { role_ids: roleIds } = req.body || {};
++  if (!Array.isArray(roleIds) || roleIds.some((id) => !Number.isInteger(id))) {
++    throw AppError.badRequest('Validasi gagal', { role_ids: 'role_ids wajib array of integer' });
++  }
++  const data = await settingsService.setSettingAccess(req.params.key, roleIds, req.user.id);
++  res.status(200).json({ success: true, message: 'Success', data });
++});
++
++// POST /settings/sync-conmas - trigger manual full siklus sync (production_cache
++// + recompute akumulasi poin Monthly + snapshot status PM Part), sinkron
++// dengan yang dijalankan cron job (conmasSyncJob.runOnce) - dibuat karena
++// nunggu jadwal cron pas testing kelamaan. Admin only (route level, sama
++// dengan Settings lain - trigger sync manual cukup sensitif buat dibuka
++// granular per role di tahap ini).
++const syncNow = asyncHandler(async (req, res) => {
++  const result = await conmasSyncJob.runOnce();
++  res.status(200).json({ success: true, message: 'Sync selesai', data: result });
++});
++
++module.exports = { list, update, updateAccess, syncNow };
+diff --git a/backend/src/jobs/conmasSyncJob.js b/backend/src/jobs/conmasSyncJob.js
+index eccc3a6..eabcee5 100644
+--- a/backend/src/jobs/conmasSyncJob.js
++++ b/backend/src/jobs/conmasSyncJob.js
+@@ -21,7 +21,7 @@ const logger = require('../utils/logger');
+ let scheduledTask = null;
+ 
+ async function runOnce() {
+-  await conmasSyncService.runSync();
++  const syncResult = await conmasSyncService.runSync();
+   await pmMonthlyAccrualService.recomputeAllLines();
+ 
+   // Sengaja TIDAK di-skip walau conmasDb belum configured (beda dari
+@@ -37,6 +37,11 @@ async function runOnce() {
+   } catch (err) {
+     logger.error('Recompute PM Part status snapshot gagal', err);
+   }
++
++  // Return value gak dipakai pemanggil cron (fire-and-forget), tapi
++  // dipakai trigger MANUAL (POST /settings/sync-conmas, settingsController.js)
++  // buat kasih feedback ke tombol "Sync Sekarang" di frontend.
++  return syncResult;
+ }
+ 
+ async function start() {
+diff --git a/backend/src/routes/lineRoutes.js b/backend/src/routes/lineRoutes.js
+index 4b7e2f9..eaef4c0 100644
+--- a/backend/src/routes/lineRoutes.js
++++ b/backend/src/routes/lineRoutes.js
+@@ -9,8 +9,13 @@ const router = express.Router();
+ 
+ router.use(requireAuth);
+ 
+-// GET - Admin & Operator
+-router.get('/', requireRole('Admin', 'Operator'), lineController.list);
++// GET - dibuka ke semua role yang sudah login (dulu hardcode 'Admin',
++// 'Operator' - efeknya role custom buatan Role Management gak pernah bisa
++// lihat Master Data Line sama sekali walau sudah digrant permission lewat
++// UI, karena middleware ini cek by NAME literal, bukan permission).
++// View-only di sini aman dilihat siapa saja yang punya akun aktif, sama
++// pola dengan pmLineRoutes.js/pmPartRoutes.js.
++router.get('/', lineController.list);
+ 
+ // POST/PATCH - Admin, atau Operator jika allow_operator_edit_master_data=true
+ router.post('/', requireMasterDataEditAccess, lineController.create);
+diff --git a/backend/src/routes/partRoutes.js b/backend/src/routes/partRoutes.js
+index 9a94ea3..02e6fd0 100644
+--- a/backend/src/routes/partRoutes.js
++++ b/backend/src/routes/partRoutes.js
+@@ -12,12 +12,14 @@ const router = express.Router();
+ 
+ router.use(requireAuth);
+ 
+-// Parts - GET: Admin & Operator
+-router.get('/', requireRole('Admin', 'Operator'), partController.list);
++// Parts - GET: dibuka ke semua role yang sudah login (lihat catatan sama di
++// lineRoutes.js - requireRole('Admin','Operator') hardcode bikin role
++// custom kejegal 403 walau sudah digrant permission lewat Role Management).
++router.get('/', partController.list);
+ 
+ // Lookup exact-match by Drawing No (hasil scan barcode kamera iPad) - akses
+ // sama dengan list biasa, cuma beda cara matching (exact, bukan ILIKE).
+-router.get('/lookup', requireRole('Admin', 'Operator'), partController.lookupByDrawingNo);
++router.get('/lookup', partController.lookupByDrawingNo);
+ 
+ // Parts - POST/PATCH: Admin, atau Operator jika allow_operator_edit_master_data=true
+ router.post('/', requireMasterDataEditAccess, partController.create);
+@@ -26,8 +28,9 @@ router.patch('/:id', requireMasterDataEditAccess, partController.update);
+ // Parts - DELETE: Admin only
+ router.delete('/:id', requireRole('Admin'), partController.remove);
+ 
+-// Part-CL Mapping (nested) - GET: Admin & Operator
+-router.get('/:partId/cl-mapping', requireRole('Admin', 'Operator'), clMappingController.list);
++// Part-CL Mapping (nested) - GET: dibuka ke semua role yang sudah login
++// (sama alasan di atas).
++router.get('/:partId/cl-mapping', clMappingController.list);
+ 
+ // Part-CL Mapping (nested) - POST: sama seperti POST /parts
+ router.post('/:partId/cl-mapping', requireMasterDataEditAccess, clMappingController.create);
+@@ -37,12 +40,7 @@ router.post('/:partId/cl-mapping', requireMasterDataEditAccess, clMappingControl
+ // dari cl-mapping di atas yang tetap Paket A. requireLicensePackage('B')
+ // dicek SEBELUM role/permission, gantiin akses "sama persis dengan
+ // cl-mapping" yang lama.
+-router.get(
+-  '/:partId/suppliers',
+-  requireLicensePackage('B'),
+-  requireRole('Admin', 'Operator'),
+-  partSupplierController.list
+-);
++router.get('/:partId/suppliers', requireLicensePackage('B'), partSupplierController.list);
+ router.post(
+   '/:partId/suppliers',
+   requireLicensePackage('B'),
+diff --git a/backend/src/routes/settingsRoutes.js b/backend/src/routes/settingsRoutes.js
+index f698720..e819760 100644
+--- a/backend/src/routes/settingsRoutes.js
++++ b/backend/src/routes/settingsRoutes.js
+@@ -6,9 +6,26 @@ const requireRole = require('../middlewares/roleMiddleware');
+ 
+ const router = express.Router();
+ 
+-router.use(requireAuth, requireRole('Admin'));
++router.use(requireAuth);
+ 
++// GET - dibuka ke SEMUA role yang sudah login (dulu Admin only) - supaya
++// role yang digrant akses edit ke sebagian setting (setting_role_access,
++// migration 1700000022000) bisa buka halaman Settings sama sekali. Role
++// tanpa grant apa pun tetap bisa lihat (read-only) 9 kategori settingnya,
++// cuma gak akan ada tombol Edit yang aktif di frontend.
+ router.get('/', settingsController.list);
++
++// PATCH /:key - akses per-key dicek DI DALAM settingsService.updateSetting
++// (Admin selalu boleh, role lain butuh grant di setting_role_access) - bukan
++// requireRole('Admin') blanket lagi.
+ router.patch('/:key', settingsController.update);
+ 
++// PATCH /:key/access - ngatur GRANT-nya sendiri tetap Admin only (siapa
++// yang boleh kasih akses ke role lain harus superuser).
++router.patch('/:key/access', requireRole('Admin'), settingsController.updateAccess);
++
++// POST /sync-conmas - trigger manual sync ConMas, Admin only (lihat catatan
++// di settingsController.js).
++router.post('/sync-conmas', requireRole('Admin'), settingsController.syncNow);
++
+ module.exports = router;
+diff --git a/backend/src/routes/supplierRoutes.js b/backend/src/routes/supplierRoutes.js
+index 9a6e889..4782f6e 100644
+--- a/backend/src/routes/supplierRoutes.js
++++ b/backend/src/routes/supplierRoutes.js
+@@ -16,9 +16,11 @@ router.use(requireAuth);
+ // adalah boundary produk, lebih besar dari role.
+ router.use(requireLicensePackage('B'));
+ 
+-// GET - Admin & Operator (sama pola dengan lineRoutes.js/partRoutes.js)
+-router.get('/', requireRole('Admin', 'Operator'), supplierController.list);
+-router.get('/:id', requireRole('Admin', 'Operator'), supplierController.detail);
++// GET - dibuka ke semua role yang sudah login (fix - dulu hardcode
++// 'Admin','Operator' bikin role custom buatan Role Management gak pernah
++// bisa lihat Master Data Supplier, lihat catatan di lineRoutes.js).
++router.get('/', supplierController.list);
++router.get('/:id', supplierController.detail);
+ 
+ // POST/PATCH - Admin, atau Operator jika allow_operator_edit_master_data=true
+ router.post('/', requireMasterDataEditAccess, supplierController.create);
+diff --git a/backend/src/services/authService.js b/backend/src/services/authService.js
+index 853fed0..442d1eb 100644
+--- a/backend/src/services/authService.js
++++ b/backend/src/services/authService.js
+@@ -90,7 +90,11 @@ async function login(username, password, context = {}) {
+   // kayak permissions - biar kalau Admin ganti LICENSE_PACKAGE env terus
+   // restart server, user gak perlu re-login buat lihat perubahan gating).
+   // Cuma ada di body response, dibaca AuthContext.jsx buat hasPackage().
+-  return { token, user: { ...userPayload, permissions, license_package: config.licensePackage } };
++  // role_id (BEDA dari `role` yang nama string) SENGAJA gak masuk JWT
++  // claims (sama alasan permissions/license_package) - cuma di body
++  // response, dipakai frontend buat cek setting_role_access (SettingsPage.jsx,
++  // migration 1700000022000) tanpa perlu resolve nama role -> id lagi di FE.
++  return { token, user: { ...userPayload, role_id: user.role_id, permissions, license_package: config.licensePackage } };
+ }
+ 
+ /**
+@@ -162,6 +166,7 @@ async function getMe(userId) {
+     email: user.email,
+     avatar_url: user.avatar_url,
+     role: user.role_name,
++    role_id: user.role_id,
+     permissions,
+     license_package: config.licensePackage,
+   };
+diff --git a/backend/src/services/settingsService.js b/backend/src/services/settingsService.js
+index 3515930..904321a 100644
+--- a/backend/src/services/settingsService.js
++++ b/backend/src/services/settingsService.js
+@@ -50,16 +50,35 @@ async function getSettings(keys) {
+  * GET /settings - list semua setting apa adanya (value tetap string dari DB,
+  * biar frontend yang render sesuai value_type; lihat 05_UI_UX_SPECIFICATION.md §4.9).
+  * Diurutkan per category (7 kategori MASTER DOCUMENT Bagian 4).
++ *
++ * Sekarang setiap row juga bawa `editable_role_ids` (role NON-Admin yang
++ * digrant akses edit ke key itu lewat setting_role_access - migration
++ * 1700000022000) - dipakai frontend buat nentuin tombol Edit muncul/tidak
++ * buat role yang login, dan buat Admin ngatur grant-nya di UI.
+  */
+ async function listSettings() {
+-  return settingsQueries.findAll();
++  const [rows, accessMap] = await Promise.all([settingsQueries.findAll(), settingsQueries.findAllRoleAccessGrouped()]);
++  return rows.map((row) => ({ ...row, editable_role_ids: accessMap[row.key] || [] }));
++}
++
++/**
++ * Cek apakah `user` (req.user - dari authMiddleware) boleh edit `key`.
++ * Admin selalu boleh (superuser, sama pola dengan requirePermission '*').
++ * Role lain: harus ada grant eksplisit di setting_role_access.
++ */
++async function canEditSetting(key, user) {
++  if (user.role === 'Admin') return true;
++  return settingsQueries.roleHasAccess(key, user.role_id);
+ }
+ 
+ /**
+  * PATCH /settings/:key - update 1 setting, validasi value_type harus cocok
+  * (03_API_SPECIFICATION.md §2), audit log wajib (Development Rules §22).
++ * `user` = req.user lengkap (bukan cuma id) - dibutuhkan buat cek
++ * setting_role_access untuk role non-Admin (Settings sekarang gak lagi
++ * hardcode Admin-only di route, lihat settingsRoutes.js).
+  */
+-async function updateSetting(key, value, userId) {
++async function updateSetting(key, value, user) {
+   const client = await db.getClient();
+   try {
+     await client.query('BEGIN');
+@@ -69,12 +88,19 @@ async function updateSetting(key, value, userId) {
+       throw AppError.notFound('Setting key tidak ditemukan');
+     }
+ 
++    if (user.role !== 'Admin') {
++      const allowed = await settingsQueries.roleHasAccess(key, user.role_id, client);
++      if (!allowed) {
++        throw AppError.forbidden('Role Anda tidak punya akses untuk mengubah setting ini');
++      }
++    }
++
+     const { valid, errors } = validateSettingValue(before.value_type, value);
+     if (!valid) {
+       throw AppError.badRequest('Validasi gagal', errors);
+     }
+ 
+-    const updated = await settingsQueries.updateValue(key, String(value), userId, client);
++    const updated = await settingsQueries.updateValue(key, String(value), user.id, client);
+ 
+     // NOTE: audit_log.record_id bertipe INT, sedangkan PK app_settings adalah
+     // `key` (VARCHAR) — bukan angka. record_id diisi null di sini (soft
+@@ -87,7 +113,7 @@ async function updateSetting(key, value, userId) {
+         action: 'UPDATE',
+         oldValue: before,
+         newValue: updated,
+-        userId,
++        userId: user.id,
+       },
+       client
+     );
+@@ -102,4 +128,45 @@ async function updateSetting(key, value, userId) {
+   }
+ }
+ 
+-module.exports = { getSetting, getSettings, listSettings, updateSetting };
++/**
++ * PATCH /settings/:key/access - Admin only (dicek di route). Replace TOTAL
++ * daftar role non-Admin yang boleh edit key ini. Kirim [] buat cabut semua
++ * akses non-Admin (balik ke Admin-only, sama seperti sebelum fitur ini ada).
++ */
++async function setSettingAccess(key, roleIds, userId) {
++  const client = await db.getClient();
++  try {
++    await client.query('BEGIN');
++
++    const setting = await settingsQueries.findByKey(key, client);
++    if (!setting) {
++      throw AppError.notFound('Setting key tidak ditemukan');
++    }
++
++    const before = await settingsQueries.findRoleIdsByKey(key, client);
++    await settingsQueries.setRoleAccess(key, roleIds, client);
++
++    await recordAudit(
++      {
++        tableName: 'setting_role_access',
++        recordId: null,
++        action: 'UPDATE',
++        oldValue: { setting_key: key, role_ids: before },
++        newValue: { setting_key: key, role_ids: roleIds },
++        userId,
++        actionDetail: `Akses edit setting "${key}" diubah`,
++      },
++      client
++    );
++
++    await client.query('COMMIT');
++    return { key, editable_role_ids: roleIds };
++  } catch (err) {
++    await client.query('ROLLBACK');
++    throw err;
++  } finally {
++    client.release();
++  }
++}
++
++module.exports = { getSetting, getSettings, listSettings, canEditSetting, updateSetting, setSettingAccess };
+diff --git a/backend/src/sql/settingsQueries.js b/backend/src/sql/settingsQueries.js
+index 2f1eb11..6e92312 100644
+--- a/backend/src/sql/settingsQueries.js
++++ b/backend/src/sql/settingsQueries.js
+@@ -24,4 +24,52 @@ async function updateValue(key, value, userId, runner = db) {
+   return result.rows[0] || null;
+ }
+ 
+-module.exports = { findAll, findByKey, updateValue };
++// Semua grant setting_role_access sekaligus, dikembalikan sebagai
++// { setting_key: [role_id, ...] } - dipakai listSettings() supaya cuma 1
++// round-trip DB (bukan query per-key).
++async function findAllRoleAccessGrouped(runner = db) {
++  const result = await runner.query('SELECT setting_key, role_id FROM setting_role_access');
++  const map = {};
++  for (const row of result.rows) {
++    if (!map[row.setting_key]) map[row.setting_key] = [];
++    map[row.setting_key].push(row.role_id);
++  }
++  return map;
++}
++
++async function findRoleIdsByKey(key, runner = db) {
++  const result = await runner.query('SELECT role_id FROM setting_role_access WHERE setting_key = $1', [key]);
++  return result.rows.map((r) => r.role_id);
++}
++
++async function roleHasAccess(key, roleId, runner = db) {
++  const result = await runner.query(
++    'SELECT 1 FROM setting_role_access WHERE setting_key = $1 AND role_id = $2',
++    [key, roleId]
++  );
++  return result.rows.length > 0;
++}
++
++// Replace TOTAL daftar role yang punya akses edit ke 1 setting key (pola
++// sama dengan permissionQueries.setRolePermissions - delete semua lalu
++// insert ulang, lebih simpel daripada diff manual & aman dalam 1 transaction).
++async function setRoleAccess(key, roleIds, client) {
++  await client.query('DELETE FROM setting_role_access WHERE setting_key = $1', [key]);
++  if (roleIds.length > 0) {
++    const values = roleIds.map((_, i) => `($1, $${i + 2})`).join(', ');
++    await client.query(
++      `INSERT INTO setting_role_access (setting_key, role_id) VALUES ${values}`,
++      [key, ...roleIds]
++    );
++  }
++}
++
++module.exports = {
++  findAll,
++  findByKey,
++  updateValue,
++  findAllRoleAccessGrouped,
++  findRoleIdsByKey,
++  roleHasAccess,
++  setRoleAccess,
++};
+diff --git a/frontend/src/api/settingsApi.js b/frontend/src/api/settingsApi.js
+index e9a699d..bf959fd 100644
+--- a/frontend/src/api/settingsApi.js
++++ b/frontend/src/api/settingsApi.js
+@@ -10,3 +10,19 @@ export async function updateSetting(key, value) {
+   const { data } = await apiClient.patch(`/settings/${key}`, { value });
+   return data.data;
+ }
++
++// Admin only (roleMiddleware di backend) - ngatur role NON-Admin mana yang
++// boleh edit setting key ini (setting_role_access, migration 1700000022000).
++export async function updateSettingAccess(key, roleIds) {
++  const { data } = await apiClient.patch(`/settings/${key}/access`, { role_ids: roleIds });
++  return data.data;
++}
++
++// Admin only - trigger manual sync ConMas (production_cache + recompute
++// akumulasi poin Monthly + snapshot status PM Part), dipakai tombol "Sync
++// Sekarang" di kategori "Sync Data Produksi" (nunggu jadwal cron kelamaan
++// pas testing).
++export async function syncConmasNow() {
++  const { data } = await apiClient.post('/settings/sync-conmas');
++  return data.data;
++}
+diff --git a/frontend/src/components/Sidebar.jsx b/frontend/src/components/Sidebar.jsx
+index 7502a87..ae47b66 100644
+--- a/frontend/src/components/Sidebar.jsx
++++ b/frontend/src/components/Sidebar.jsx
+@@ -127,12 +127,17 @@ const NAV_GROUPS = [
+     key: 'admin',
+     label: 'Administrasi',
+     icon: ShieldCheck,
+-    adminOnly: true,
+     items: [
++      // 'Settings' SENGAJA TIDAK adminOnly lagi (dulu 1 group ini semua
++      // adminOnly) - role non-Admin yang digrant akses lewat
++      // setting_role_access (migration 1700000022000) sekarang perlu bisa
++      // buka menu ini juga. 3 item lain (User Management/Recycle Bin/Audit
++      // Log) TETAP adminOnly: true, difilter per-item di bawah (bukan lagi
++      // per-group) - lihat NAV_GROUPS.map di bawah.
+       { to: '/settings', label: 'Settings' },
+-      { to: '/users', label: 'User Management' },
+-      { to: '/recycle-bin', label: 'Recycle Bin' },
+-      { to: '/audit-log', label: 'Audit Log' },
++      { to: '/users', label: 'User Management', adminOnly: true },
++      { to: '/recycle-bin', label: 'Recycle Bin', adminOnly: true },
++      { to: '/audit-log', label: 'Audit Log', adminOnly: true },
+     ],
+   },
+ ];
+@@ -372,7 +377,10 @@ function Sidebar() {
+               bukan `mb-2.5` per-item lagi (dulu ada 2 tempat berbeda buat
+               collapsed vs expanded, gampang drift - poin 10). */}
+           <div className="space-y-2.5">
+-            {NAV_GROUPS.filter((g) => !g.adminOnly || isAdmin).map((group) => (
++            {NAV_GROUPS.filter((g) => !g.adminOnly || isAdmin)
++              .map((group) => ({ ...group, items: group.items.filter((item) => !item.adminOnly || isAdmin) }))
++              .filter((group) => group.items.length > 0)
++              .map((group) => (
+               <NavGroup
+                 key={group.key}
+                 group={group}
+diff --git a/frontend/src/hooks/useSettings.js b/frontend/src/hooks/useSettings.js
+index 8da91c5..1ec78d7 100644
+--- a/frontend/src/hooks/useSettings.js
++++ b/frontend/src/hooks/useSettings.js
+@@ -1,6 +1,6 @@
+ // src/hooks/useSettings.js
+ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+-import { fetchSettings, updateSetting } from '../api/settingsApi';
++import { fetchSettings, updateSetting, updateSettingAccess, syncConmasNow } from '../api/settingsApi';
+ 
+ export function useSettings() {
+   return useQuery({ queryKey: ['settings'], queryFn: fetchSettings });
+@@ -21,3 +21,28 @@ export function useUpdateSetting() {
+     },
+   });
+ }
++
++// Admin only - ngatur role non-Admin mana yang boleh edit 1 setting key.
++export function useUpdateSettingAccess() {
++  const queryClient = useQueryClient();
++  return useMutation({
++    mutationFn: ({ key, roleIds }) => updateSettingAccess(key, roleIds),
++    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings'] }),
++  });
++}
++
++// Trigger manual sync ConMas - gak invalidate ['settings'] (settings-nya
++// sendiri gak berubah), tapi hasil sync mempengaruhi angka PM Part/PM Line/
++// Dashboard (production_cache baru + akumulasi poin ke-recompute), sama
++// invalidation-nya dengan useUpdateSetting di atas.
++export function useSyncConmasNow() {
++  const queryClient = useQueryClient();
++  return useMutation({
++    mutationFn: syncConmasNow,
++    onSuccess: () => {
++      queryClient.invalidateQueries({ queryKey: ['pm-part'] });
++      queryClient.invalidateQueries({ queryKey: ['pm-line'] });
++      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
++    },
++  });
++}
+diff --git a/frontend/src/pages/SettingsPage.jsx b/frontend/src/pages/SettingsPage.jsx
+index c1694ac..5386414 100644
+--- a/frontend/src/pages/SettingsPage.jsx
++++ b/frontend/src/pages/SettingsPage.jsx
+@@ -1,27 +1,29 @@
+ // src/pages/SettingsPage.jsx
+ import { useState } from 'react';
+-import { Sliders, Award, CalendarClock, Repeat, RefreshCw, LayoutGrid, Users, Mail, Package } from 'lucide-react';
++import {
++  Sliders,
++  Award,
++  CalendarClock,
++  Repeat,
++  RefreshCw,
++  LayoutGrid,
++  Users,
++  Mail,
++  Package,
++  Pencil,
++  Check,
++  X,
++  Lock,
++  ShieldCheck,
++  Loader2,
++} from 'lucide-react';
+ import { usePageHeader } from '../contexts/PageHeaderContext';
+-import { useSettings, useUpdateSetting } from '../hooks/useSettings';
++import { useAuth } from '../contexts/AuthContext';
++import { useSettings, useUpdateSetting, useUpdateSettingAccess, useSyncConmasNow } from '../hooks/useSettings';
++import { useRoles } from '../hooks/useRoles';
+ import ToggleSwitch from '../components/ToggleSwitch';
+ import { Input } from '../components/ui/input';
+-
+-// Reskin (checklist §6b, halaman utama terakhir yang masih tampilan lama):
+-// `.panel`/`.panel-header`/`.panel-title`/`.form-input` dilepas TOTAL
+-// (§7.3), diganti Tailwind murni - style ngikutin pattern yang udah
+-// established di LinesTab.jsx/DashboardPage.jsx (rounded-xl border-border
+-// bg-card p-4.5, judul text-[15px] font-semibold, mb-4 antara header &
+-// konten).
+-//
+-// ToggleSwitch.jsx SENGAJA GAK diikutkan reskin ini - dia komponen shared
+-// (dipakai juga di UserManagementPage.jsx), dan sesi reskin UserManagement
+-// sebelumnya udah EKSPLISIT nyatet skip komponen ini (lihat komentar di
+-// UserManagementPage.jsx). Ngikutin keputusan yang sama, bukan bikin
+-// keputusan baru sepihak yang malah bikin dua halaman beda konvensi.
+-//
+-// Logic (grouping kategori dari CATEGORY_META, cast value_type, save
+-// on-blur/on-toggle, rollback tampilan pas gagal save) TIDAK berubah sama
+-// sekali - cuma markup yang diganti.
++import { Button } from '../components/ui/button';
+ 
+ // Urutan & metadata 7 kategori sesuai MASTER DOCUMENT Bagian 4
+ // + kategori 'notifikasi' dan 'inventory' (ditambah belakangan)
+@@ -80,83 +82,274 @@ const SETTING_LABELS = {
+   inventory_safety_stock_percentage: 'Persentase Safety Stock',
+ };
+ 
+-function SettingRow({ setting }) {
++function displayValue(setting) {
++  if (setting.value_type === 'boolean') return setting.value === 'true' || setting.value === true ? 'Ya' : 'Tidak';
++  return String(setting.value);
++}
++
++// Popover kecil Admin-only buat ngatur role non-Admin mana yang boleh edit
++// 1 setting key (setting_role_access, migration 1700000022000). Admin
++// sendiri gak perlu row di sini - selalu superuser.
++function RoleAccessEditor({ setting, onClose }) {
++  const { data: roles = [] } = useRoles();
++  const updateAccess = useUpdateSettingAccess();
++  const [draft, setDraft] = useState(setting.editable_role_ids || []);
++  const [error, setError] = useState('');
++
++  const grantableRoles = roles.filter((r) => r.name !== 'Admin');
++
++  function toggle(roleId) {
++    setDraft((prev) => (prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId]));
++  }
++
++  async function save() {
++    setError('');
++    try {
++      await updateAccess.mutateAsync({ key: setting.key, roleIds: draft });
++      onClose();
++    } catch (err) {
++      setError(err.response?.data?.message || 'Gagal simpan akses role');
++    }
++  }
++
++  return (
++    <div className="mt-2 rounded-lg border border-[var(--border-soft)] bg-[var(--panel-2)] p-2.5">
++      <div className="mb-1.5 text-[11px] font-medium text-muted-foreground">
++        Role lain yang boleh edit setting ini (Admin selalu boleh)
++      </div>
++      {grantableRoles.length === 0 && (
++        <div className="text-[11px] text-[var(--text-faint)]">Belum ada role lain selain Admin/Operator.</div>
++      )}
++      <div className="flex flex-wrap gap-2">
++        {grantableRoles.map((r) => (
++          <label key={r.id} className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
++            <input
++              type="checkbox"
++              checked={draft.includes(r.id)}
++              onChange={() => toggle(r.id)}
++              className="h-3.5 w-3.5 accent-[var(--accent)]"
++            />
++            {r.name}
++          </label>
++        ))}
++      </div>
++      {error && <div className="mt-1.5 text-[11px] text-destructive">{error}</div>}
++      <div className="mt-2 flex gap-1.5">
++        <Button type="button" size="sm" onClick={save} disabled={updateAccess.isPending}>
++          {updateAccess.isPending ? 'Menyimpan...' : 'Simpan Akses'}
++        </Button>
++        <Button type="button" size="sm" variant="outline" onClick={onClose}>
++          Batal
++        </Button>
++      </div>
++    </div>
++  );
++}
++
++function SettingRow({ setting, canEdit, isAdmin }) {
+   const updateMutation = useUpdateSetting();
++  const [isEditing, setIsEditing] = useState(false);
+   const [localValue, setLocalValue] = useState(setting.value);
+   const [error, setError] = useState('');
++  const [showAccessEditor, setShowAccessEditor] = useState(false);
++
++  function startEdit() {
++    setLocalValue(setting.value);
++    setError('');
++    setIsEditing(true);
++  }
++
++  function cancelEdit() {
++    setLocalValue(setting.value);
++    setError('');
++    setIsEditing(false);
++  }
+ 
+-  async function save(rawValue) {
++  async function save() {
+     setError('');
+-    let castedValue = rawValue;
+-    if (setting.value_type === 'number') castedValue = Number(rawValue);
+-    if (setting.value_type === 'boolean') castedValue = rawValue === true || rawValue === 'true';
++    let castedValue = localValue;
++    if (setting.value_type === 'number') castedValue = Number(localValue);
++    if (setting.value_type === 'boolean') castedValue = localValue === true || localValue === 'true';
+ 
+     try {
+       await updateMutation.mutateAsync({ key: setting.key, value: castedValue });
++      setIsEditing(false);
+     } catch (err) {
+       setError(err.response?.data?.message || 'Gagal menyimpan');
+-      setLocalValue(setting.value); // rollback tampilan ke nilai server
+     }
+   }
+ 
++  const grantedToOtherRoles = (setting.editable_role_ids || []).length > 0;
++
+   return (
+-    <div className="flex items-center justify-between gap-4 border-b border-[var(--border-soft)] py-3 last:border-b-0">
+-      <div className="min-w-0">
+-        <div className="text-[13px] font-medium">{SETTING_LABELS[setting.key] || setting.key}</div>
+-        {setting.description && <div className="text-xs text-muted-foreground">{setting.description}</div>}
+-        <div className="mt-0.5 font-[var(--font-mono)] text-[10px] text-[var(--text-faint)]">{setting.key}</div>
+-        {error && <div className="mt-0.5 text-xs text-destructive">{error}</div>}
++    <div className="border-b border-[var(--border-soft)] py-3 last:border-b-0">
++      <div className="flex items-center justify-between gap-4">
++        <div className="min-w-0">
++          <div className="flex items-center gap-1.5 text-[13px] font-medium">
++            {SETTING_LABELS[setting.key] || setting.key}
++            {!canEdit && <Lock size={11} className="text-[var(--text-faint)]" aria-label="Read-only" />}
++          </div>
++          {setting.description && <div className="text-xs text-muted-foreground">{setting.description}</div>}
++          <div className="mt-0.5 font-[var(--font-mono)] text-[10px] text-[var(--text-faint)]">{setting.key}</div>
++          {error && <div className="mt-0.5 text-xs text-destructive">{error}</div>}
++        </div>
++
++        <div className="flex shrink-0 items-center gap-2">
++          {!isEditing && (
++            <>
++              <span className="font-[var(--font-mono)] text-[13px]">{displayValue(setting)}</span>
++              {canEdit && (
++                <Button
++                  type="button"
++                  variant="ghost"
++                  size="icon"
++                  className="h-7 w-7"
++                  aria-label={`Edit ${SETTING_LABELS[setting.key] || setting.key}`}
++                  onClick={startEdit}
++                >
++                  <Pencil size={13} />
++                </Button>
++              )}
++              {isAdmin && (
++                <Button
++                  type="button"
++                  variant="ghost"
++                  size="icon"
++                  className={`h-7 w-7 ${grantedToOtherRoles ? 'text-[var(--accent)]' : ''}`}
++                  aria-label={`Atur akses role untuk ${SETTING_LABELS[setting.key] || setting.key}`}
++                  onClick={() => setShowAccessEditor((v) => !v)}
++                >
++                  <ShieldCheck size={13} />
++                </Button>
++              )}
++            </>
++          )}
++
++          {isEditing && (
++            <>
++              {setting.value_type === 'boolean' && (
++                <ToggleSwitch
++                  checked={localValue === 'true' || localValue === true}
++                  disabled={updateMutation.isPending}
++                  label={SETTING_LABELS[setting.key] || setting.key}
++                  onChange={(next) => setLocalValue(next)}
++                />
++              )}
++              {setting.value_type === 'number' && (
++                <Input
++                  type="number"
++                  className="w-[70px] text-right font-[var(--font-mono)]"
++                  value={localValue}
++                  disabled={updateMutation.isPending}
++                  onChange={(e) => setLocalValue(e.target.value)}
++                  autoFocus
++                />
++              )}
++              {setting.value_type === 'text' && (
++                <Input
++                  type="text"
++                  className="w-[160px]"
++                  value={localValue}
++                  disabled={updateMutation.isPending}
++                  onChange={(e) => setLocalValue(e.target.value)}
++                  autoFocus
++                />
++              )}
++              <Button
++                type="button"
++                variant="ghost"
++                size="icon"
++                className="h-7 w-7 text-[var(--ok)]"
++                aria-label="Simpan"
++                disabled={updateMutation.isPending}
++                onClick={save}
++              >
++                {updateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Check size={15} />}
++              </Button>
++              <Button
++                type="button"
++                variant="ghost"
++                size="icon"
++                className="h-7 w-7"
++                aria-label="Batal"
++                disabled={updateMutation.isPending}
++                onClick={cancelEdit}
++              >
++                <X size={15} />
++              </Button>
++            </>
++          )}
++        </div>
+       </div>
+ 
+-      <div className="shrink-0">
+-        {setting.value_type === 'boolean' && (
+-          <ToggleSwitch
+-            checked={localValue === 'true' || localValue === true}
+-            disabled={updateMutation.isPending}
+-            label={SETTING_LABELS[setting.key] || setting.key}
+-            onChange={(next) => {
+-              setLocalValue(next);
+-              save(next);
+-            }}
+-          />
+-        )}
+-        {setting.value_type === 'number' && (
+-          <Input
+-            type="number"
+-            className="w-[70px] text-right font-[var(--font-mono)]"
+-            value={localValue}
+-            disabled={updateMutation.isPending}
+-            onChange={(e) => setLocalValue(e.target.value)}
+-            onBlur={(e) => save(e.target.value)}
+-          />
+-        )}
+-        {setting.value_type === 'text' && (
+-          <Input
+-            type="text"
+-            className="w-[160px]"
+-            value={localValue}
+-            disabled={updateMutation.isPending}
+-            onChange={(e) => setLocalValue(e.target.value)}
+-            onBlur={(e) => save(e.target.value)}
+-          />
++      {showAccessEditor && <RoleAccessEditor setting={setting} onClose={() => setShowAccessEditor(false)} />}
++    </div>
++  );
++}
++
++function SyncNowButton() {
++  const syncNow = useSyncConmasNow();
++  const [result, setResult] = useState(null);
++
++  async function handleSync() {
++    setResult(null);
++    try {
++      const data = await syncNow.mutateAsync();
++      if (data?.skipped) {
++        setResult({ ok: false, text: 'Dilewati - kredensial ConMas belum diisi di .env' });
++      } else if (data?.error) {
++        setResult({ ok: false, text: 'Sync gagal, cek log server' });
++      } else {
++        setResult({ ok: true, text: `Selesai - ${data?.rowsSynced ?? 0} baris ter-sync` });
++      }
++    } catch (err) {
++      setResult({ ok: false, text: err.response?.data?.message || 'Sync gagal' });
++    }
++  }
++
++  return (
++    <div className="flex items-center gap-2">
++      {result && (
++        <span className={`text-xs ${result.ok ? 'text-[var(--ok)]' : 'text-destructive'}`}>{result.text}</span>
++      )}
++      <Button type="button" size="sm" variant="outline" onClick={handleSync} disabled={syncNow.isPending}>
++        {syncNow.isPending ? (
++          <>
++            <Loader2 size={13} className="animate-spin" /> Sync...
++          </>
++        ) : (
++          <>
++            <RefreshCw size={13} /> Sync Sekarang
++          </>
+         )}
+-      </div>
++      </Button>
+     </div>
+   );
+ }
+ 
+-function CategoryCard({ categoryKey, settings }) {
++function CategoryCard({ categoryKey, settings, isAdmin, userRoleId }) {
+   const meta = CATEGORY_META[categoryKey] || { no: '-', title: categoryKey, icon: Sliders };
+   const Icon = meta.icon;
+   return (
+     <div className="rounded-xl border border-border bg-card p-4.5">
+-      <h2 className="m-0 mb-1 flex items-center gap-2 font-[var(--font-display)] text-[15px] font-semibold">
+-        <Icon size={16} />
+-        <span className="font-[var(--font-mono)] text-[var(--text-faint)]">{String(meta.no).padStart(2, '0')}</span>
+-        {meta.title}
+-      </h2>
++      <div className="mb-1 flex items-center justify-between gap-2">
++        <h2 className="m-0 flex items-center gap-2 font-[var(--font-display)] text-[15px] font-semibold">
++          <Icon size={16} />
++          <span className="font-[var(--font-mono)] text-[var(--text-faint)]">{String(meta.no).padStart(2, '0')}</span>
++          {meta.title}
++        </h2>
++        {/* Tombol manual sync cuma relevan & cuma boleh dipakai Admin (route
++            POST /settings/sync-conmas Admin only) - taruh di header kategori
++            "Sync Data Produksi" biar dekat sama setting interval-nya. */}
++        {categoryKey === 'sync_data_produksi' && isAdmin && <SyncNowButton />}
++      </div>
+       {settings.map((s) => (
+-        <SettingRow key={s.key} setting={s} />
++        <SettingRow
++          key={s.key}
++          setting={s}
++          isAdmin={isAdmin}
++          canEdit={isAdmin || (s.editable_role_ids || []).includes(userRoleId)}
++        />
+       ))}
+     </div>
+   );
+@@ -164,6 +357,7 @@ function CategoryCard({ categoryKey, settings }) {
+ 
+ function SettingsPage() {
+   usePageHeader({ title: 'Settings' });
++  const { user, isAdmin } = useAuth();
+   const { data, isLoading, isError } = useSettings();
+ 
+   if (isError) {
+@@ -189,8 +383,13 @@ function SettingsPage() {
+ 
+   return (
+     <div className="flex flex-col gap-4">
++      {!isAdmin && (
++        <div className="rounded-lg bg-[var(--panel-2)] px-3.5 py-2.5 text-xs text-muted-foreground">
++          Anda hanya bisa mengubah setting yang sudah di-grant Admin untuk role Anda — sisanya tampil read-only.
++        </div>
++      )}
+       {orderedCategories.map((cat) => (
+-        <CategoryCard key={cat} categoryKey={cat} settings={grouped[cat]} />
++        <CategoryCard key={cat} categoryKey={cat} settings={grouped[cat]} isAdmin={isAdmin} userRoleId={user?.role_id} />
+       ))}
+     </div>
+   );

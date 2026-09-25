@@ -1,27 +1,29 @@
 // src/pages/SettingsPage.jsx
 import { useState } from 'react';
-import { Sliders, Award, CalendarClock, Repeat, RefreshCw, LayoutGrid, Users, Mail, Package } from 'lucide-react';
+import {
+  Sliders,
+  Award,
+  CalendarClock,
+  Repeat,
+  RefreshCw,
+  LayoutGrid,
+  Users,
+  Mail,
+  Package,
+  Pencil,
+  Check,
+  X,
+  Lock,
+  ShieldCheck,
+  Loader2,
+} from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
-import { useSettings, useUpdateSetting } from '../hooks/useSettings';
+import { useAuth } from '../contexts/AuthContext';
+import { useSettings, useUpdateSetting, useUpdateSettingAccess, useSyncConmasNow } from '../hooks/useSettings';
+import { useRoles } from '../hooks/useRoles';
 import ToggleSwitch from '../components/ToggleSwitch';
 import { Input } from '../components/ui/input';
-
-// Reskin (checklist §6b, halaman utama terakhir yang masih tampilan lama):
-// `.panel`/`.panel-header`/`.panel-title`/`.form-input` dilepas TOTAL
-// (§7.3), diganti Tailwind murni - style ngikutin pattern yang udah
-// established di LinesTab.jsx/DashboardPage.jsx (rounded-xl border-border
-// bg-card p-4.5, judul text-[15px] font-semibold, mb-4 antara header &
-// konten).
-//
-// ToggleSwitch.jsx SENGAJA GAK diikutkan reskin ini - dia komponen shared
-// (dipakai juga di UserManagementPage.jsx), dan sesi reskin UserManagement
-// sebelumnya udah EKSPLISIT nyatet skip komponen ini (lihat komentar di
-// UserManagementPage.jsx). Ngikutin keputusan yang sama, bukan bikin
-// keputusan baru sepihak yang malah bikin dua halaman beda konvensi.
-//
-// Logic (grouping kategori dari CATEGORY_META, cast value_type, save
-// on-blur/on-toggle, rollback tampilan pas gagal save) TIDAK berubah sama
-// sekali - cuma markup yang diganti.
+import { Button } from '../components/ui/button';
 
 // Urutan & metadata 7 kategori sesuai MASTER DOCUMENT Bagian 4
 // + kategori 'notifikasi' dan 'inventory' (ditambah belakangan)
@@ -81,83 +83,274 @@ const SETTING_LABELS = {
   inventory_safety_stock_percentage: 'Persentase Safety Stock',
 };
 
-function SettingRow({ setting }) {
-  const updateMutation = useUpdateSetting();
-  const [localValue, setLocalValue] = useState(setting.value);
+function displayValue(setting) {
+  if (setting.value_type === 'boolean') return setting.value === 'true' || setting.value === true ? 'Ya' : 'Tidak';
+  return String(setting.value);
+}
+
+// Popover kecil Admin-only buat ngatur role non-Admin mana yang boleh edit
+// 1 setting key (setting_role_access, migration 1700000022000). Admin
+// sendiri gak perlu row di sini - selalu superuser.
+function RoleAccessEditor({ setting, onClose }) {
+  const { data: roles = [] } = useRoles();
+  const updateAccess = useUpdateSettingAccess();
+  const [draft, setDraft] = useState(setting.editable_role_ids || []);
   const [error, setError] = useState('');
 
-  async function save(rawValue) {
-    setError('');
-    let castedValue = rawValue;
-    if (setting.value_type === 'number') castedValue = Number(rawValue);
-    if (setting.value_type === 'boolean') castedValue = rawValue === true || rawValue === 'true';
+  const grantableRoles = roles.filter((r) => r.name !== 'Admin');
 
+  function toggle(roleId) {
+    setDraft((prev) => (prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId]));
+  }
+
+  async function save() {
+    setError('');
     try {
-      await updateMutation.mutateAsync({ key: setting.key, value: castedValue });
+      await updateAccess.mutateAsync({ key: setting.key, roleIds: draft });
+      onClose();
     } catch (err) {
-      setError(err.response?.data?.message || 'Gagal menyimpan');
-      setLocalValue(setting.value); // rollback tampilan ke nilai server
+      setError(err.response?.data?.message || 'Gagal simpan akses role');
     }
   }
 
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-[var(--border-soft)] py-3 last:border-b-0">
-      <div className="min-w-0">
-        <div className="text-[13px] font-medium">{SETTING_LABELS[setting.key] || setting.key}</div>
-        {setting.description && <div className="text-xs text-muted-foreground">{setting.description}</div>}
-        <div className="mt-0.5 font-[var(--font-mono)] text-[10px] text-[var(--text-faint)]">{setting.key}</div>
-        {error && <div className="mt-0.5 text-xs text-destructive">{error}</div>}
+    <div className="mt-2 rounded-lg border border-[var(--border-soft)] bg-[var(--panel-2)] p-2.5">
+      <div className="mb-1.5 text-[11px] font-medium text-muted-foreground">
+        Role lain yang boleh edit setting ini (Admin selalu boleh)
       </div>
-
-      <div className="shrink-0">
-        {setting.value_type === 'boolean' && (
-          <ToggleSwitch
-            checked={localValue === 'true' || localValue === true}
-            disabled={updateMutation.isPending}
-            label={SETTING_LABELS[setting.key] || setting.key}
-            onChange={(next) => {
-              setLocalValue(next);
-              save(next);
-            }}
-          />
-        )}
-        {setting.value_type === 'number' && (
-          <Input
-            type="number"
-            className="w-[70px] text-right font-[var(--font-mono)]"
-            value={localValue}
-            disabled={updateMutation.isPending}
-            onChange={(e) => setLocalValue(e.target.value)}
-            onBlur={(e) => save(e.target.value)}
-          />
-        )}
-        {setting.value_type === 'text' && (
-          <Input
-            type="text"
-            className="w-[160px]"
-            value={localValue}
-            disabled={updateMutation.isPending}
-            onChange={(e) => setLocalValue(e.target.value)}
-            onBlur={(e) => save(e.target.value)}
-          />
-        )}
+      {grantableRoles.length === 0 && (
+        <div className="text-[11px] text-[var(--text-faint)]">Belum ada role lain selain Admin/Operator.</div>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {grantableRoles.map((r) => (
+          <label key={r.id} className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={draft.includes(r.id)}
+              onChange={() => toggle(r.id)}
+              className="h-3.5 w-3.5 accent-[var(--accent)]"
+            />
+            {r.name}
+          </label>
+        ))}
+      </div>
+      {error && <div className="mt-1.5 text-[11px] text-destructive">{error}</div>}
+      <div className="mt-2 flex gap-1.5">
+        <Button type="button" size="sm" onClick={save} disabled={updateAccess.isPending}>
+          {updateAccess.isPending ? 'Menyimpan...' : 'Simpan Akses'}
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={onClose}>
+          Batal
+        </Button>
       </div>
     </div>
   );
 }
 
-function CategoryCard({ categoryKey, settings }) {
+function SettingRow({ setting, canEdit, isAdmin }) {
+  const updateMutation = useUpdateSetting();
+  const [isEditing, setIsEditing] = useState(false);
+  const [localValue, setLocalValue] = useState(setting.value);
+  const [error, setError] = useState('');
+  const [showAccessEditor, setShowAccessEditor] = useState(false);
+
+  function startEdit() {
+    setLocalValue(setting.value);
+    setError('');
+    setIsEditing(true);
+  }
+
+  function cancelEdit() {
+    setLocalValue(setting.value);
+    setError('');
+    setIsEditing(false);
+  }
+
+  async function save() {
+    setError('');
+    let castedValue = localValue;
+    if (setting.value_type === 'number') castedValue = Number(localValue);
+    if (setting.value_type === 'boolean') castedValue = localValue === true || localValue === 'true';
+
+    try {
+      await updateMutation.mutateAsync({ key: setting.key, value: castedValue });
+      setIsEditing(false);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal menyimpan');
+    }
+  }
+
+  const grantedToOtherRoles = (setting.editable_role_ids || []).length > 0;
+
+  return (
+    <div className="border-b border-[var(--border-soft)] py-3 last:border-b-0">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-[13px] font-medium">
+            {SETTING_LABELS[setting.key] || setting.key}
+            {!canEdit && <Lock size={11} className="text-[var(--text-faint)]" aria-label="Read-only" />}
+          </div>
+          {setting.description && <div className="text-xs text-muted-foreground">{setting.description}</div>}
+          <div className="mt-0.5 font-[var(--font-mono)] text-[10px] text-[var(--text-faint)]">{setting.key}</div>
+          {error && <div className="mt-0.5 text-xs text-destructive">{error}</div>}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          {!isEditing && (
+            <>
+              <span className="font-[var(--font-mono)] text-[13px]">{displayValue(setting)}</span>
+              {canEdit && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  aria-label={`Edit ${SETTING_LABELS[setting.key] || setting.key}`}
+                  onClick={startEdit}
+                >
+                  <Pencil size={13} />
+                </Button>
+              )}
+              {isAdmin && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={`h-7 w-7 ${grantedToOtherRoles ? 'text-[var(--accent)]' : ''}`}
+                  aria-label={`Atur akses role untuk ${SETTING_LABELS[setting.key] || setting.key}`}
+                  onClick={() => setShowAccessEditor((v) => !v)}
+                >
+                  <ShieldCheck size={13} />
+                </Button>
+              )}
+            </>
+          )}
+
+          {isEditing && (
+            <>
+              {setting.value_type === 'boolean' && (
+                <ToggleSwitch
+                  checked={localValue === 'true' || localValue === true}
+                  disabled={updateMutation.isPending}
+                  label={SETTING_LABELS[setting.key] || setting.key}
+                  onChange={(next) => setLocalValue(next)}
+                />
+              )}
+              {setting.value_type === 'number' && (
+                <Input
+                  type="number"
+                  className="w-[70px] text-right font-[var(--font-mono)]"
+                  value={localValue}
+                  disabled={updateMutation.isPending}
+                  onChange={(e) => setLocalValue(e.target.value)}
+                  autoFocus
+                />
+              )}
+              {setting.value_type === 'text' && (
+                <Input
+                  type="text"
+                  className="w-[160px]"
+                  value={localValue}
+                  disabled={updateMutation.isPending}
+                  onChange={(e) => setLocalValue(e.target.value)}
+                  autoFocus
+                />
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-[var(--ok)]"
+                aria-label="Simpan"
+                disabled={updateMutation.isPending}
+                onClick={save}
+              >
+                {updateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Check size={15} />}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                aria-label="Batal"
+                disabled={updateMutation.isPending}
+                onClick={cancelEdit}
+              >
+                <X size={15} />
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {showAccessEditor && <RoleAccessEditor setting={setting} onClose={() => setShowAccessEditor(false)} />}
+    </div>
+  );
+}
+
+function SyncNowButton() {
+  const syncNow = useSyncConmasNow();
+  const [result, setResult] = useState(null);
+
+  async function handleSync() {
+    setResult(null);
+    try {
+      const data = await syncNow.mutateAsync();
+      if (data?.skipped) {
+        setResult({ ok: false, text: 'Dilewati - kredensial ConMas belum diisi di .env' });
+      } else if (data?.error) {
+        setResult({ ok: false, text: 'Sync gagal, cek log server' });
+      } else {
+        setResult({ ok: true, text: `Selesai - ${data?.rowsSynced ?? 0} baris ter-sync` });
+      }
+    } catch (err) {
+      setResult({ ok: false, text: err.response?.data?.message || 'Sync gagal' });
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      {result && (
+        <span className={`text-xs ${result.ok ? 'text-[var(--ok)]' : 'text-destructive'}`}>{result.text}</span>
+      )}
+      <Button type="button" size="sm" variant="outline" onClick={handleSync} disabled={syncNow.isPending}>
+        {syncNow.isPending ? (
+          <>
+            <Loader2 size={13} className="animate-spin" /> Sync...
+          </>
+        ) : (
+          <>
+            <RefreshCw size={13} /> Sync Sekarang
+          </>
+        )}
+      </Button>
+    </div>
+  );
+}
+
+function CategoryCard({ categoryKey, settings, isAdmin, userRoleId }) {
   const meta = CATEGORY_META[categoryKey] || { no: '-', title: categoryKey, icon: Sliders };
   const Icon = meta.icon;
   return (
     <div className="rounded-xl border border-border bg-card p-4.5">
-      <h2 className="m-0 mb-1 flex items-center gap-2 font-[var(--font-display)] text-[15px] font-semibold">
-        <Icon size={16} />
-        <span className="font-[var(--font-mono)] text-[var(--text-faint)]">{String(meta.no).padStart(2, '0')}</span>
-        {meta.title}
-      </h2>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <h2 className="m-0 flex items-center gap-2 font-[var(--font-display)] text-[15px] font-semibold">
+          <Icon size={16} />
+          <span className="font-[var(--font-mono)] text-[var(--text-faint)]">{String(meta.no).padStart(2, '0')}</span>
+          {meta.title}
+        </h2>
+        {/* Tombol manual sync cuma relevan & cuma boleh dipakai Admin (route
+            POST /settings/sync-conmas Admin only) - taruh di header kategori
+            "Sync Data Produksi" biar dekat sama setting interval-nya. */}
+        {categoryKey === 'sync_data_produksi' && isAdmin && <SyncNowButton />}
+      </div>
       {settings.map((s) => (
-        <SettingRow key={s.key} setting={s} />
+        <SettingRow
+          key={s.key}
+          setting={s}
+          isAdmin={isAdmin}
+          canEdit={isAdmin || (s.editable_role_ids || []).includes(userRoleId)}
+        />
       ))}
     </div>
   );
@@ -165,6 +358,7 @@ function CategoryCard({ categoryKey, settings }) {
 
 function SettingsPage() {
   usePageHeader({ title: 'Settings' });
+  const { user, isAdmin } = useAuth();
   const { data, isLoading, isError } = useSettings();
 
   if (isError) {
@@ -190,8 +384,13 @@ function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      {!isAdmin && (
+        <div className="rounded-lg bg-[var(--panel-2)] px-3.5 py-2.5 text-xs text-muted-foreground">
+          Anda hanya bisa mengubah setting yang sudah di-grant Admin untuk role Anda — sisanya tampil read-only.
+        </div>
+      )}
       {orderedCategories.map((cat) => (
-        <CategoryCard key={cat} categoryKey={cat} settings={grouped[cat]} />
+        <CategoryCard key={cat} categoryKey={cat} settings={grouped[cat]} isAdmin={isAdmin} userRoleId={user?.role_id} />
       ))}
     </div>
   );

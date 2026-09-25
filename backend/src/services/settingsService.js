@@ -50,16 +50,35 @@ async function getSettings(keys) {
  * GET /settings - list semua setting apa adanya (value tetap string dari DB,
  * biar frontend yang render sesuai value_type; lihat 05_UI_UX_SPECIFICATION.md §4.9).
  * Diurutkan per category (7 kategori MASTER DOCUMENT Bagian 4).
+ *
+ * Sekarang setiap row juga bawa `editable_role_ids` (role NON-Admin yang
+ * digrant akses edit ke key itu lewat setting_role_access - migration
+ * 1700000022000) - dipakai frontend buat nentuin tombol Edit muncul/tidak
+ * buat role yang login, dan buat Admin ngatur grant-nya di UI.
  */
 async function listSettings() {
-  return settingsQueries.findAll();
+  const [rows, accessMap] = await Promise.all([settingsQueries.findAll(), settingsQueries.findAllRoleAccessGrouped()]);
+  return rows.map((row) => ({ ...row, editable_role_ids: accessMap[row.key] || [] }));
+}
+
+/**
+ * Cek apakah `user` (req.user - dari authMiddleware) boleh edit `key`.
+ * Admin selalu boleh (superuser, sama pola dengan requirePermission '*').
+ * Role lain: harus ada grant eksplisit di setting_role_access.
+ */
+async function canEditSetting(key, user) {
+  if (user.role === 'Admin') return true;
+  return settingsQueries.roleHasAccess(key, user.role_id);
 }
 
 /**
  * PATCH /settings/:key - update 1 setting, validasi value_type harus cocok
  * (03_API_SPECIFICATION.md §2), audit log wajib (Development Rules §22).
+ * `user` = req.user lengkap (bukan cuma id) - dibutuhkan buat cek
+ * setting_role_access untuk role non-Admin (Settings sekarang gak lagi
+ * hardcode Admin-only di route, lihat settingsRoutes.js).
  */
-async function updateSetting(key, value, userId) {
+async function updateSetting(key, value, user) {
   const client = await db.getClient();
   try {
     await client.query('BEGIN');
@@ -69,12 +88,19 @@ async function updateSetting(key, value, userId) {
       throw AppError.notFound('Setting key tidak ditemukan');
     }
 
+    if (user.role !== 'Admin') {
+      const allowed = await settingsQueries.roleHasAccess(key, user.role_id, client);
+      if (!allowed) {
+        throw AppError.forbidden('Role Anda tidak punya akses untuk mengubah setting ini');
+      }
+    }
+
     const { valid, errors } = validateSettingValue(before.value_type, value);
     if (!valid) {
       throw AppError.badRequest('Validasi gagal', errors);
     }
 
-    const updated = await settingsQueries.updateValue(key, String(value), userId, client);
+    const updated = await settingsQueries.updateValue(key, String(value), user.id, client);
 
     // NOTE: audit_log.record_id bertipe INT, sedangkan PK app_settings adalah
     // `key` (VARCHAR) — bukan angka. record_id diisi null di sini (soft
@@ -87,7 +113,7 @@ async function updateSetting(key, value, userId) {
         action: 'UPDATE',
         oldValue: before,
         newValue: updated,
-        userId,
+        userId: user.id,
       },
       client
     );
@@ -102,4 +128,45 @@ async function updateSetting(key, value, userId) {
   }
 }
 
-module.exports = { getSetting, getSettings, listSettings, updateSetting };
+/**
+ * PATCH /settings/:key/access - Admin only (dicek di route). Replace TOTAL
+ * daftar role non-Admin yang boleh edit key ini. Kirim [] buat cabut semua
+ * akses non-Admin (balik ke Admin-only, sama seperti sebelum fitur ini ada).
+ */
+async function setSettingAccess(key, roleIds, userId) {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const setting = await settingsQueries.findByKey(key, client);
+    if (!setting) {
+      throw AppError.notFound('Setting key tidak ditemukan');
+    }
+
+    const before = await settingsQueries.findRoleIdsByKey(key, client);
+    await settingsQueries.setRoleAccess(key, roleIds, client);
+
+    await recordAudit(
+      {
+        tableName: 'setting_role_access',
+        recordId: null,
+        action: 'UPDATE',
+        oldValue: { setting_key: key, role_ids: before },
+        newValue: { setting_key: key, role_ids: roleIds },
+        userId,
+        actionDetail: `Akses edit setting "${key}" diubah`,
+      },
+      client
+    );
+
+    await client.query('COMMIT');
+    return { key, editable_role_ids: roleIds };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { getSetting, getSettings, listSettings, canEditSetting, updateSetting, setSettingAccess };
