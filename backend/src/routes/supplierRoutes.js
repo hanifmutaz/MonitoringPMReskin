@@ -16,9 +16,11 @@ router.use(requireAuth);
 // adalah boundary produk, lebih besar dari role.
 router.use(requireLicensePackage('B'));
 
-// GET - Admin & Operator (sama pola dengan lineRoutes.js/partRoutes.js)
-router.get('/', requireRole('Admin', 'Operator'), supplierController.list);
-router.get('/:id', requireRole('Admin', 'Operator'), supplierController.detail);
+// GET - dibuka ke semua role yang sudah login (fix - dulu hardcode
+// 'Admin','Operator' bikin role custom buatan Role Management gak pernah
+// bisa lihat Master Data Supplier, lihat catatan di lineRoutes.js).
+router.get('/', supplierController.list);
+router.get('/:id', supplierController.detail);
 
 // POST/PATCH - Admin, atau Operator jika allow_operator_edit_master_data=true
 router.post('/', requireMasterDataEditAccess, supplierController.create);

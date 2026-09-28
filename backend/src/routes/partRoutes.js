@@ -12,12 +12,14 @@ const router = express.Router();
 
 router.use(requireAuth);
 
-// Parts - GET: Admin & Operator
-router.get('/', requireRole('Admin', 'Operator'), partController.list);
+// Parts - GET: dibuka ke semua role yang sudah login (lihat catatan sama di
+// lineRoutes.js - requireRole('Admin','Operator') hardcode bikin role
+// custom kejegal 403 walau sudah digrant permission lewat Role Management).
+router.get('/', partController.list);
 
 // Lookup exact-match by Drawing No (hasil scan barcode kamera iPad) - akses
 // sama dengan list biasa, cuma beda cara matching (exact, bukan ILIKE).
-router.get('/lookup', requireRole('Admin', 'Operator'), partController.lookupByDrawingNo);
+router.get('/lookup', partController.lookupByDrawingNo);
 
 // Parts - POST/PATCH: Admin, atau Operator jika allow_operator_edit_master_data=true
 router.post('/', requireMasterDataEditAccess, partController.create);
@@ -26,8 +28,9 @@ router.patch('/:id', requireMasterDataEditAccess, partController.update);
 // Parts - DELETE: Admin only
 router.delete('/:id', requireRole('Admin'), partController.remove);
 
-// Part-CL Mapping (nested) - GET: Admin & Operator
-router.get('/:partId/cl-mapping', requireRole('Admin', 'Operator'), clMappingController.list);
+// Part-CL Mapping (nested) - GET: dibuka ke semua role yang sudah login
+// (sama alasan di atas).
+router.get('/:partId/cl-mapping', clMappingController.list);
 
 // Part-CL Mapping (nested) - POST: sama seperti POST /parts
 router.post('/:partId/cl-mapping', requireMasterDataEditAccess, clMappingController.create);
@@ -37,12 +40,7 @@ router.post('/:partId/cl-mapping', requireMasterDataEditAccess, clMappingControl
 // dari cl-mapping di atas yang tetap Paket A. requireLicensePackage('B')
 // dicek SEBELUM role/permission, gantiin akses "sama persis dengan
 // cl-mapping" yang lama.
-router.get(
-  '/:partId/suppliers',
-  requireLicensePackage('B'),
-  requireRole('Admin', 'Operator'),
-  partSupplierController.list
-);
+router.get('/:partId/suppliers', requireLicensePackage('B'), partSupplierController.list);
 router.post(
   '/:partId/suppliers',
   requireLicensePackage('B'),

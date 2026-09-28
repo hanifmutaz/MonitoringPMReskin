@@ -14,6 +14,7 @@
 const cron = require('node-cron');
 const conmasSyncService = require('../services/conmasSyncService');
 const pmMonthlyAccrualService = require('../services/pmMonthlyAccrualService');
+const pmWeeklyAccrualService = require('../services/pmWeeklyAccrualService');
 const pmPartSnapshotService = require('../services/pmPartSnapshotService');
 const settingsService = require('../services/settingsService');
 const logger = require('../utils/logger');
@@ -21,8 +22,12 @@ const logger = require('../utils/logger');
 let scheduledTask = null;
 
 async function runOnce() {
-  await conmasSyncService.runSync();
+  const syncResult = await conmasSyncService.runSync();
   await pmMonthlyAccrualService.recomputeAllLines();
+  // FIX 24 Sep 2026: akumulasi_poin_weekly sebelumnya nggak pernah
+  // ke-recompute otomatis (lihat pmWeeklyAccrualService.js header) -
+  // sekarang jalan bareng Monthly, pakai production_cache yang sama.
+  await pmWeeklyAccrualService.recomputeAllLines();
 
   // Sengaja TIDAK di-skip walau conmasDb belum configured (beda dari
   // pmMonthlyAccrualService di atas) - snapshot status PM Part tidak
@@ -37,6 +42,11 @@ async function runOnce() {
   } catch (err) {
     logger.error('Recompute PM Part status snapshot gagal', err);
   }
+
+  // Return value gak dipakai pemanggil cron (fire-and-forget), tapi
+  // dipakai trigger MANUAL (POST /settings/sync-conmas, settingsController.js)
+  // buat kasih feedback ke tombol "Sync Sekarang" di frontend.
+  return syncResult;
 }
 
 async function start() {
@@ -62,4 +72,11 @@ async function start() {
   runOnce().catch((err) => logger.error('ConMas sync job (initial run) crashed', err));
 }
 
-module.exports = { start, runOnce };
+function stop() {
+  if (scheduledTask) {
+    scheduledTask.stop();
+    scheduledTask = null;
+  }
+}
+
+module.exports = { start, stop, runOnce };

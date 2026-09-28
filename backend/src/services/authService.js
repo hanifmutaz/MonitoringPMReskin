@@ -90,7 +90,11 @@ async function login(username, password, context = {}) {
   // kayak permissions - biar kalau Admin ganti LICENSE_PACKAGE env terus
   // restart server, user gak perlu re-login buat lihat perubahan gating).
   // Cuma ada di body response, dibaca AuthContext.jsx buat hasPackage().
-  return { token, user: { ...userPayload, permissions, license_package: config.licensePackage } };
+  // role_id (BEDA dari `role` yang nama string) SENGAJA gak masuk JWT
+  // claims (sama alasan permissions/license_package) - cuma di body
+  // response, dipakai frontend buat cek setting_role_access (SettingsPage.jsx,
+  // migration 1700000022000) tanpa perlu resolve nama role -> id lagi di FE.
+  return { token, user: { ...userPayload, role_id: user.role_id, permissions, license_package: config.licensePackage } };
 }
 
 /**
@@ -162,6 +166,7 @@ async function getMe(userId) {
     email: user.email,
     avatar_url: user.avatar_url,
     role: user.role_name,
+    role_id: user.role_id,
     permissions,
     license_package: config.licensePackage,
   };

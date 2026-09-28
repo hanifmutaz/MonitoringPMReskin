@@ -24,4 +24,52 @@ async function updateValue(key, value, userId, runner = db) {
   return result.rows[0] || null;
 }
 
-module.exports = { findAll, findByKey, updateValue };
+// Semua grant setting_role_access sekaligus, dikembalikan sebagai
+// { setting_key: [role_id, ...] } - dipakai listSettings() supaya cuma 1
+// round-trip DB (bukan query per-key).
+async function findAllRoleAccessGrouped(runner = db) {
+  const result = await runner.query('SELECT setting_key, role_id FROM setting_role_access');
+  const map = {};
+  for (const row of result.rows) {
+    if (!map[row.setting_key]) map[row.setting_key] = [];
+    map[row.setting_key].push(row.role_id);
+  }
+  return map;
+}
+
+async function findRoleIdsByKey(key, runner = db) {
+  const result = await runner.query('SELECT role_id FROM setting_role_access WHERE setting_key = $1', [key]);
+  return result.rows.map((r) => r.role_id);
+}
+
+async function roleHasAccess(key, roleId, runner = db) {
+  const result = await runner.query(
+    'SELECT 1 FROM setting_role_access WHERE setting_key = $1 AND role_id = $2',
+    [key, roleId]
+  );
+  return result.rows.length > 0;
+}
+
+// Replace TOTAL daftar role yang punya akses edit ke 1 setting key (pola
+// sama dengan permissionQueries.setRolePermissions - delete semua lalu
+// insert ulang, lebih simpel daripada diff manual & aman dalam 1 transaction).
+async function setRoleAccess(key, roleIds, client) {
+  await client.query('DELETE FROM setting_role_access WHERE setting_key = $1', [key]);
+  if (roleIds.length > 0) {
+    const values = roleIds.map((_, i) => `($1, $${i + 2})`).join(', ');
+    await client.query(
+      `INSERT INTO setting_role_access (setting_key, role_id) VALUES ${values}`,
+      [key, ...roleIds]
+    );
+  }
+}
+
+module.exports = {
+  findAll,
+  findByKey,
+  updateValue,
+  findAllRoleAccessGrouped,
+  findRoleIdsByKey,
+  roleHasAccess,
+  setRoleAccess,
+};
