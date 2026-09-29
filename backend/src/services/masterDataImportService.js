@@ -40,6 +40,7 @@ const partQueries = require('../sql/partQueries');
 const clMappingQueries = require('../sql/clMappingQueries');
 const { recordAudit } = require('../utils/auditLog');
 const AppError = require('../utils/AppError');
+const dateUtils = require('../utils/dateUtils');
 
 const HEADER_ALIASES = {
   line_no: ['line no', 'line no.', 'line'],
@@ -62,6 +63,13 @@ const HEADER_ALIASES = {
 // diformat sebagai Date - xlsx.utils.sheet_to_json({raw:true}) balikin serial
 // number itu apa adanya. Konversi ke 'YYYY-MM-DD' pakai epoch Excel (1899-12-30),
 // atau terima langsung kalau sel-nya berupa teks 'YYYY-MM-DD'/tanggal biasa.
+// Cek tanggal kalender beneran ada (tolak 2026-02-31 dst) tanpa Date lokal.
+function isRealDate(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
 function parseExcelDateCell(value) {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number') {
@@ -72,13 +80,14 @@ function parseExcelDateCell(value) {
   const str = String(value).trim();
   if (!str) return null;
   const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (match) return match[0];
+  if (match) return isRealDate(match[0]) ? match[0] : null;
   const dmy = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
   if (dmy) {
     const [, d, m, y] = dmy;
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    const iso = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    return isRealDate(iso) ? iso : null;
   }
-  return null; // format tidak dikenali - dibiarkan null, bukan error (kolom ini opsional)
+  return null; // tidak dikenali / tanggal ngawur - caller (parsePreview) yang nge-flag jadi error baris
 }
 
 function normalizeHeader(h) {
@@ -168,8 +177,8 @@ async function parsePreview(fileBuffer) {
     const targetShotRaw = r[colMap.target_shot];
     const targetShot = Number(targetShotRaw);
     const pemakaianHariExcel = colMap.pemakaian_hari !== undefined ? r[colMap.pemakaian_hari] : null;
-    const tglPasangAwal =
-      colMap.tgl_pasang_awal !== undefined ? parseExcelDateCell(r[colMap.tgl_pasang_awal]) : null;
+    const tglPasangAwalRaw = colMap.tgl_pasang_awal !== undefined ? r[colMap.tgl_pasang_awal] : null;
+    const tglPasangAwal = parseExcelDateCell(tglPasangAwalRaw);
 
     const { original, cleaned, wasAutoCleaned } = autoCleanDrawingNo(r[colMap.drawing_no]);
 
@@ -180,6 +189,12 @@ async function parsePreview(fileBuffer) {
     if (!cleaned) errors.push('Drawing No kosong');
     if (!partName) errors.push('Part Name kosong');
     if (!Number.isFinite(targetShot) || targetShot <= 0) errors.push('Target Shot harus angka > 0');
+    const tglRawFilled = tglPasangAwalRaw !== null && tglPasangAwalRaw !== undefined && String(tglPasangAwalRaw).trim() !== '';
+    if (tglRawFilled && !tglPasangAwal) {
+      errors.push('Tanggal Pasang Awal tidak valid (pakai YYYY-MM-DD atau DD/MM/YYYY)');
+    } else if (tglPasangAwal && tglPasangAwal > dateUtils.todayString()) {
+      errors.push('Tanggal Pasang Awal tidak boleh di masa depan');
+    }
 
     return {
       row_number: headerIdx + 2 + i, // nomor baris asli Excel (1-based + header)
@@ -424,4 +439,4 @@ async function commitImport(rows, userId) {
   }
 }
 
-module.exports = { parsePreview, commitImport };
+module.exports = { parsePreview, commitImport, parseExcelDateCell };

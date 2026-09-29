@@ -181,7 +181,7 @@ function PartFormModal({ initial, lines, onClose }) {
             <Input
               type="date"
               value={form.tgl_pasang_awal}
-              max={new Date().toISOString().slice(0, 10)}
+              max={todayString()}
               onChange={(e) => setForm({ ...form, tgl_pasang_awal: e.target.value })}
             />
             <p className="mt-1 text-[11px] text-muted-foreground">

@@ -5,6 +5,7 @@ const LIST_SELECT = `
   SELECT
     p.id, p.line_id, l.line_name, p.jig_name, p.drawing_no, p.part_name, p.target_shot,
     p.spare_part_number, p.spare_part_qty, p.spare_part_location, p.spare_part_note,
+    to_char(p.tgl_pasang_awal, 'YYYY-MM-DD') AS tgl_pasang_awal,
     p.inventory_item_id, inv.spare_part_number AS inv_spare_part_number, inv.current_stock AS inv_current_stock,
     p.is_active,
     (SELECT COUNT(*)::int FROM part_cl_mapping m WHERE m.part_id = p.id) AS cl_count,
@@ -85,9 +86,9 @@ async function lineExists(lineId, runner = db) {
 
 async function create(data, runner = db) {
   const result = await runner.query(
-    `INSERT INTO parts (line_id, jig_name, drawing_no, part_name, target_shot, spare_part_number, spare_part_qty, spare_part_location, spare_part_note)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     RETURNING id, line_id, jig_name, drawing_no, part_name, target_shot, spare_part_number, spare_part_qty, spare_part_location, spare_part_note, is_active, created_at`,
+    `INSERT INTO parts (line_id, jig_name, drawing_no, part_name, target_shot, spare_part_number, spare_part_qty, spare_part_location, spare_part_note, tgl_pasang_awal)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     RETURNING id, line_id, jig_name, drawing_no, part_name, target_shot, spare_part_number, spare_part_qty, spare_part_location, spare_part_note, to_char(tgl_pasang_awal, 'YYYY-MM-DD') AS tgl_pasang_awal, is_active, created_at`,
     [
       data.line_id,
       data.jig_name,
@@ -98,6 +99,7 @@ async function create(data, runner = db) {
       data.spare_part_qty ?? null,
       data.spare_part_location ?? null,
       data.spare_part_note ?? null,
+      data.tgl_pasang_awal || null,
     ]
   );
   return result.rows[0];
@@ -116,7 +118,7 @@ async function update(id, fields, runner = db) {
 
   const result = await runner.query(
     `UPDATE parts SET ${setClauses.join(', ')} WHERE id = $${params.length}
-     RETURNING id, line_id, jig_name, drawing_no, part_name, target_shot, spare_part_number, spare_part_qty, spare_part_location, spare_part_note, is_active, updated_at`,
+     RETURNING id, line_id, jig_name, drawing_no, part_name, target_shot, spare_part_number, spare_part_qty, spare_part_location, spare_part_note, to_char(tgl_pasang_awal, 'YYYY-MM-DD') AS tgl_pasang_awal, is_active, updated_at`,
     params
   );
   return result.rows[0] || null;
