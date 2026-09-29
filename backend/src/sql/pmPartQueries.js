@@ -27,15 +27,24 @@ function buildCounterCte(filteredPartsSelect) {
     WHERE h.deleted_at IS NULL
     GROUP BY h.part_id
   ),
+  -- Baseline mulai hitung Counter: pakai riwayat penggantian terakhir kalau
+  -- ADA, atau fallback ke tgl_pasang_awal Part kalau BELUM PERNAH diganti
+  -- sama sekali (lihat migration 1700000025000 - tanpa ini, Part orisinal
+  -- counter-nya nyangkut 0 selamanya karena tidak ada baseline sama sekali).
+  part_baseline AS (
+    SELECT fp.id AS part_id, COALESCE(plg.last_tgl_ganti, fp.tgl_pasang_awal) AS baseline_date
+    FROM filtered_parts fp
+    LEFT JOIN part_last_ganti plg ON plg.part_id = fp.id
+  ),
   part_counter AS (
     SELECT m.part_id, COALESCE(SUM(pc.output_actual), 0) AS counter
     FROM part_cl_mapping m
     JOIN filtered_parts fp ON fp.id = m.part_id
-    JOIN part_last_ganti plg ON plg.part_id = m.part_id
+    JOIN part_baseline pb ON pb.part_id = m.part_id AND pb.baseline_date IS NOT NULL
     JOIN production_cache pc
       ON pc.line_id = fp.line_id
      AND pc.cl_no = m.cl_no
-     AND pc.tanggal >= plg.last_tgl_ganti
+     AND pc.tanggal >= pb.baseline_date
     GROUP BY m.part_id
   )
   `;
@@ -45,13 +54,17 @@ const FINAL_SELECT = `
   SELECT
     fp.id AS part_id, fp.line_id, l.line_name, fp.jig_name, fp.drawing_no, fp.part_name, fp.target_shot,
     COALESCE(pcnt.counter, 0) AS counter,
-    plg.last_tgl_ganti,
+    -- last_tgl_ganti di response TETAP pakai nama ini (bukan diganti jadi
+    -- "baseline_date") supaya pmPartService.computeMetrics() dan field API
+    -- yang sudah ada (last_tgl_ganti) tidak perlu berubah - nilainya SEKARANG
+    -- sudah termasuk fallback tgl_pasang_awal lewat part_baseline.
+    pb.baseline_date AS last_tgl_ganti,
     (SELECT s.supplier_name FROM part_suppliers ps JOIN suppliers s ON s.id = ps.supplier_id
      WHERE ps.part_id = fp.id AND ps.is_primary = TRUE LIMIT 1) AS primary_supplier_name
   FROM filtered_parts fp
   JOIN lines l ON l.id = fp.line_id
   LEFT JOIN part_counter pcnt ON pcnt.part_id = fp.id
-  LEFT JOIN part_last_ganti plg ON plg.part_id = fp.id
+  LEFT JOIN part_baseline pb ON pb.part_id = fp.id
 `;
 
 async function findAllWithCounter({ lineId, search, limit, offset } = {}, runner = db) {
@@ -78,7 +91,7 @@ async function findAllWithCounter({ lineId, search, limit, offset } = {}, runner
   }
 
   const filteredPartsSelect = `
-    SELECT p.id, p.line_id, p.jig_name, p.drawing_no, p.part_name, p.target_shot
+    SELECT p.id, p.line_id, p.jig_name, p.drawing_no, p.part_name, p.target_shot, p.tgl_pasang_awal
     FROM parts p
     ${where}
   `;
@@ -122,7 +135,7 @@ async function countAll({ lineId, search } = {}, runner = db) {
  */
 async function findOneWithCounter(partId, runner = db) {
   const filteredPartsSelect = `
-    SELECT p.id, p.line_id, p.jig_name, p.drawing_no, p.part_name, p.target_shot
+    SELECT p.id, p.line_id, p.jig_name, p.drawing_no, p.part_name, p.target_shot, p.tgl_pasang_awal
     FROM parts p
     WHERE p.id = $1
   `;

@@ -101,7 +101,10 @@ function ImportMasterDataTab() {
     <div>
       <p className="mb-4 text-xs text-muted-foreground">
         Upload file Excel Master Data (.xlsx / .xlsm) untuk membuat Line, Part, dan CL Mapping sekaligus — tidak perlu
-        input manual satu-satu. Sistem akan menampilkan preview dulu sebelum data benar-benar disimpan.
+        input manual satu-satu. Sistem akan menampilkan preview dulu sebelum data benar-benar disimpan. Kolom{' '}
+        <strong className="text-foreground">Tgl Pasang Awal</strong> opsional — isi untuk Part yang belum pernah
+        diganti sama sekali sejak awal (baseline awal sistem mulai menghitung Counter/Sisa Shot). Kalau part sudah
+        pernah punya riwayat penggantian, kolom ini boleh dikosongkan.
       </p>
 
       <div
@@ -193,7 +196,19 @@ function ImportMasterDataTab() {
             <table className="w-full border-collapse">
               <thead className="sticky top-0 bg-card">
                 <tr className="border-b border-border">
-                  {['', 'Baris', 'Status', 'Line No', 'CL No', 'Jig Name', 'Drawing No', 'Part Name', 'Target Shot', 'Info'].map(
+                  {[
+                    '',
+                    'Baris',
+                    'Status',
+                    'Line No',
+                    'CL No',
+                    'Jig Name',
+                    'Drawing No',
+                    'Part Name',
+                    'Target Shot',
+                    'Tgl Pasang Awal',
+                    'Info',
+                  ].map(
                     (h, i) => (
                       <th
                         key={i}
@@ -250,6 +265,14 @@ function ImportMasterDataTab() {
                       <td className="px-2.5 py-2.5 text-[13px]">{row.part_name}</td>
                       <td className="px-2.5 py-2.5 text-right font-[var(--font-mono)] text-[13px]">
                         {row.target_shot?.toLocaleString('id-ID') ?? '-'}
+                      </td>
+                      <td className="px-2.5 py-2.5">
+                        <Input
+                          type="date"
+                          className="h-7 w-[140px] font-[var(--font-mono)] text-xs"
+                          value={row.tgl_pasang_awal || ''}
+                          onChange={(e) => updateRow(row.row_number, 'tgl_pasang_awal', e.target.value || null)}
+                        />
                       </td>
                       <td className="max-w-[220px] px-2.5 py-2.5 text-[11px] text-muted-foreground">
                         {row.errors?.join('; ')}

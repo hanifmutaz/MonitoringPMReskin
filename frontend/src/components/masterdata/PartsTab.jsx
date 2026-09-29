@@ -51,6 +51,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { todayString } from '../../utils/todayString';
 
 const DEFAULT_LIMIT = 50;
 
@@ -60,6 +61,7 @@ const emptyForm = {
   drawing_no: '',
   part_name: '',
   target_shot: '',
+  tgl_pasang_awal: '',
   spare_part_number: '',
   spare_part_qty: '',
   spare_part_location: '',
@@ -76,6 +78,7 @@ function PartFormModal({ initial, lines, onClose }) {
           drawing_no: initial.drawing_no,
           part_name: initial.part_name,
           target_shot: initial.target_shot,
+          tgl_pasang_awal: initial.tgl_pasang_awal || '',
           spare_part_number: initial.spare_part_number || '',
           spare_part_qty: initial.spare_part_qty ?? '',
           spare_part_location: initial.spare_part_location || '',
@@ -96,6 +99,7 @@ function PartFormModal({ initial, lines, onClose }) {
       drawing_no: form.drawing_no,
       part_name: form.part_name,
       target_shot: Number(form.target_shot),
+      tgl_pasang_awal: form.tgl_pasang_awal || undefined,
       spare_part_number: form.spare_part_number || undefined,
       spare_part_qty: form.spare_part_qty === '' ? undefined : Number(form.spare_part_qty),
       spare_part_location: form.spare_part_location || undefined,
@@ -171,6 +175,22 @@ function PartFormModal({ initial, lines, onClose }) {
               required
             />
             {errors.target_shot && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.target_shot}</p>}
+          </div>
+          <div>
+            <Label className="mb-1.5">Tanggal Pasang Awal</Label>
+            <Input
+              type="date"
+              value={form.tgl_pasang_awal}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setForm({ ...form, tgl_pasang_awal: e.target.value })}
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Opsional. Isi kalau Part ini belum pernah diganti sama sekali — jadi baseline sistem mulai menghitung
+              Counter/Sisa Shot. Kalau sudah pernah ada riwayat penggantian, boleh dikosongkan.
+            </p>
+            {errors.tgl_pasang_awal && (
+              <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.tgl_pasang_awal}</p>
+            )}
           </div>
 
           <div className="border-t border-[var(--border-soft)] pt-3 sm:col-span-2">

@@ -50,7 +50,36 @@ const HEADER_ALIASES = {
   part_name: ['part name'],
   target_shot: ['target shot'],
   pemakaian_hari: ['pemakaian/hari', 'pemakaian hari', 'pemakaian per hari'],
+  // OPSIONAL (bukan requiredCols) - baseline fallback buat Part yang belum
+  // pernah punya riwayat penggantian sama sekali, lihat migration
+  // 1700000025000 & pmPartQueries.js. Kalau kolom ini nggak ada di Excel
+  // sama sekali, import tetap jalan seperti biasa (tgl_pasang_awal = null,
+  // counter part itu 0 sampai nanti diisi manual atau ada riwayat PM).
+  tgl_pasang_awal: ['tanggal pasang awal', 'tgl pasang awal', 'tanggal pasang', 'install date', 'installation date'],
 };
+
+// Excel biasa nyimpen tanggal sebagai serial number (bukan string) kalau sel-nya
+// diformat sebagai Date - xlsx.utils.sheet_to_json({raw:true}) balikin serial
+// number itu apa adanya. Konversi ke 'YYYY-MM-DD' pakai epoch Excel (1899-12-30),
+// atau terima langsung kalau sel-nya berupa teks 'YYYY-MM-DD'/tanggal biasa.
+function parseExcelDateCell(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') {
+    const utcDays = Math.floor(value - 25569); // 25569 = hari antara 1899-12-30 dan 1970-01-01
+    const utcMs = utcDays * 86400 * 1000;
+    return new Date(utcMs).toISOString().slice(0, 10);
+  }
+  const str = String(value).trim();
+  if (!str) return null;
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return match[0];
+  const dmy = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return null; // format tidak dikenali - dibiarkan null, bukan error (kolom ini opsional)
+}
 
 function normalizeHeader(h) {
   return String(h || '')
@@ -139,6 +168,8 @@ async function parsePreview(fileBuffer) {
     const targetShotRaw = r[colMap.target_shot];
     const targetShot = Number(targetShotRaw);
     const pemakaianHariExcel = colMap.pemakaian_hari !== undefined ? r[colMap.pemakaian_hari] : null;
+    const tglPasangAwal =
+      colMap.tgl_pasang_awal !== undefined ? parseExcelDateCell(r[colMap.tgl_pasang_awal]) : null;
 
     const { original, cleaned, wasAutoCleaned } = autoCleanDrawingNo(r[colMap.drawing_no]);
 
@@ -162,6 +193,7 @@ async function parsePreview(fileBuffer) {
       part_name: partName,
       target_shot: Number.isFinite(targetShot) ? targetShot : null,
       pemakaian_hari_excel: pemakaianHariExcel,
+      tgl_pasang_awal: tglPasangAwal,
       errors,
     };
   });
@@ -190,11 +222,15 @@ async function parsePreview(fileBuffer) {
   for (const groupRows of partGroups.values()) {
     const distinctNames = new Set(groupRows.map((r) => r.part_name));
     const distinctShots = new Set(groupRows.map((r) => r.target_shot));
-    if (distinctNames.size > 1 || distinctShots.size > 1) {
+    // tgl_pasang_awal: cuma bandingin baris yang ADA isinya (banyak baris CL
+    // wajar kosong semua kalau kolomnya emang gak diisi Admin) - beda dari
+    // Part Name/Target Shot yang harus selalu ada isinya.
+    const distinctTglPasang = new Set(groupRows.map((r) => r.tgl_pasang_awal).filter(Boolean));
+    if (distinctNames.size > 1 || distinctShots.size > 1 || distinctTglPasang.size > 1) {
       const rowNums = groupRows.map((r) => r.row_number).join(', ');
       for (const r of groupRows) {
         r.errors.push(
-          `Part Name/Target Shot tidak konsisten untuk Drawing No yang sama (baris: ${rowNums}) - samakan dulu sebelum commit`
+          `Part Name/Target Shot/Tanggal Pasang Awal tidak konsisten untuk Drawing No yang sama (baris: ${rowNums}) - samakan dulu sebelum commit`
         );
       }
     }
@@ -301,10 +337,23 @@ async function commitImport(rows, userId) {
         if (existingPart) {
           partId = existingPart.id;
           const before = await partQueries.findRawById(partId, client);
-          if (before.part_name !== row.part_name || Number(before.target_shot) !== Number(row.target_shot)) {
+          // tgl_pasang_awal HANYA diupdate kalau Excel ngisi nilai baru DAN
+          // part-nya belum punya nilai tersimpan - sengaja TIDAK menimpa
+          // baseline yang sudah ada (misal admin re-import ulang file lama),
+          // beda dari part_name/target_shot yang boleh dikoreksi kapan saja.
+          const shouldUpdateTglPasang = row.tgl_pasang_awal && !before.tgl_pasang_awal;
+          if (
+            before.part_name !== row.part_name ||
+            Number(before.target_shot) !== Number(row.target_shot) ||
+            shouldUpdateTglPasang
+          ) {
             const updated = await partQueries.update(
               partId,
-              { part_name: row.part_name, target_shot: Number(row.target_shot) },
+              {
+                part_name: row.part_name,
+                target_shot: Number(row.target_shot),
+                ...(shouldUpdateTglPasang ? { tgl_pasang_awal: row.tgl_pasang_awal } : {}),
+              },
               client
             );
             result.parts_updated += 1;
@@ -321,6 +370,7 @@ async function commitImport(rows, userId) {
               drawing_no: row.drawing_no,
               part_name: row.part_name,
               target_shot: Number(row.target_shot),
+              tgl_pasang_awal: row.tgl_pasang_awal || null,
             },
             client
           );

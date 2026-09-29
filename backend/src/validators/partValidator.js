@@ -1,5 +1,19 @@
 // src/validators/partValidator.js
 
+const dateUtils = require('../utils/dateUtils');
+
+// tgl_pasang_awal OPSIONAL (part yang sudah pernah diganti tidak butuh ini -
+// baseline-nya dari riwayat penggantian, lihat pmPartQueries.js), tapi kalau
+// diisi harus format & isi yang valid - dipakai bareng di create & update.
+function validateTglPasangAwal(value, errors) {
+  if (value === undefined || value === null || value === '') return;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    errors.tgl_pasang_awal = 'Tanggal Pasang Awal harus format YYYY-MM-DD';
+  } else if (value > dateUtils.todayString()) {
+    errors.tgl_pasang_awal = 'Tanggal Pasang Awal tidak boleh di masa depan';
+  }
+}
+
 function validateCreatePart(body) {
   const errors = {};
 
@@ -29,6 +43,7 @@ function validateCreatePart(body) {
       errors.spare_part_qty = 'Spare Part Qty harus bilangan bulat >= 0';
     }
   }
+  validateTglPasangAwal(body && body.tgl_pasang_awal, errors);
 
   return { valid: Object.keys(errors).length === 0, errors };
 }
@@ -73,6 +88,7 @@ function validateUpdatePart(body) {
   if (body.is_active !== undefined && typeof body.is_active !== 'boolean') {
     errors.is_active = 'Harus boolean';
   }
+  validateTglPasangAwal(body && body.tgl_pasang_awal, errors);
   if (Object.keys(body || {}).length === 0) {
     errors._general = 'Tidak ada field yang diubah';
   }
