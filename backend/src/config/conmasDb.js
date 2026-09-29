@@ -7,6 +7,7 @@
 // src/config/db.js (yang itu buat DB aplikasi PM Monitoring sendiri).
 
 const { Pool } = require('pg');
+require('./pgTypes'); // DATE tetap string 'YYYY-MM-DD' (anti geser 1 hari di server WIB)
 const env = require('./env');
 const logger = require('../utils/logger');
 
