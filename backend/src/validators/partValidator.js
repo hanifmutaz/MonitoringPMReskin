@@ -2,11 +2,15 @@
 
 const dateUtils = require('../utils/dateUtils');
 
-// tgl_pasang_awal OPSIONAL (part yang sudah pernah diganti tidak butuh ini -
-// baseline-nya dari riwayat penggantian, lihat pmPartQueries.js), tapi kalau
-// diisi harus format & isi yang valid - dipakai bareng di create & update.
-function validateTglPasangAwal(value, errors) {
-  if (value === undefined || value === null || value === '') return;
+// tgl_pasang_awal WAJIB saat CREATE part baru (tanpa ini Counter/Sisa Shot
+// part orisinal nyangkut 0 - lihat pmPartQueries.js), tapi tetap OPSIONAL
+// saat UPDATE (part lama yang belum terisi tidak boleh terblokir edit biasa).
+// Kalau diisi, format & isinya harus valid - dipakai bareng di create & update.
+function validateTglPasangAwal(value, errors, { required = false } = {}) {
+  if (value === undefined || value === null || value === '') {
+    if (required) errors.tgl_pasang_awal = 'Tanggal Pasang Awal wajib diisi untuk Part baru';
+    return;
+  }
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     errors.tgl_pasang_awal = 'Tanggal Pasang Awal harus format YYYY-MM-DD';
   } else if (value > dateUtils.todayString()) {
@@ -43,7 +47,7 @@ function validateCreatePart(body) {
       errors.spare_part_qty = 'Spare Part Qty harus bilangan bulat >= 0';
     }
   }
-  validateTglPasangAwal(body && body.tgl_pasang_awal, errors);
+  validateTglPasangAwal(body && body.tgl_pasang_awal, errors, { required: true });
 
   return { valid: Object.keys(errors).length === 0, errors };
 }

@@ -177,16 +177,19 @@ function PartFormModal({ initial, lines, onClose }) {
             {errors.target_shot && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.target_shot}</p>}
           </div>
           <div>
-            <Label className="mb-1.5">Tanggal Pasang Awal</Label>
+            <Label className="mb-1.5">Tanggal Pasang Awal{!isEdit && ' *'}</Label>
             <Input
               type="date"
+              required={!isEdit}
               value={form.tgl_pasang_awal}
               max={todayString()}
               onChange={(e) => setForm({ ...form, tgl_pasang_awal: e.target.value })}
             />
             <p className="mt-1 text-[11px] text-muted-foreground">
-              Opsional. Isi kalau Part ini belum pernah diganti sama sekali — jadi baseline sistem mulai menghitung
-              Counter/Sisa Shot. Kalau sudah pernah ada riwayat penggantian, boleh dikosongkan.
+              {isEdit ? 'Opsional saat edit. ' : 'Wajib untuk Part baru. '}
+              Tanggal Part ini pertama kali dipasang di mesin (bukan tanggal input data) — jadi baseline sistem mulai
+              menghitung Counter/Sisa Shot. Kalau sudah pernah diganti, riwayat penggantian terakhir yang dipakai
+              duluan.
             </p>
             {errors.tgl_pasang_awal && (
               <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.tgl_pasang_awal}</p>

@@ -76,7 +76,9 @@ function ImportMasterDataTab() {
     // baris yang tadinya error tapi sudah dibenerin gak nyangkut jadi 'error'
     // terus. Validasi FINAL & otoritatif tetap di server saat commit.
     const hasRequired = row.line_no && row.jig_name && row.drawing_no && row.part_name && row.cl_no && row.target_shot;
-    return hasRequired ? 'valid' : 'error';
+    // Part BARU (belum ada di DB) wajib punya Tgl Pasang Awal - part yang sudah ada tidak.
+    const hasTglIfNew = row.part_exists || !!row.tgl_pasang_awal;
+    return hasRequired && hasTglIfNew ? 'valid' : 'error';
   }
 
   async function handleCommit() {
@@ -102,9 +104,9 @@ function ImportMasterDataTab() {
       <p className="mb-4 text-xs text-muted-foreground">
         Upload file Excel Master Data (.xlsx / .xlsm) untuk membuat Line, Part, dan CL Mapping sekaligus — tidak perlu
         input manual satu-satu. Sistem akan menampilkan preview dulu sebelum data benar-benar disimpan. Kolom{' '}
-        <strong className="text-foreground">Tgl Pasang Awal</strong> opsional — isi untuk Part yang belum pernah
-        diganti sama sekali sejak awal (baseline awal sistem mulai menghitung Counter/Sisa Shot). Kalau part sudah
-        pernah punya riwayat penggantian, kolom ini boleh dikosongkan.
+        <strong className="text-foreground">Tgl Pasang Awal</strong> wajib untuk Part baru — tanggal Part pertama
+        kali dipasang di mesin (baseline sistem mulai menghitung Counter/Sisa Shot). Untuk Part yang sudah ada di
+        sistem, kolom ini boleh dikosongkan.
       </p>
 
       <div

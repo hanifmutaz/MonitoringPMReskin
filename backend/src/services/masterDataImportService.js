@@ -241,6 +241,13 @@ async function parsePreview(fileBuffer) {
     // wajar kosong semua kalau kolomnya emang gak diisi Admin) - beda dari
     // Part Name/Target Shot yang harus selalu ada isinya.
     const distinctTglPasang = new Set(groupRows.map((r) => r.tgl_pasang_awal).filter(Boolean));
+    if (distinctTglPasang.size === 1) {
+      // 1 Part bisa muncul di banyak baris CL - cukup 1 baris yang ngisi tanggal,
+      // baris lain di Part yang sama otomatis ikut (biar wajib-isi tidak
+      // nuntut tanggal yang sama diketik berulang di tiap baris CL).
+      const [onlyDate] = distinctTglPasang;
+      for (const r of groupRows) r.tgl_pasang_awal = onlyDate;
+    }
     if (distinctNames.size > 1 || distinctShots.size > 1 || distinctTglPasang.size > 1) {
       const rowNums = groupRows.map((r) => r.row_number).join(', ');
       for (const r of groupRows) {
@@ -269,6 +276,11 @@ async function parsePreview(fileBuffer) {
     if (lineId) {
       const existingPart = await partQueries.findByLineJigAndDrawing(lineId, row.jig_name, row.drawing_no);
       row.part_exists = !!existingPart;
+    }
+    if (!row.part_exists && !row.tgl_pasang_awal) {
+      row.errors.push('Tanggal Pasang Awal wajib diisi untuk Part baru');
+      row.status = 'error';
+      continue;
     }
     row.status = row.drawing_no_auto_cleaned ? 'warning' : 'valid';
   }
@@ -316,6 +328,15 @@ async function commitImport(rows, userId) {
     await client.query('BEGIN');
 
     const lineIdCache = new Map();
+
+    // Tanggal Pasang Awal per Part (Line+Jig+Drawing): ambil baris pertama yang
+    // ada isinya, supaya baris CL pertama yang kosong tidak menggagalkan
+    // pembuatan Part padahal baris CL lain di Part yang sama sudah ngisi.
+    const groupTglPasang = new Map();
+    for (const r of candidateRows) {
+      const gk = `${r.line_no}|${r.jig_name}|${r.drawing_no}`;
+      if (r.tgl_pasang_awal && !groupTglPasang.has(gk)) groupTglPasang.set(gk, r.tgl_pasang_awal);
+    }
 
     for (let idx = 0; idx < candidateRows.length; idx++) {
       const row = candidateRows[idx];
@@ -378,6 +399,19 @@ async function commitImport(rows, userId) {
             );
           }
         } else {
+          // Part BARU: Tanggal Pasang Awal wajib & valid (validasi otoritatif di
+          // server - client bisa saja ngirim row hasil edit yang sudah dikosongkan).
+          const tglPasang =
+            row.tgl_pasang_awal || groupTglPasang.get(`${row.line_no}|${row.jig_name}|${row.drawing_no}`) || null;
+          if (!tglPasang) {
+            throw new Error('Tanggal Pasang Awal wajib diisi untuk Part baru');
+          }
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(tglPasang) || !isRealDate(tglPasang)) {
+            throw new Error('Tanggal Pasang Awal tidak valid (harus YYYY-MM-DD)');
+          }
+          if (tglPasang > dateUtils.todayString()) {
+            throw new Error('Tanggal Pasang Awal tidak boleh di masa depan');
+          }
           const createdPart = await partQueries.create(
             {
               line_id: lineId,
@@ -385,7 +419,7 @@ async function commitImport(rows, userId) {
               drawing_no: row.drawing_no,
               part_name: row.part_name,
               target_shot: Number(row.target_shot),
-              tgl_pasang_awal: row.tgl_pasang_awal || null,
+              tgl_pasang_awal: tglPasang,
             },
             client
           );
