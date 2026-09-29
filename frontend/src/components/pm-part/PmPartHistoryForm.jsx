@@ -31,8 +31,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-
-const todayStr = () => new Date().toISOString().slice(0, 10);
+import { todayString as todayStr } from '../../utils/todayString';
 
 const emptyForm = {
   line_id: '',
