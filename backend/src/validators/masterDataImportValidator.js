@@ -8,6 +8,10 @@ function validateCommitPayload(body) {
     return { valid: false, errors };
   }
 
+  if (body.overwriteTglPasang !== undefined && typeof body.overwriteTglPasang !== 'boolean') {
+    errors.overwriteTglPasang = 'overwriteTglPasang harus boolean';
+  }
+
   body.rows.forEach((row, idx) => {
     if (row.include === false) return; // baris yang di-uncheck Admin, tidak divalidasi
 

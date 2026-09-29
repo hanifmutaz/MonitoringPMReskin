@@ -58,7 +58,8 @@ async function findById(id, runner = db) {
 // (lihat migration 1700000017000, uq_parts_line_jig_drawing_active).
 async function findByLineJigAndDrawing(lineId, jigName, drawingNo, runner = db) {
   const result = await runner.query(
-    `SELECT id FROM parts WHERE line_id = $1 AND jig_name = $2 AND drawing_no = $3 AND deleted_at IS NULL`,
+    `SELECT id, to_char(tgl_pasang_awal, 'YYYY-MM-DD') AS tgl_pasang_awal
+       FROM parts WHERE line_id = $1 AND jig_name = $2 AND drawing_no = $3 AND deleted_at IS NULL`,
     [lineId, jigName, drawingNo]
   );
   return result.rows[0] || null;

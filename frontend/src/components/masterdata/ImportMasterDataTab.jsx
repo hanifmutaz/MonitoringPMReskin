@@ -32,6 +32,7 @@ function ImportMasterDataTab() {
   const [previewError, setPreviewError] = useState('');
   const [commitResult, setCommitResult] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [overwriteTgl, setOverwriteTgl] = useState(false); // timpa Tgl Pasang Awal yang sudah terisi di sistem
 
   const { preview: previewMutation, commit: commitMutation } = useMasterDataImportMutations();
 
@@ -40,6 +41,7 @@ function ImportMasterDataTab() {
     setFileName(file.name);
     setPreviewError('');
     setCommitResult(null);
+    setOverwriteTgl(false);
     try {
       const data = await previewMutation.mutateAsync(file);
       setPreview(data);
@@ -85,8 +87,12 @@ function ImportMasterDataTab() {
     setCommitResult(null);
     const finalRows = rows.map((r) => ({ ...r, status: r.include ? reRunErrorCheck(r) : r.status }));
     try {
-      const result = await commitMutation.mutateAsync(finalRows.filter((r) => r.include));
+      const result = await commitMutation.mutateAsync({
+        rows: finalRows.filter((r) => r.include),
+        overwriteTglPasang: overwriteTgl,
+      });
       setCommitResult(result);
+      setOverwriteTgl(false);
       setPreview(null);
       setRows([]);
       setFileName('');
@@ -97,6 +103,10 @@ function ImportMasterDataTab() {
   }
 
   const includedCount = rows.filter((r) => r.include).length;
+  // Baris Part yang sudah punya tanggal di sistem, tapi tanggal di Excel beda.
+  const tglConflictCount = rows.filter(
+    (r) => r.include && r.part_exists && r.existing_tgl_pasang_awal && r.tgl_pasang_awal && r.tgl_pasang_awal !== r.existing_tgl_pasang_awal
+  ).length;
   const errorIncludedCount = rows.filter((r) => r.include && reRunErrorCheck(r) === 'error').length;
 
   return (
@@ -161,7 +171,8 @@ function ImportMasterDataTab() {
           <div className="mb-1.5 text-sm font-semibold">Import selesai</div>
           <p className="text-xs text-muted-foreground">
             Line baru: {commitResult.lines_created} · Part baru: {commitResult.parts_created} · Part diupdate:{' '}
-            {commitResult.parts_updated} · CL Mapping baru: {commitResult.mappings_created} · CL Mapping dilewati
+            {commitResult.parts_updated}
+            {commitResult.tgl_pasang_overwritten > 0 && ` (${commitResult.tgl_pasang_overwritten} tanggal pasang ditimpa)`} · CL Mapping baru: {commitResult.mappings_created} · CL Mapping dilewati
             (sudah ada): {commitResult.mappings_skipped} · Baris dilewati karena error: {commitResult.rows_skipped}
           </p>
           {commitResult.row_errors?.length > 0 && (
@@ -281,6 +292,11 @@ function ImportMasterDataTab() {
                         {!row.line_exists && !row.errors?.length && ' Line baru akan dibuat.'}
                         {row.line_exists && !row.part_exists && !row.errors?.length && ' Part baru di Line ini.'}
                         {row.part_exists && !row.errors?.length && ' Part sudah ada — CL Mapping akan ditambahkan.'}
+                        {row.part_exists &&
+                          row.existing_tgl_pasang_awal &&
+                          row.tgl_pasang_awal &&
+                          row.tgl_pasang_awal !== row.existing_tgl_pasang_awal &&
+                          ` Tgl di sistem ${row.existing_tgl_pasang_awal} — ${overwriteTgl ? 'akan ditimpa.' : 'tidak diubah.'}`}
                       </td>
                     </tr>
                   );
@@ -288,6 +304,22 @@ function ImportMasterDataTab() {
               </tbody>
             </table>
           </div>
+
+          {tglConflictCount > 0 && (
+            <label className="mt-4 flex cursor-pointer items-start gap-2 rounded-lg border border-[var(--border-soft)] p-3 text-xs">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-3.5 w-3.5 accent-[var(--accent)]"
+                checked={overwriteTgl}
+                onChange={(e) => setOverwriteTgl(e.target.checked)}
+              />
+              <span>
+                <strong className="text-foreground">Timpa Tanggal Pasang Awal yang sudah terisi di sistem</strong>{' '}
+                ({tglConflictCount} baris beda dengan Excel). Default mati: tanggal yang sudah tersimpan tidak diubah.
+                Nyalakan kalau tanggal di Excel ini yang paling benar.
+              </span>
+            </label>
+          )}
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <span className="text-xs text-muted-foreground">

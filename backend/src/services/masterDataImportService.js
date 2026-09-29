@@ -51,18 +51,13 @@ const HEADER_ALIASES = {
   part_name: ['part name'],
   target_shot: ['target shot'],
   pemakaian_hari: ['pemakaian/hari', 'pemakaian hari', 'pemakaian per hari'],
-  // OPSIONAL (bukan requiredCols) - baseline fallback buat Part yang belum
-  // pernah punya riwayat penggantian sama sekali, lihat migration
-  // 1700000025000 & pmPartQueries.js. Kalau kolom ini nggak ada di Excel
-  // sama sekali, import tetap jalan seperti biasa (tgl_pasang_awal = null,
-  // counter part itu 0 sampai nanti diisi manual atau ada riwayat PM).
+  // Baseline buat Part yang belum pernah punya riwayat penggantian, lihat
+  // migration 1700000025000 & pmPartQueries.js. Bukan bagian requiredCols
+  // (kolomnya boleh tidak ada di file), tapi WAJIB terisi per baris untuk Part
+  // BARU - dicek di parsePreview (status error) dan di commitImport.
   tgl_pasang_awal: ['tanggal pasang awal', 'tgl pasang awal', 'tanggal pasang', 'install date', 'installation date'],
 };
 
-// Excel biasa nyimpen tanggal sebagai serial number (bukan string) kalau sel-nya
-// diformat sebagai Date - xlsx.utils.sheet_to_json({raw:true}) balikin serial
-// number itu apa adanya. Konversi ke 'YYYY-MM-DD' pakai epoch Excel (1899-12-30),
-// atau terima langsung kalau sel-nya berupa teks 'YYYY-MM-DD'/tanggal biasa.
 // Cek tanggal kalender beneran ada (tolak 2026-02-31 dst) tanpa Date lokal.
 function isRealDate(iso) {
   const [y, m, d] = iso.split('-').map(Number);
@@ -70,6 +65,10 @@ function isRealDate(iso) {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
 }
 
+// Excel biasa nyimpen tanggal sebagai serial number (bukan string) kalau sel-nya
+// diformat sebagai Date - xlsx.utils.sheet_to_json({raw:true}) balikin serial
+// number itu apa adanya. Konversi ke 'YYYY-MM-DD' pakai epoch Excel (1899-12-30),
+// atau terima langsung kalau sel-nya berupa teks 'YYYY-MM-DD' / 'DD/MM/YYYY'.
 function parseExcelDateCell(value) {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number') {
@@ -88,6 +87,17 @@ function parseExcelDateCell(value) {
     return isRealDate(iso) ? iso : null;
   }
   return null; // tidak dikenali / tanggal ngawur - caller (parsePreview) yang nge-flag jadi error baris
+}
+
+// Validasi otoritatif di server sebelum Tanggal Pasang Awal ditulis ke DB
+// (client bisa ngirim baris hasil edit). Dipakai di jalur create & update.
+function assertValidTglPasang(tgl) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(tgl) || !isRealDate(tgl)) {
+    throw new Error('Tanggal Pasang Awal tidak valid (harus YYYY-MM-DD)');
+  }
+  if (tgl > dateUtils.todayString()) {
+    throw new Error('Tanggal Pasang Awal tidak boleh di masa depan');
+  }
 }
 
 function normalizeHeader(h) {
@@ -273,9 +283,11 @@ async function parsePreview(fileBuffer) {
     const lineId = lineMap.get(row.line_no);
     row.line_exists = !!lineId;
     row.part_exists = false;
+    row.existing_tgl_pasang_awal = null; // tanggal yang SAAT INI tersimpan di sistem (buat info di preview)
     if (lineId) {
       const existingPart = await partQueries.findByLineJigAndDrawing(lineId, row.jig_name, row.drawing_no);
       row.part_exists = !!existingPart;
+      row.existing_tgl_pasang_awal = (existingPart && existingPart.tgl_pasang_awal) || null;
     }
     if (!row.part_exists && !row.tgl_pasang_awal) {
       row.errors.push('Tanggal Pasang Awal wajib diisi untuk Part baru');
@@ -309,14 +321,20 @@ async function parsePreview(fileBuffer) {
  * Baris dengan `include: false` dilewati (Admin uncheck di UI). Baris yang
  * gagal saat commit (row_errors) TIDAK menggagalkan baris lain — dijaga
  * pakai SAVEPOINT per baris di dalam 1 transaksi besar.
+ *
+ * Tanggal Pasang Awal untuk Part yang SUDAH ada: default cuma diisi kalau di
+ * sistem masih kosong (baseline yang sudah ada tidak dirusak import ulang
+ * file lama). Kalau `overwriteTglPasang` true, tanggal dari Excel juga
+ * menimpa tanggal yang sudah tersimpan (hanya baris yang tanggalnya beda).
  */
-async function commitImport(rows, userId) {
+async function commitImport(rows, userId, { overwriteTglPasang = false } = {}) {
   const candidateRows = (rows || []).filter((r) => r.include !== false);
 
   const result = {
     lines_created: 0,
     parts_created: 0,
     parts_updated: 0,
+    tgl_pasang_overwritten: 0,
     mappings_created: 0,
     mappings_skipped: 0,
     rows_skipped: 0,
@@ -373,11 +391,15 @@ async function commitImport(rows, userId) {
         if (existingPart) {
           partId = existingPart.id;
           const before = await partQueries.findRawById(partId, client);
-          // tgl_pasang_awal HANYA diupdate kalau Excel ngisi nilai baru DAN
-          // part-nya belum punya nilai tersimpan - sengaja TIDAK menimpa
-          // baseline yang sudah ada (misal admin re-import ulang file lama),
-          // beda dari part_name/target_shot yang boleh dikoreksi kapan saja.
-          const shouldUpdateTglPasang = row.tgl_pasang_awal && !before.tgl_pasang_awal;
+          // tgl_pasang_awal: default HANYA diisi kalau part-nya belum punya nilai
+          // tersimpan. Menimpa nilai yang sudah ada cuma kalau Admin secara
+          // eksplisit menyalakan overwriteTglPasang di preview.
+          const currentTgl = existingPart.tgl_pasang_awal || null;
+          const isFill = !!row.tgl_pasang_awal && !currentTgl;
+          const isOverwrite =
+            overwriteTglPasang && !!row.tgl_pasang_awal && !!currentTgl && currentTgl !== row.tgl_pasang_awal;
+          const shouldUpdateTglPasang = isFill || isOverwrite;
+          if (shouldUpdateTglPasang) assertValidTglPasang(row.tgl_pasang_awal);
           if (
             before.part_name !== row.part_name ||
             Number(before.target_shot) !== Number(row.target_shot) ||
@@ -393,6 +415,7 @@ async function commitImport(rows, userId) {
               client
             );
             result.parts_updated += 1;
+            if (isOverwrite) result.tgl_pasang_overwritten += 1;
             await recordAudit(
               { tableName: 'parts', recordId: partId, action: 'UPDATE', oldValue: before, newValue: updated, userId },
               client
@@ -406,12 +429,7 @@ async function commitImport(rows, userId) {
           if (!tglPasang) {
             throw new Error('Tanggal Pasang Awal wajib diisi untuk Part baru');
           }
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(tglPasang) || !isRealDate(tglPasang)) {
-            throw new Error('Tanggal Pasang Awal tidak valid (harus YYYY-MM-DD)');
-          }
-          if (tglPasang > dateUtils.todayString()) {
-            throw new Error('Tanggal Pasang Awal tidak boleh di masa depan');
-          }
+          assertValidTglPasang(tglPasang);
           const createdPart = await partQueries.create(
             {
               line_id: lineId,
