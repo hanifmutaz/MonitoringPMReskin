@@ -29,6 +29,10 @@ const settingsService = require('./settingsService');
 const pmLineHistoryService = require('./pmLineHistoryService');
 const dateUtils = require('../utils/dateUtils');
 const AppError = require('../utils/AppError');
+const db = require('../config/db');
+const { recordAudit } = require('../utils/auditLog');
+const pmMonthlyAccrualService = require('./pmMonthlyAccrualService');
+const pmWeeklyAccrualService = require('./pmWeeklyAccrualService');
 
 async function getThresholds() {
   const s = await settingsService.getSettings([
@@ -126,4 +130,68 @@ async function getPmLineStatus({ lineId }) {
   });
 }
 
-module.exports = { getPmLineStatus, computeLineStatus, getThresholds, statusFromRemainingDays };
+/**
+ * Admin koreksi "Tgl PM Monthly/Weekly Terakhir" langsung dari Monitoring.
+ * - Tulis ke pm_monthly_helper + audit log (tgl lama, tgl baru, alasan, siapa)
+ *   dalam SATU transaksi.
+ * - Setelah commit, poin akumulasi di-recompute dari baseline baru (job
+ *   accrual idempotent). Kalau ConMas belum dikonfigurasi/error, tanggal
+ *   tetap tersimpan tapi poin belum ikut - dilaporkan lewat `poin_recomputed`.
+ * - Riwayat PM (pm_monthly_history) TIDAK diubah; ini koreksi baseline.
+ */
+async function updateLastPmDate({ lineId, jenisPm, tgl, alasan, userId }) {
+  const client = await db.getClient();
+  let helperAfter;
+  try {
+    await client.query('BEGIN');
+
+    const line = await pmLineQueries.findLineById(lineId, client);
+    if (!line) throw AppError.notFound('Line tidak ditemukan');
+
+    await pmLineQueries.ensureHelperExists(lineId, client);
+    const helperBefore = await pmLineQueries.findHelperByLine(lineId, client);
+
+    const column = jenisPm === 'WEEKLY' ? 'tgl_pm_weekly_terakhir' : 'tgl_pm_monthly_terakhir';
+    const tglLama = dateUtils.formatDate(helperBefore[column]);
+    if (tglLama === tgl) {
+      throw AppError.badRequest('Validasi gagal', { tgl: 'Tanggal sama dengan yang sekarang' });
+    }
+
+    helperAfter = await pmLineQueries.updateHelper(lineId, { [column]: tgl }, client);
+
+    await recordAudit(
+      {
+        tableName: 'pm_monthly_helper',
+        recordId: lineId,
+        action: 'UPDATE',
+        oldValue: { [column]: tglLama },
+        newValue: { [column]: tgl },
+        userId,
+        actionDetail: `Koreksi ${column} Line ${line.line_name}: ${tglLama || '-'} -> ${tgl}. Alasan: ${alasan.trim()}`,
+      },
+      client
+    );
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  let recomputed = false;
+  try {
+    const accrual = jenisPm === 'WEEKLY' ? pmWeeklyAccrualService : pmMonthlyAccrualService;
+    const result = await accrual.recomputeAllLines();
+    recomputed = !result.skipped && !result.error;
+  } catch (err) {
+    recomputed = false;
+  }
+
+  const rows = await pmLineQueries.findAllStatus({ lineId });
+  const thresholds = await getThresholds();
+  return { ...computeLineStatus(rows[0] || helperAfter, thresholds), poin_recomputed: recomputed };
+}
+
+module.exports = { getPmLineStatus, computeLineStatus, getThresholds, statusFromRemainingDays, updateLastPmDate };

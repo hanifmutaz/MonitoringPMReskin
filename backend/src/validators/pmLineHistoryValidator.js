@@ -27,4 +27,27 @@ function validateCreatePmLineHistory(body) {
   return { valid: Object.keys(errors).length === 0, errors };
 }
 
-module.exports = { validateCreatePmLineHistory, JENIS_ENUM };
+// Admin edit langsung "Tgl PM Terakhir" di halaman Monitoring (koreksi data).
+// Alasan WAJIB karena perubahan ini nggak lewat riwayat PM, jadi cuma audit
+// log yang jadi jejaknya.
+function validateUpdateLastPmDate(body) {
+  const errors = {};
+
+  if (!body || !JENIS_ENUM.includes(body.jenis_pm)) {
+    errors.jenis_pm = `Jenis PM harus salah satu dari: ${JENIS_ENUM.join(', ')}`;
+  }
+  if (!body || typeof body.tgl !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.tgl)) {
+    errors.tgl = 'Tanggal wajib diisi format YYYY-MM-DD';
+  } else if (body.tgl > dateUtils.todayString()) {
+    errors.tgl = 'Tanggal tidak boleh di masa depan';
+  }
+  if (!body || typeof body.alasan !== 'string' || body.alasan.trim().length < 5) {
+    errors.alasan = 'Alasan wajib diisi (minimal 5 karakter)';
+  } else if (body.alasan.length > 500) {
+    errors.alasan = 'Alasan maksimal 500 karakter';
+  }
+
+  return { valid: Object.keys(errors).length === 0, errors };
+}
+
+module.exports = { validateCreatePmLineHistory, validateUpdateLastPmDate, JENIS_ENUM };

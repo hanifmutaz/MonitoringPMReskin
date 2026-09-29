@@ -25,6 +25,8 @@ import { usePmLineStatus } from '../hooks/usePmLineStatus';
 import buildPmLineColumns from '../components/pm-line/pmLineColumns';
 import Banner from '../components/Banner';
 import PmLineHistoryForm from '../components/pm-line/PmLineHistoryForm';
+import PmLineEditDateForm from '../components/pm-line/PmLineEditDateForm';
+import { useAuth } from '../contexts/AuthContext';
 import { DataTable } from '../components/data-display/DataTable';
 import { EmptyState } from '../components/ui/empty-state';
 import { Button } from '../components/ui/button';
@@ -33,6 +35,9 @@ function PmLineStatusPage() {
   usePageHeader({ title: 'Monitoring PM Monthly and Weekly' });
 
   const { data, isLoading, isFetching, isError } = usePmLineStatus({});
+  const { hasPermission } = useAuth();
+  const canEditDate = hasPermission('pm_line.edit_date'); // efektifnya Admin ('*')
+  const [editDateTarget, setEditDateTarget] = useState(null); // { line, jenisPm }
   const [inputTarget, setInputTarget] = useState(null); // { line, jenisPm }
   // Modal "Input PM" TANPA preset - dipindah kesini dari menu Sidebar
   // (sebelumnya halaman /pm-line/form terpisah, diminta lewat chat). Form
@@ -43,6 +48,9 @@ function PmLineStatusPage() {
   const columns = buildPmLineColumns({
     onInputMonthly: (line) => setInputTarget({ line, jenisPm: 'MONTHLY' }),
     onInputWeekly: (line) => setInputTarget({ line, jenisPm: 'WEEKLY' }),
+    canEditDate,
+    onEditMonthlyDate: (line) => setEditDateTarget({ line, jenisPm: 'MONTHLY' }),
+    onEditWeeklyDate: (line) => setEditDateTarget({ line, jenisPm: 'WEEKLY' }),
   });
 
   // BUGFIX (iPad): form "Input PM" sebelumnya dibuka via Modal (Dialog)
@@ -104,6 +112,16 @@ function PmLineStatusPage() {
             onSuccess={closeAllForms}
           />
         </div>
+      )}
+
+      {editDateTarget && (
+        <PmLineEditDateForm
+          key={`${editDateTarget.line.line_id}-${editDateTarget.jenisPm}`}
+          line={editDateTarget.line}
+          jenisPm={editDateTarget.jenisPm}
+          onCancel={() => setEditDateTarget(null)}
+          onSuccess={() => setEditDateTarget(null)}
+        />
       )}
 
       <DataTable

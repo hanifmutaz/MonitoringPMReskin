@@ -8,6 +8,7 @@
 //   OnTimeBadge/StatusBadge (dot + bg-dim + text mono) - bukan gaya baru.
 import StatusBadge from '../data-display/StatusBadge';
 import { Button } from '../ui/button';
+import { Pencil } from 'lucide-react';
 import { formatDate } from '../../utils/formatDate';
 
 function ketepatanTone(percentage) {
@@ -47,7 +48,26 @@ function StatusWithKetepatan({ status, percentage }) {
   );
 }
 
-function buildPmLineColumns({ onInputMonthly, onInputWeekly }) {
+function DateWithEdit({ value, canEdit, onEdit, label }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 font-[var(--font-mono)] text-[13px]">
+      {formatDate(value)}
+      {canEdit && (
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label={label}
+          title={label}
+          className="rounded p-0.5 text-[var(--text-faint)] hover:bg-[var(--panel-3)] hover:text-foreground"
+        >
+          <Pencil size={12} />
+        </button>
+      )}
+    </span>
+  );
+}
+
+function buildPmLineColumns({ onInputMonthly, onInputWeekly, canEditDate = false, onEditMonthlyDate, onEditWeeklyDate }) {
   return [
     {
       key: 'line',
@@ -57,7 +77,14 @@ function buildPmLineColumns({ onInputMonthly, onInputWeekly }) {
     {
       key: 'tgl_monthly',
       header: 'Tgl Monthly Terakhir',
-      render: (line) => <span className="font-[var(--font-mono)] text-[13px]">{formatDate(line.tgl_pm_monthly_terakhir)}</span>,
+      render: (line) => (
+        <DateWithEdit
+          value={line.tgl_pm_monthly_terakhir}
+          canEdit={canEditDate}
+          onEdit={() => onEditMonthlyDate?.(line)}
+          label="Koreksi tanggal Monthly"
+        />
+      ),
     },
     {
       key: 'poin_monthly',
@@ -77,7 +104,14 @@ function buildPmLineColumns({ onInputMonthly, onInputWeekly }) {
     {
       key: 'tgl_weekly',
       header: 'Tgl Weekly Terakhir',
-      render: (line) => <span className="font-[var(--font-mono)] text-[13px]">{formatDate(line.tgl_pm_weekly_terakhir)}</span>,
+      render: (line) => (
+        <DateWithEdit
+          value={line.tgl_pm_weekly_terakhir}
+          canEdit={canEditDate}
+          onEdit={() => onEditWeeklyDate?.(line)}
+          label="Koreksi tanggal Weekly"
+        />
+      ),
     },
     {
       key: 'poin_weekly',
