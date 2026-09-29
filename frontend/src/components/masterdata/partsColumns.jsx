@@ -11,6 +11,13 @@
 import { Link2, Truck, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '../ui/button';
 
+// 'YYYY-MM-DD' (string dari API, sengaja tanpa parse Date biar tidak geser timezone) -> 'DD/MM/YYYY'.
+function formatTglPasang(value) {
+  if (!value) return null;
+  const [y, m, d] = String(value).slice(0, 10).split('-');
+  return y && m && d ? `${d}/${m}/${y}` : null;
+}
+
 function buildPartsColumns({ onClMapping, onSupplier, onEdit, onDelete }) {
   return [
     {
@@ -44,6 +51,23 @@ function buildPartsColumns({ onClMapping, onSupplier, onEdit, onDelete }) {
       header: 'Target Shot',
       align: 'right',
       render: (part) => <span className="font-[var(--font-mono)] text-[13px]">{part.target_shot.toLocaleString('id-ID')}</span>,
+    },
+    {
+      key: 'tgl_pasang_awal',
+      header: 'Tgl Pasang Awal',
+      render: (part) => {
+        const tgl = formatTglPasang(part.tgl_pasang_awal);
+        return tgl ? (
+          <span className="font-[var(--font-mono)] text-[13px]">{tgl}</span>
+        ) : (
+          <span
+            className="text-xs text-[var(--text-faint)]"
+            title="Belum diisi. Opsional untuk Part yang sudah punya riwayat penggantian, tapi Part yang belum pernah diganti butuh ini supaya Counter/Sisa Shot terhitung."
+          >
+            Belum diisi
+          </span>
+        );
+      },
     },
     {
       key: 'cl_count',
