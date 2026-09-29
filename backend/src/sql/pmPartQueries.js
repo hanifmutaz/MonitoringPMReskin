@@ -27,12 +27,35 @@ function buildCounterCte(filteredPartsSelect) {
     WHERE h.deleted_at IS NULL
     GROUP BY h.part_id
   ),
-  -- Baseline mulai hitung Counter: pakai riwayat penggantian terakhir kalau
-  -- ADA, atau fallback ke tgl_pasang_awal Part kalau BELUM PERNAH diganti
-  -- sama sekali (lihat migration 1700000025000 - tanpa ini, Part orisinal
-  -- counter-nya nyangkut 0 selamanya karena tidak ada baseline sama sekali).
+  -- Baseline mulai hitung Counter. Dua mode:
+  --  (a) MODE OFFSET (counter_awal): Part punya counter_awal_tanggal DAN belum
+  --      ada riwayat penggantian SESUDAH tanggal itu. Counter = counter_awal +
+  --      produksi dengan tanggal > counter_awal_tanggal (counter_awal dianggap
+  --      posisi akhir hari cutoff, jadi hari cutoff sendiri TIDAK dihitung lagi
+  --      supaya tidak dobel). Lihat migration 1700000026000.
+  --  (b) MODE LAMA: MAX(tgl_ganti) kalau ADA riwayat, atau fallback ke
+  --      tgl_pasang_awal kalau BELUM PERNAH diganti (migration 1700000025000).
+  --      Produksi dihitung tanggal >= baseline (perilaku lama, tidak diubah).
+  -- count_from = tanggal pertama produksi yang ikut dijumlahkan.
+  -- usage_start_date = titik awal buat hitung Pemakaian/Hari (tanpa counter_awal).
   part_baseline AS (
-    SELECT fp.id AS part_id, COALESCE(plg.last_tgl_ganti, fp.tgl_pasang_awal) AS baseline_date
+    SELECT
+      fp.id AS part_id,
+      COALESCE(plg.last_tgl_ganti, fp.tgl_pasang_awal) AS baseline_date,
+      (fp.counter_awal_tanggal IS NOT NULL
+        AND (plg.last_tgl_ganti IS NULL OR plg.last_tgl_ganti <= fp.counter_awal_tanggal)) AS use_offset,
+      CASE
+        WHEN fp.counter_awal_tanggal IS NOT NULL
+         AND (plg.last_tgl_ganti IS NULL OR plg.last_tgl_ganti <= fp.counter_awal_tanggal)
+          THEN fp.counter_awal_tanggal + 1
+        ELSE COALESCE(plg.last_tgl_ganti, fp.tgl_pasang_awal)
+      END AS count_from,
+      CASE
+        WHEN fp.counter_awal_tanggal IS NOT NULL
+         AND (plg.last_tgl_ganti IS NULL OR plg.last_tgl_ganti <= fp.counter_awal_tanggal)
+          THEN fp.counter_awal_tanggal
+        ELSE COALESCE(plg.last_tgl_ganti, fp.tgl_pasang_awal)
+      END AS usage_start_date
     FROM filtered_parts fp
     LEFT JOIN part_last_ganti plg ON plg.part_id = fp.id
   ),
@@ -40,11 +63,11 @@ function buildCounterCte(filteredPartsSelect) {
     SELECT m.part_id, COALESCE(SUM(pc.output_actual), 0) AS counter
     FROM part_cl_mapping m
     JOIN filtered_parts fp ON fp.id = m.part_id
-    JOIN part_baseline pb ON pb.part_id = m.part_id AND pb.baseline_date IS NOT NULL
+    JOIN part_baseline pb ON pb.part_id = m.part_id AND pb.count_from IS NOT NULL
     JOIN production_cache pc
       ON pc.line_id = fp.line_id
      AND pc.cl_no = m.cl_no
-     AND pc.tanggal >= pb.baseline_date
+     AND pc.tanggal >= pb.count_from
     GROUP BY m.part_id
   )
   `;
@@ -53,7 +76,12 @@ function buildCounterCte(filteredPartsSelect) {
 const FINAL_SELECT = `
   SELECT
     fp.id AS part_id, fp.line_id, l.line_name, fp.jig_name, fp.drawing_no, fp.part_name, fp.target_shot,
-    COALESCE(pcnt.counter, 0) AS counter,
+    -- counter = produksi sejak count_from + counter_awal (hanya mode offset).
+    -- counter_awal_applied & usage_start_date dipakai computeMetrics supaya
+    -- Pemakaian/Hari dihitung dari produksi nyata saja (bukan dari offset).
+    COALESCE(pcnt.counter, 0) + CASE WHEN pb.use_offset THEN COALESCE(fp.counter_awal, 0) ELSE 0 END AS counter,
+    CASE WHEN pb.use_offset THEN COALESCE(fp.counter_awal, 0) ELSE 0 END AS counter_awal_applied,
+    pb.usage_start_date,
     -- last_tgl_ganti di response TETAP pakai nama ini (bukan diganti jadi
     -- "baseline_date") supaya pmPartService.computeMetrics() dan field API
     -- yang sudah ada (last_tgl_ganti) tidak perlu berubah - nilainya SEKARANG
@@ -91,7 +119,8 @@ async function findAllWithCounter({ lineId, search, limit, offset } = {}, runner
   }
 
   const filteredPartsSelect = `
-    SELECT p.id, p.line_id, p.jig_name, p.drawing_no, p.part_name, p.target_shot, p.tgl_pasang_awal
+    SELECT p.id, p.line_id, p.jig_name, p.drawing_no, p.part_name, p.target_shot, p.tgl_pasang_awal,
+           p.counter_awal, p.counter_awal_tanggal
     FROM parts p
     ${where}
   `;
@@ -135,7 +164,8 @@ async function countAll({ lineId, search } = {}, runner = db) {
  */
 async function findOneWithCounter(partId, runner = db) {
   const filteredPartsSelect = `
-    SELECT p.id, p.line_id, p.jig_name, p.drawing_no, p.part_name, p.target_shot, p.tgl_pasang_awal
+    SELECT p.id, p.line_id, p.jig_name, p.drawing_no, p.part_name, p.target_shot, p.tgl_pasang_awal,
+           p.counter_awal, p.counter_awal_tanggal
     FROM parts p
     WHERE p.id = $1
   `;

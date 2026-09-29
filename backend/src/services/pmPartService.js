@@ -2,6 +2,7 @@
 //
 // Implementasi formula MASTER DOCUMENT Bagian 2.A — TIDAK DIUBAH:
 //   1. Counter Saat Ini   = SUM cross-CL sejak Tgl Pasang Terakhir (SQL layer)
+//                           (+ counter_awal kalau Part pakai offset awal monitoring)
 //   2. Sisa Shot          = Target Shot - Counter Saat Ini
 //   3. Pemakaian/Hari     = rata-rata gabungan Output Actual per hari
 //                           (diturunkan dari Counter / jumlah hari sejak
@@ -29,9 +30,16 @@ function computeMetrics(row, thresholds) {
   const counter = Number(row.counter);
   const remainingShot = targetShot - counter;
 
-  const daysSinceInstall = dateUtils.daysSince(row.last_tgl_ganti);
+  // Pemakaian/Hari dihitung dari produksi NYATA saja. Kalau Part pakai
+  // counter_awal (offset posisi awal saat mulai monitoring), offset itu
+  // dikeluarkan dulu dan hari dihitung sejak counter_awal_tanggal
+  // (row.usage_start_date), supaya usage/hari tidak membengkak oleh shot lama.
+  // Row tanpa field baru (mis. test lama) tetap jalan: offset 0, hari dari last_tgl_ganti.
+  const counterAwalApplied = Number(row.counter_awal_applied) || 0;
+  const usageCounter = counter - counterAwalApplied;
+  const daysSinceInstall = dateUtils.daysSince(row.usage_start_date || row.last_tgl_ganti);
   const usagePerDay =
-    daysSinceInstall && daysSinceInstall > 0 ? counter / daysSinceInstall : 0;
+    daysSinceInstall && daysSinceInstall > 0 ? usageCounter / daysSinceInstall : 0;
 
   let status = 'OK';
   let estimatedPmDate = null;
@@ -60,6 +68,7 @@ function computeMetrics(row, thresholds) {
     drawing_no: row.drawing_no,
     part_name: row.part_name,
     counter,
+    counter_awal: counterAwalApplied,
     target_shot: targetShot,
     remaining_shot: remainingShot,
     usage_per_day: Math.round(usagePerDay * 100) / 100,

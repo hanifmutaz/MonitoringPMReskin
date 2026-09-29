@@ -56,6 +56,11 @@ const HEADER_ALIASES = {
   // (kolomnya boleh tidak ada di file), tapi WAJIB terisi per baris untuk Part
   // BARU - dicek di parsePreview (status error) dan di commitImport.
   tgl_pasang_awal: ['tanggal pasang awal', 'tgl pasang awal', 'tanggal pasang', 'install date', 'installation date'],
+  // Posisi shot awal saat mulai monitoring (migration 1700000026000). Selalu
+  // berpasangan: Counter Awal = shot terpakai per AKHIR HARI Tanggal Counter
+  // Awal; produksi dihitung otomatis mulai hari sesudahnya. Opsional di file.
+  counter_awal: ['counter awal', 'shot awal', 'counter awal (shot)'],
+  counter_awal_tanggal: ['tanggal counter awal', 'tgl counter awal', 'counter awal tanggal', 'tanggal cutoff'],
 };
 
 // Cek tanggal kalender beneran ada (tolak 2026-02-31 dst) tanpa Date lokal.
@@ -97,6 +102,19 @@ function assertValidTglPasang(tgl) {
   }
   if (tgl > dateUtils.todayString()) {
     throw new Error('Tanggal Pasang Awal tidak boleh di masa depan');
+  }
+}
+
+// Validasi otoritatif di server buat pasangan Counter Awal (jalur create & update).
+function assertValidCounterAwal(counterAwal, tanggal) {
+  if (!Number.isInteger(counterAwal) || counterAwal < 0) {
+    throw new Error('Counter Awal harus bilangan bulat >= 0');
+  }
+  if (typeof tanggal !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(tanggal) || !isRealDate(tanggal)) {
+    throw new Error('Tanggal Counter Awal tidak valid (harus YYYY-MM-DD)');
+  }
+  if (tanggal > dateUtils.todayString()) {
+    throw new Error('Tanggal Counter Awal tidak boleh di masa depan');
   }
 }
 
@@ -189,6 +207,13 @@ async function parsePreview(fileBuffer) {
     const pemakaianHariExcel = colMap.pemakaian_hari !== undefined ? r[colMap.pemakaian_hari] : null;
     const tglPasangAwalRaw = colMap.tgl_pasang_awal !== undefined ? r[colMap.tgl_pasang_awal] : null;
     const tglPasangAwal = parseExcelDateCell(tglPasangAwalRaw);
+    const counterAwalRaw = colMap.counter_awal !== undefined ? r[colMap.counter_awal] : null;
+    const counterAwalTglRaw = colMap.counter_awal_tanggal !== undefined ? r[colMap.counter_awal_tanggal] : null;
+    const counterAwalFilled = counterAwalRaw !== null && counterAwalRaw !== undefined && String(counterAwalRaw).trim() !== '';
+    const counterAwalNum = counterAwalFilled ? Number(String(counterAwalRaw).replace(/[.,\s]/g, '')) : null;
+    const counterAwalTgl = parseExcelDateCell(counterAwalTglRaw);
+    const counterAwalTglFilled =
+      counterAwalTglRaw !== null && counterAwalTglRaw !== undefined && String(counterAwalTglRaw).trim() !== '';
 
     const { original, cleaned, wasAutoCleaned } = autoCleanDrawingNo(r[colMap.drawing_no]);
 
@@ -205,6 +230,14 @@ async function parsePreview(fileBuffer) {
     } else if (tglPasangAwal && tglPasangAwal > dateUtils.todayString()) {
       errors.push('Tanggal Pasang Awal tidak boleh di masa depan');
     }
+    if (counterAwalFilled && (!Number.isInteger(counterAwalNum) || counterAwalNum < 0)) {
+      errors.push('Counter Awal harus bilangan bulat >= 0');
+    }
+    if (counterAwalTglFilled && !counterAwalTgl) {
+      errors.push('Tanggal Counter Awal tidak valid (pakai YYYY-MM-DD atau DD/MM/YYYY)');
+    } else if (counterAwalTgl && counterAwalTgl > dateUtils.todayString()) {
+      errors.push('Tanggal Counter Awal tidak boleh di masa depan');
+    }
 
     return {
       row_number: headerIdx + 2 + i, // nomor baris asli Excel (1-based + header)
@@ -219,6 +252,8 @@ async function parsePreview(fileBuffer) {
       target_shot: Number.isFinite(targetShot) ? targetShot : null,
       pemakaian_hari_excel: pemakaianHariExcel,
       tgl_pasang_awal: tglPasangAwal,
+      counter_awal: counterAwalFilled && Number.isInteger(counterAwalNum) ? counterAwalNum : null,
+      counter_awal_tanggal: counterAwalTgl,
       errors,
     };
   });
@@ -258,6 +293,32 @@ async function parsePreview(fileBuffer) {
       const [onlyDate] = distinctTglPasang;
       for (const r of groupRows) r.tgl_pasang_awal = onlyDate;
     }
+    // Counter Awal + tanggalnya: 1 nilai per Part fisik, sama pola dengan
+    // tgl_pasang_awal (cuma 1 baris CL yang perlu ngisi, sisanya ikut). Angka 0
+    // adalah nilai sah, jadi cek pakai != null (bukan truthy).
+    const distinctCounterAwal = new Set(groupRows.map((r) => r.counter_awal).filter((v) => v !== null));
+    const distinctCounterTgl = new Set(groupRows.map((r) => r.counter_awal_tanggal).filter(Boolean));
+    if (distinctCounterAwal.size === 1) {
+      const [onlyVal] = distinctCounterAwal;
+      for (const r of groupRows) r.counter_awal = onlyVal;
+    }
+    if (distinctCounterTgl.size === 1) {
+      const [onlyTgl] = distinctCounterTgl;
+      for (const r of groupRows) r.counter_awal_tanggal = onlyTgl;
+    }
+    if (distinctCounterAwal.size > 1 || distinctCounterTgl.size > 1) {
+      const rowNums = groupRows.map((r) => r.row_number).join(', ');
+      for (const r of groupRows) {
+        r.errors.push(
+          `Counter Awal/Tanggal Counter Awal tidak konsisten untuk Drawing No yang sama (baris: ${rowNums}) - samakan dulu sebelum commit`
+        );
+      }
+    } else if ((distinctCounterAwal.size === 1) !== (distinctCounterTgl.size === 1)) {
+      // Harus berpasangan: angka tanpa tanggal cutoff (atau sebaliknya) tidak bisa dipakai.
+      for (const r of groupRows) {
+        r.errors.push('Counter Awal dan Tanggal Counter Awal harus diisi berpasangan');
+      }
+    }
     if (distinctNames.size > 1 || distinctShots.size > 1 || distinctTglPasang.size > 1) {
       const rowNums = groupRows.map((r) => r.row_number).join(', ');
       for (const r of groupRows) {
@@ -284,13 +345,20 @@ async function parsePreview(fileBuffer) {
     row.line_exists = !!lineId;
     row.part_exists = false;
     row.existing_tgl_pasang_awal = null; // tanggal yang SAAT INI tersimpan di sistem (buat info di preview)
+    row.existing_counter_awal = null; // Counter Awal yang SAAT INI tersimpan (null = belum ada)
+    row.existing_counter_awal_tanggal = null;
     if (lineId) {
       const existingPart = await partQueries.findByLineJigAndDrawing(lineId, row.jig_name, row.drawing_no);
       row.part_exists = !!existingPart;
       row.existing_tgl_pasang_awal = (existingPart && existingPart.tgl_pasang_awal) || null;
+      if (existingPart && existingPart.counter_awal_tanggal) {
+        row.existing_counter_awal = Number(existingPart.counter_awal);
+        row.existing_counter_awal_tanggal = existingPart.counter_awal_tanggal;
+      }
     }
-    if (!row.part_exists && !row.tgl_pasang_awal) {
-      row.errors.push('Tanggal Pasang Awal wajib diisi untuk Part baru');
+    const punyaCounterAwal = row.counter_awal !== null && !!row.counter_awal_tanggal;
+    if (!row.part_exists && !row.tgl_pasang_awal && !punyaCounterAwal) {
+      row.errors.push('Part baru wajib punya Tanggal Pasang Awal, atau Counter Awal + Tanggal Counter Awal');
       row.status = 'error';
       continue;
     }
@@ -326,8 +394,12 @@ async function parsePreview(fileBuffer) {
  * sistem masih kosong (baseline yang sudah ada tidak dirusak import ulang
  * file lama). Kalau `overwriteTglPasang` true, tanggal dari Excel juga
  * menimpa tanggal yang sudah tersimpan (hanya baris yang tanggalnya beda).
+ *
+ * Counter Awal (+ tanggalnya) untuk Part yang SUDAH ada: pola sama - default
+ * cuma diisi kalau di sistem masih kosong; `overwriteCounterAwal` true buat
+ * menimpa pasangan yang sudah tersimpan kalau nilainya beda.
  */
-async function commitImport(rows, userId, { overwriteTglPasang = false } = {}) {
+async function commitImport(rows, userId, { overwriteTglPasang = false, overwriteCounterAwal = false } = {}) {
   const candidateRows = (rows || []).filter((r) => r.include !== false);
 
   const result = {
@@ -335,6 +407,7 @@ async function commitImport(rows, userId, { overwriteTglPasang = false } = {}) {
     parts_created: 0,
     parts_updated: 0,
     tgl_pasang_overwritten: 0,
+    counter_awal_overwritten: 0,
     mappings_created: 0,
     mappings_skipped: 0,
     rows_skipped: 0,
@@ -354,6 +427,14 @@ async function commitImport(rows, userId, { overwriteTglPasang = false } = {}) {
     for (const r of candidateRows) {
       const gk = `${r.line_no}|${r.jig_name}|${r.drawing_no}`;
       if (r.tgl_pasang_awal && !groupTglPasang.has(gk)) groupTglPasang.set(gk, r.tgl_pasang_awal);
+    }
+    // Sama untuk pasangan Counter Awal - ambil dari baris pertama yang lengkap (angka 0 sah).
+    const groupCounterAwal = new Map();
+    for (const r of candidateRows) {
+      const gk = `${r.line_no}|${r.jig_name}|${r.drawing_no}`;
+      if (r.counter_awal !== null && r.counter_awal !== undefined && r.counter_awal_tanggal && !groupCounterAwal.has(gk)) {
+        groupCounterAwal.set(gk, { counter_awal: Number(r.counter_awal), counter_awal_tanggal: r.counter_awal_tanggal });
+      }
     }
 
     for (let idx = 0; idx < candidateRows.length; idx++) {
@@ -400,10 +481,28 @@ async function commitImport(rows, userId, { overwriteTglPasang = false } = {}) {
             overwriteTglPasang && !!row.tgl_pasang_awal && !!currentTgl && currentTgl !== row.tgl_pasang_awal;
           const shouldUpdateTglPasang = isFill || isOverwrite;
           if (shouldUpdateTglPasang) assertValidTglPasang(row.tgl_pasang_awal);
+
+          // Counter Awal: isi kalau kosong di sistem; timpa hanya kalau diminta & beda.
+          const rowCounter =
+            row.counter_awal !== null && row.counter_awal !== undefined && row.counter_awal_tanggal
+              ? { counter_awal: Number(row.counter_awal), counter_awal_tanggal: row.counter_awal_tanggal }
+              : groupCounterAwal.get(`${row.line_no}|${row.jig_name}|${row.drawing_no}`) || null;
+          const currentCounterTgl = existingPart.counter_awal_tanggal || null;
+          const isCounterFill = !!rowCounter && !currentCounterTgl;
+          const isCounterOverwrite =
+            overwriteCounterAwal &&
+            !!rowCounter &&
+            !!currentCounterTgl &&
+            (Number(existingPart.counter_awal) !== rowCounter.counter_awal ||
+              currentCounterTgl !== rowCounter.counter_awal_tanggal);
+          const shouldUpdateCounterAwal = isCounterFill || isCounterOverwrite;
+          if (shouldUpdateCounterAwal) assertValidCounterAwal(rowCounter.counter_awal, rowCounter.counter_awal_tanggal);
+
           if (
             before.part_name !== row.part_name ||
             Number(before.target_shot) !== Number(row.target_shot) ||
-            shouldUpdateTglPasang
+            shouldUpdateTglPasang ||
+            shouldUpdateCounterAwal
           ) {
             const updated = await partQueries.update(
               partId,
@@ -411,11 +510,15 @@ async function commitImport(rows, userId, { overwriteTglPasang = false } = {}) {
                 part_name: row.part_name,
                 target_shot: Number(row.target_shot),
                 ...(shouldUpdateTglPasang ? { tgl_pasang_awal: row.tgl_pasang_awal } : {}),
+                ...(shouldUpdateCounterAwal
+                  ? { counter_awal: rowCounter.counter_awal, counter_awal_tanggal: rowCounter.counter_awal_tanggal }
+                  : {}),
               },
               client
             );
             result.parts_updated += 1;
             if (isOverwrite) result.tgl_pasang_overwritten += 1;
+            if (isCounterOverwrite) result.counter_awal_overwritten += 1;
             await recordAudit(
               { tableName: 'parts', recordId: partId, action: 'UPDATE', oldValue: before, newValue: updated, userId },
               client
@@ -426,10 +529,15 @@ async function commitImport(rows, userId, { overwriteTglPasang = false } = {}) {
           // server - client bisa saja ngirim row hasil edit yang sudah dikosongkan).
           const tglPasang =
             row.tgl_pasang_awal || groupTglPasang.get(`${row.line_no}|${row.jig_name}|${row.drawing_no}`) || null;
-          if (!tglPasang) {
-            throw new Error('Tanggal Pasang Awal wajib diisi untuk Part baru');
+          const newCounter =
+            row.counter_awal !== null && row.counter_awal !== undefined && row.counter_awal_tanggal
+              ? { counter_awal: Number(row.counter_awal), counter_awal_tanggal: row.counter_awal_tanggal }
+              : groupCounterAwal.get(`${row.line_no}|${row.jig_name}|${row.drawing_no}`) || null;
+          if (!tglPasang && !newCounter) {
+            throw new Error('Part baru wajib punya Tanggal Pasang Awal, atau Counter Awal + Tanggal Counter Awal');
           }
-          assertValidTglPasang(tglPasang);
+          if (tglPasang) assertValidTglPasang(tglPasang);
+          if (newCounter) assertValidCounterAwal(newCounter.counter_awal, newCounter.counter_awal_tanggal);
           const createdPart = await partQueries.create(
             {
               line_id: lineId,
@@ -438,6 +546,8 @@ async function commitImport(rows, userId, { overwriteTglPasang = false } = {}) {
               part_name: row.part_name,
               target_shot: Number(row.target_shot),
               tgl_pasang_awal: tglPasang,
+              counter_awal: newCounter ? newCounter.counter_awal : null,
+              counter_awal_tanggal: newCounter ? newCounter.counter_awal_tanggal : null,
             },
             client
           );

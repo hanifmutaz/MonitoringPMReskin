@@ -11,6 +11,9 @@ function validateCommitPayload(body) {
   if (body.overwriteTglPasang !== undefined && typeof body.overwriteTglPasang !== 'boolean') {
     errors.overwriteTglPasang = 'overwriteTglPasang harus boolean';
   }
+  if (body.overwriteCounterAwal !== undefined && typeof body.overwriteCounterAwal !== 'boolean') {
+    errors.overwriteCounterAwal = 'overwriteCounterAwal harus boolean';
+  }
 
   body.rows.forEach((row, idx) => {
     if (row.include === false) return; // baris yang di-uncheck Admin, tidak divalidasi

@@ -62,6 +62,8 @@ const emptyForm = {
   part_name: '',
   target_shot: '',
   tgl_pasang_awal: '',
+  counter_awal: '',
+  counter_awal_tanggal: '',
   spare_part_number: '',
   spare_part_qty: '',
   spare_part_location: '',
@@ -79,6 +81,8 @@ function PartFormModal({ initial, lines, onClose }) {
           part_name: initial.part_name,
           target_shot: initial.target_shot,
           tgl_pasang_awal: initial.tgl_pasang_awal || '',
+          counter_awal: initial.counter_awal != null ? String(initial.counter_awal) : '',
+          counter_awal_tanggal: initial.counter_awal_tanggal || '',
           spare_part_number: initial.spare_part_number || '',
           spare_part_qty: initial.spare_part_qty ?? '',
           spare_part_location: initial.spare_part_location || '',
@@ -93,7 +97,21 @@ function PartFormModal({ initial, lines, onClose }) {
   async function handleSubmit(e) {
     e.preventDefault();
     setErrors({});
+    // Counter Awal + tanggalnya berpasangan. Saat edit dan dua-duanya dikosongkan
+    // (padahal sebelumnya terisi) kirim null berpasangan supaya nilainya terhapus;
+    // selain itu kirim hanya kalau diisi.
+    const counterFilled = form.counter_awal !== '' || form.counter_awal_tanggal !== '';
+    const hadCounter = isEdit && initial.counter_awal_tanggal;
+    const counterPayload = counterFilled
+      ? {
+          counter_awal: form.counter_awal === '' ? undefined : Number(form.counter_awal),
+          counter_awal_tanggal: form.counter_awal_tanggal || undefined,
+        }
+      : hadCounter
+        ? { counter_awal: null, counter_awal_tanggal: null }
+        : {};
     const payload = {
+      ...counterPayload,
       line_id: Number(form.line_id),
       jig_name: form.jig_name,
       drawing_no: form.drawing_no,
@@ -177,16 +195,16 @@ function PartFormModal({ initial, lines, onClose }) {
             {errors.target_shot && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.target_shot}</p>}
           </div>
           <div>
-            <Label className="mb-1.5">Tanggal Pasang Awal{!isEdit && ' *'}</Label>
+            <Label className="mb-1.5">Tanggal Pasang Awal{!isEdit && form.counter_awal === '' && ' *'}</Label>
             <Input
               type="date"
-              required={!isEdit}
+              required={!isEdit && form.counter_awal === ''}
               value={form.tgl_pasang_awal}
               max={todayString()}
               onChange={(e) => setForm({ ...form, tgl_pasang_awal: e.target.value })}
             />
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {isEdit ? 'Opsional saat edit. ' : 'Wajib untuk Part baru. '}
+              {isEdit ? 'Opsional saat edit. ' : 'Wajib untuk Part baru (kecuali Counter Awal diisi). '}
               Tanggal Part ini pertama kali dipasang di mesin (bukan tanggal input data) — jadi baseline sistem mulai
               menghitung Counter/Sisa Shot. Kalau sudah pernah diganti, riwayat penggantian terakhir yang dipakai
               duluan.
@@ -195,6 +213,36 @@ function PartFormModal({ initial, lines, onClose }) {
               <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.tgl_pasang_awal}</p>
             )}
           </div>
+
+          <div>
+            <Label className="mb-1.5">Counter Awal (shot)</Label>
+            <Input
+              type="number"
+              min={0}
+              className="text-right font-[var(--font-mono)]"
+              value={form.counter_awal}
+              onChange={(e) => setForm({ ...form, counter_awal: e.target.value })}
+            />
+            {errors.counter_awal && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.counter_awal}</p>}
+          </div>
+          <div>
+            <Label className="mb-1.5">Tanggal Counter Awal</Label>
+            <Input
+              type="date"
+              required={form.counter_awal !== ''}
+              value={form.counter_awal_tanggal}
+              max={todayString()}
+              onChange={(e) => setForm({ ...form, counter_awal_tanggal: e.target.value })}
+            />
+            {errors.counter_awal_tanggal && (
+              <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.counter_awal_tanggal}</p>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground sm:col-span-2">
+            Opsional, untuk Part yang sudah berjalan dan tanggal pasangnya tidak pasti. Counter Awal = shot yang sudah
+            terpakai per <em>akhir hari</em> Tanggal Counter Awal; produksi dihitung otomatis mulai hari berikutnya.
+            Diisi berpasangan. Berhenti dipakai begitu ada riwayat PM sesudah tanggal itu.
+          </p>
 
           <div className="border-t border-[var(--border-soft)] pt-3 sm:col-span-2">
             <span className="text-xs text-muted-foreground">

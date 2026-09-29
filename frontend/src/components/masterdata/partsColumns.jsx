@@ -70,6 +70,23 @@ function buildPartsColumns({ onClMapping, onSupplier, onEdit, onDelete }) {
       },
     },
     {
+      key: 'counter_awal',
+      header: 'Counter Awal',
+      align: 'right',
+      render: (part) => {
+        const tgl = formatTglPasang(part.counter_awal_tanggal);
+        if (part.counter_awal == null || !tgl) {
+          return <span className="text-xs text-[var(--text-faint)]">-</span>;
+        }
+        return (
+          <>
+            <div className="font-[var(--font-mono)] text-[13px]">{Number(part.counter_awal).toLocaleString('id-ID')}</div>
+            <div className="text-[10px] text-[var(--text-faint)]">per {tgl}</div>
+          </>
+        );
+      },
+    },
+    {
       key: 'cl_count',
       header: 'CL',
       align: 'center',

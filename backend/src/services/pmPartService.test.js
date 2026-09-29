@@ -86,4 +86,36 @@ describe('pmPartService.computeMetrics - Counter & Status Threshold PM Part', ()
     );
     assert.equal(result.wear_percentage, 99); // 695880/700000*100 = 99.4 -> 99
   });
+
+  test('counter_awal (offset): usage/hari dihitung dari produksi nyata sejak tanggal cutoff, bukan dari offset', () => {
+    // counter total 502.000 = offset 500.000 + produksi 2.000 sejak cutoff 2 hari lalu
+    // -> usage/hari = 2.000 / 2 = 1.000 (BUKAN 502.000 / 2)
+    const result = computeMetrics(
+      {
+        part_id: 1, line_id: 1, line_name: 'L1', drawing_no: 'D1', part_name: 'P1',
+        target_shot: 1000000, counter: 502000, counter_awal_applied: 500000,
+        usage_start_date: daysAgo(2), last_tgl_ganti: null,
+      },
+      THRESHOLDS
+    );
+    assert.equal(result.counter, 502000);
+    assert.equal(result.counter_awal, 500000);
+    assert.equal(result.usage_per_day, 1000);
+    assert.equal(result.remaining_shot, 498000);
+    assert.equal(result.status, 'OK');
+  });
+
+  test('counter_awal (offset): part yang sudah lewat target waktu mulai monitoring langsung DANGER', () => {
+    const result = computeMetrics(
+      {
+        part_id: 1, line_id: 1, line_name: 'L1', drawing_no: 'D1', part_name: 'P1',
+        target_shot: 1000000, counter: 1200000, counter_awal_applied: 1200000,
+        usage_start_date: daysAgo(0), last_tgl_ganti: null,
+      },
+      THRESHOLDS
+    );
+    assert.equal(result.remaining_shot, -200000);
+    assert.equal(result.status, 'DANGER');
+    assert.equal(result.wear_percentage, 120);
+  });
 });

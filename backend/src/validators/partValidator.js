@@ -8,7 +8,7 @@ const dateUtils = require('../utils/dateUtils');
 // Kalau diisi, format & isinya harus valid - dipakai bareng di create & update.
 function validateTglPasangAwal(value, errors, { required = false } = {}) {
   if (value === undefined || value === null || value === '') {
-    if (required) errors.tgl_pasang_awal = 'Tanggal Pasang Awal wajib diisi untuk Part baru';
+    if (required) errors.tgl_pasang_awal = 'Tanggal Pasang Awal wajib diisi untuk Part baru (atau isi Counter Awal + Tanggal Counter Awal)';
     return;
   }
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -16,6 +16,30 @@ function validateTglPasangAwal(value, errors, { required = false } = {}) {
   } else if (value > dateUtils.todayString()) {
     errors.tgl_pasang_awal = 'Tanggal Pasang Awal tidak boleh di masa depan';
   }
+}
+
+// counter_awal + counter_awal_tanggal SELALU berpasangan (migration
+// 1700000026000): dua-duanya diisi, atau dua-duanya kosong. counter_awal
+// boleh 0 (Part baru/belum terpakai per tanggal cutoff), tanggal tidak boleh
+// di masa depan. Dipakai bareng di create & update.
+function validateCounterAwal(body, errors) {
+  const hasAngka = body && body.counter_awal !== undefined && body.counter_awal !== null && body.counter_awal !== '';
+  const hasTanggal =
+    body && body.counter_awal_tanggal !== undefined && body.counter_awal_tanggal !== null && body.counter_awal_tanggal !== '';
+  if (!hasAngka && !hasTanggal) return;
+
+  if (hasAngka && (!Number.isInteger(body.counter_awal) || body.counter_awal < 0)) {
+    errors.counter_awal = 'Counter Awal harus bilangan bulat >= 0';
+  }
+  if (hasTanggal) {
+    if (typeof body.counter_awal_tanggal !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.counter_awal_tanggal)) {
+      errors.counter_awal_tanggal = 'Tanggal Counter Awal harus format YYYY-MM-DD';
+    } else if (body.counter_awal_tanggal > dateUtils.todayString()) {
+      errors.counter_awal_tanggal = 'Tanggal Counter Awal tidak boleh di masa depan';
+    }
+  }
+  if (hasAngka && !hasTanggal) errors.counter_awal_tanggal = 'Tanggal Counter Awal wajib diisi kalau Counter Awal diisi';
+  if (hasTanggal && !hasAngka) errors.counter_awal = 'Counter Awal wajib diisi kalau Tanggal Counter Awal diisi';
 }
 
 function validateCreatePart(body) {
@@ -47,7 +71,13 @@ function validateCreatePart(body) {
       errors.spare_part_qty = 'Spare Part Qty harus bilangan bulat >= 0';
     }
   }
-  validateTglPasangAwal(body && body.tgl_pasang_awal, errors, { required: true });
+  // Part baru butuh SALAH SATU titik awal hitung: Tanggal Pasang Awal ATAU
+  // pasangan Counter Awal + Tanggalnya (buat Part lama yang tanggal pasangnya
+  // tidak diketahui).
+  const punyaCounterAwal =
+    body && body.counter_awal !== undefined && body.counter_awal !== null && body.counter_awal !== '';
+  validateTglPasangAwal(body && body.tgl_pasang_awal, errors, { required: !punyaCounterAwal });
+  validateCounterAwal(body, errors);
 
   return { valid: Object.keys(errors).length === 0, errors };
 }
@@ -93,6 +123,7 @@ function validateUpdatePart(body) {
     errors.is_active = 'Harus boolean';
   }
   validateTglPasangAwal(body && body.tgl_pasang_awal, errors);
+  validateCounterAwal(body, errors);
   if (Object.keys(body || {}).length === 0) {
     errors._general = 'Tidak ada field yang diubah';
   }

@@ -33,6 +33,7 @@ function ImportMasterDataTab() {
   const [commitResult, setCommitResult] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [overwriteTgl, setOverwriteTgl] = useState(false); // timpa Tgl Pasang Awal yang sudah terisi di sistem
+  const [overwriteCounter, setOverwriteCounter] = useState(false); // timpa Counter Awal yang sudah terisi di sistem
 
   const { preview: previewMutation, commit: commitMutation } = useMasterDataImportMutations();
 
@@ -42,6 +43,7 @@ function ImportMasterDataTab() {
     setPreviewError('');
     setCommitResult(null);
     setOverwriteTgl(false);
+    setOverwriteCounter(false);
     try {
       const data = await previewMutation.mutateAsync(file);
       setPreview(data);
@@ -78,8 +80,11 @@ function ImportMasterDataTab() {
     // baris yang tadinya error tapi sudah dibenerin gak nyangkut jadi 'error'
     // terus. Validasi FINAL & otoritatif tetap di server saat commit.
     const hasRequired = row.line_no && row.jig_name && row.drawing_no && row.part_name && row.cl_no && row.target_shot;
-    // Part BARU (belum ada di DB) wajib punya Tgl Pasang Awal - part yang sudah ada tidak.
-    const hasTglIfNew = row.part_exists || !!row.tgl_pasang_awal;
+    // Part BARU (belum ada di DB) wajib punya Tgl Pasang Awal ATAU pasangan
+    // Counter Awal + Tanggal Counter Awal - part yang sudah ada tidak.
+    const hasCounterAwal =
+      row.counter_awal !== null && row.counter_awal !== undefined && row.counter_awal !== '' && !!row.counter_awal_tanggal;
+    const hasTglIfNew = row.part_exists || !!row.tgl_pasang_awal || hasCounterAwal;
     return hasRequired && hasTglIfNew ? 'valid' : 'error';
   }
 
@@ -90,9 +95,11 @@ function ImportMasterDataTab() {
       const result = await commitMutation.mutateAsync({
         rows: finalRows.filter((r) => r.include),
         overwriteTglPasang: overwriteTgl,
+        overwriteCounterAwal: overwriteCounter,
       });
       setCommitResult(result);
       setOverwriteTgl(false);
+      setOverwriteCounter(false);
       setPreview(null);
       setRows([]);
       setFileName('');
@@ -107,6 +114,17 @@ function ImportMasterDataTab() {
   const tglConflictCount = rows.filter(
     (r) => r.include && r.part_exists && r.existing_tgl_pasang_awal && r.tgl_pasang_awal && r.tgl_pasang_awal !== r.existing_tgl_pasang_awal
   ).length;
+  // Baris Part yang sudah punya Counter Awal di sistem, tapi angka/tanggal di Excel beda.
+  const counterConflictCount = rows.filter(
+    (r) =>
+      r.include &&
+      r.part_exists &&
+      r.existing_counter_awal_tanggal &&
+      r.counter_awal !== null &&
+      r.counter_awal !== undefined &&
+      r.counter_awal_tanggal &&
+      (Number(r.counter_awal) !== Number(r.existing_counter_awal) || r.counter_awal_tanggal !== r.existing_counter_awal_tanggal)
+  ).length;
   const errorIncludedCount = rows.filter((r) => r.include && reRunErrorCheck(r) === 'error').length;
 
   return (
@@ -115,8 +133,11 @@ function ImportMasterDataTab() {
         Upload file Excel Master Data (.xlsx / .xlsm) untuk membuat Line, Part, dan CL Mapping sekaligus — tidak perlu
         input manual satu-satu. Sistem akan menampilkan preview dulu sebelum data benar-benar disimpan. Kolom{' '}
         <strong className="text-foreground">Tgl Pasang Awal</strong> wajib untuk Part baru — tanggal Part pertama
-        kali dipasang di mesin (baseline sistem mulai menghitung Counter/Sisa Shot). Untuk Part yang sudah ada di
-        sistem, kolom ini boleh dikosongkan.
+        kali dipasang di mesin (baseline sistem mulai menghitung Counter/Sisa Shot). Kalau tanggal pasang tidak
+        diketahui, isi pasangan kolom <strong className="text-foreground">Counter Awal</strong> +{' '}
+        <strong className="text-foreground">Tanggal Counter Awal</strong>: Counter Awal = shot yang sudah terpakai
+        per <em>akhir hari</em> tanggal tersebut, produksi dihitung otomatis mulai hari berikutnya. Untuk Part yang
+        sudah ada di sistem, kolom-kolom ini boleh dikosongkan.
       </p>
 
       <div
@@ -172,7 +193,8 @@ function ImportMasterDataTab() {
           <p className="text-xs text-muted-foreground">
             Line baru: {commitResult.lines_created} · Part baru: {commitResult.parts_created} · Part diupdate:{' '}
             {commitResult.parts_updated}
-            {commitResult.tgl_pasang_overwritten > 0 && ` (${commitResult.tgl_pasang_overwritten} tanggal pasang ditimpa)`} · CL Mapping baru: {commitResult.mappings_created} · CL Mapping dilewati
+            {commitResult.tgl_pasang_overwritten > 0 && ` (${commitResult.tgl_pasang_overwritten} tanggal pasang ditimpa)`}
+            {commitResult.counter_awal_overwritten > 0 && ` (${commitResult.counter_awal_overwritten} Counter Awal ditimpa)`} · CL Mapping baru: {commitResult.mappings_created} · CL Mapping dilewati
             (sudah ada): {commitResult.mappings_skipped} · Baris dilewati karena error: {commitResult.rows_skipped}
           </p>
           {commitResult.row_errors?.length > 0 && (
@@ -220,6 +242,8 @@ function ImportMasterDataTab() {
                     'Part Name',
                     'Target Shot',
                     'Tgl Pasang Awal',
+                    'Counter Awal',
+                    'Tgl Counter Awal',
                     'Info',
                   ].map(
                     (h, i) => (
@@ -228,7 +252,7 @@ function ImportMasterDataTab() {
                         scope="col"
                         className={cn(
                           'whitespace-nowrap px-2.5 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]',
-                          h === 'Target Shot' && 'text-right'
+                          (h === 'Target Shot' || h === 'Counter Awal') && 'text-right'
                         )}
                       >
                         {h}
@@ -287,6 +311,25 @@ function ImportMasterDataTab() {
                           onChange={(e) => updateRow(row.row_number, 'tgl_pasang_awal', e.target.value || null)}
                         />
                       </td>
+                      <td className="px-2.5 py-2.5">
+                        <Input
+                          type="number"
+                          min={0}
+                          className="h-7 w-[120px] text-right font-[var(--font-mono)] text-xs"
+                          value={row.counter_awal ?? ''}
+                          onChange={(e) =>
+                            updateRow(row.row_number, 'counter_awal', e.target.value === '' ? null : Number(e.target.value))
+                          }
+                        />
+                      </td>
+                      <td className="px-2.5 py-2.5">
+                        <Input
+                          type="date"
+                          className="h-7 w-[140px] font-[var(--font-mono)] text-xs"
+                          value={row.counter_awal_tanggal || ''}
+                          onChange={(e) => updateRow(row.row_number, 'counter_awal_tanggal', e.target.value || null)}
+                        />
+                      </td>
                       <td className="max-w-[220px] px-2.5 py-2.5 text-[11px] text-muted-foreground">
                         {row.errors?.join('; ')}
                         {!row.line_exists && !row.errors?.length && ' Line baru akan dibuat.'}
@@ -297,6 +340,14 @@ function ImportMasterDataTab() {
                           row.tgl_pasang_awal &&
                           row.tgl_pasang_awal !== row.existing_tgl_pasang_awal &&
                           ` Tgl di sistem ${row.existing_tgl_pasang_awal} — ${overwriteTgl ? 'akan ditimpa.' : 'tidak diubah.'}`}
+                        {row.part_exists &&
+                          row.existing_counter_awal_tanggal &&
+                          row.counter_awal !== null &&
+                          row.counter_awal !== undefined &&
+                          row.counter_awal_tanggal &&
+                          (Number(row.counter_awal) !== Number(row.existing_counter_awal) ||
+                            row.counter_awal_tanggal !== row.existing_counter_awal_tanggal) &&
+                          ` Counter Awal di sistem ${Number(row.existing_counter_awal).toLocaleString('id-ID')} (${row.existing_counter_awal_tanggal}) — ${overwriteCounter ? 'akan ditimpa.' : 'tidak diubah.'}`}
                       </td>
                     </tr>
                   );
@@ -317,6 +368,22 @@ function ImportMasterDataTab() {
                 <strong className="text-foreground">Timpa Tanggal Pasang Awal yang sudah terisi di sistem</strong>{' '}
                 ({tglConflictCount} baris beda dengan Excel). Default mati: tanggal yang sudah tersimpan tidak diubah.
                 Nyalakan kalau tanggal di Excel ini yang paling benar.
+              </span>
+            </label>
+          )}
+
+          {counterConflictCount > 0 && (
+            <label className="mt-4 flex cursor-pointer items-start gap-2 rounded-lg border border-[var(--border-soft)] p-3 text-xs">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-3.5 w-3.5 accent-[var(--accent)]"
+                checked={overwriteCounter}
+                onChange={(e) => setOverwriteCounter(e.target.checked)}
+              />
+              <span>
+                <strong className="text-foreground">Timpa Counter Awal yang sudah terisi di sistem</strong>{' '}
+                ({counterConflictCount} baris beda dengan Excel). Default mati: Counter Awal yang sudah tersimpan tidak
+                diubah. Nyalakan kalau angka di Excel ini yang paling benar.
               </span>
             </label>
           )}

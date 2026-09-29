@@ -10,7 +10,7 @@ export async function previewImport(file) {
   return data.data; // { sheet_used, summary, rows, ignored_columns }
 }
 
-export async function commitImport({ rows, overwriteTglPasang = false }) {
-  const { data } = await apiClient.post('/master-data-import/commit', { rows, overwriteTglPasang });
-  return data.data; // { lines_created, parts_created, parts_updated, tgl_pasang_overwritten, mappings_created, mappings_skipped, rows_skipped, row_errors }
+export async function commitImport({ rows, overwriteTglPasang = false, overwriteCounterAwal = false }) {
+  const { data } = await apiClient.post('/master-data-import/commit', { rows, overwriteTglPasang, overwriteCounterAwal });
+  return data.data; // { lines_created, parts_created, parts_updated, tgl_pasang_overwritten, counter_awal_overwritten, mappings_created, mappings_skipped, rows_skipped, row_errors }
 }

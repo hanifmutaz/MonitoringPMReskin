@@ -18,6 +18,7 @@ const commit = asyncHandler(async (req, res) => {
 
   const data = await masterDataImportService.commitImport(req.body.rows, req.user.id, {
     overwriteTglPasang: req.body.overwriteTglPasang === true,
+    overwriteCounterAwal: req.body.overwriteCounterAwal === true,
   });
   res.status(200).json({ success: true, message: 'Success', data });
 });
