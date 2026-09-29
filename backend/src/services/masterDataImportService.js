@@ -74,8 +74,19 @@ function isRealDate(iso) {
 // diformat sebagai Date - xlsx.utils.sheet_to_json({raw:true}) balikin serial
 // number itu apa adanya. Konversi ke 'YYYY-MM-DD' pakai epoch Excel (1899-12-30),
 // atau terima langsung kalau sel-nya berupa teks 'YYYY-MM-DD' / 'DD/MM/YYYY'.
+const MONTH_ABBR = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, mei: 5, jun: 6, jul: 7, aug: 8, agu: 8, agt: 8,
+  sep: 9, oct: 10, okt: 10, nov: 11, dec: 12, des: 12,
+};
+
 function parseExcelDateCell(value) {
   if (value === null || value === undefined || value === '') return null;
+  // Jaga-jaga kalau sel datang sebagai objek Date (mis. dibaca dengan cellDates).
+  // Pakai komponen UTC supaya tidak geser hari karena timezone server.
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return new Date(value.getTime() + 12 * 3600 * 1000).toISOString().slice(0, 10);
+  }
   if (typeof value === 'number') {
     const utcDays = Math.floor(value - 25569); // 25569 = hari antara 1899-12-30 dan 1970-01-01
     const utcMs = utcDays * 86400 * 1000;
@@ -90,6 +101,16 @@ function parseExcelDateCell(value) {
     const [, d, m, y] = dmy;
     const iso = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
     return isRealDate(iso) ? iso : null;
+  }
+  // Teks 'DD-Mon-YYYY' / 'DD Mon YYYY' (mis. '28-Sep-2026', '5 Agu 2026'), nama bulan Inggris/Indonesia.
+  const dmon = str.match(/^(\d{1,2})[-/ ]([A-Za-z]{3,4})[-/ ,]*(\d{4})$/);
+  if (dmon) {
+    const [, d, mon, y] = dmon;
+    const m = MONTH_ABBR[mon.slice(0, 3).toLowerCase()];
+    if (m) {
+      const iso = `${y}-${String(m).padStart(2, '0')}-${d.padStart(2, '0')}`;
+      return isRealDate(iso) ? iso : null;
+    }
   }
   return null; // tidak dikenali / tanggal ngawur - caller (parsePreview) yang nge-flag jadi error baris
 }
@@ -157,7 +178,7 @@ function autoCleanDrawingNo(raw) {
 async function parsePreview(fileBuffer) {
   let workbook;
   try {
-    workbook = xlsx.read(fileBuffer, { type: 'buffer', cellDates: true });
+    workbook = xlsx.read(fileBuffer, { type: 'buffer', cellDates: false });
   } catch {
     throw AppError.badRequest('File tidak bisa dibaca', { _general: 'Pastikan file berformat .xlsx/.xlsm yang valid' });
   }

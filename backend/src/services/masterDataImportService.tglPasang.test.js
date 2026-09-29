@@ -24,4 +24,14 @@ describe('parseExcelDateCell - kolom Tanggal Pasang Awal', () => {
   test('format tidak dikenali -> null', () => {
     assert.equal(parseExcelDateCell('kemarin'), null);
   });
+  test('teks DD-Mon-YYYY (Inggris/Indonesia) -> YYYY-MM-DD', () => {
+    assert.equal(parseExcelDateCell('28-Sep-2026'), '2026-09-28');
+    assert.equal(parseExcelDateCell('5 Agu 2026'), '2026-08-05');
+    assert.equal(parseExcelDateCell('01-Okt-2026'), '2026-10-01');
+    assert.equal(parseExcelDateCell('31-Feb-2026'), null);
+    assert.equal(parseExcelDateCell('28-Xyz-2026'), null);
+  });
+  test('serial number tanggal 28-Sep-2026', () => {
+    assert.equal(parseExcelDateCell(46293), '2026-09-28');
+  });
 });
