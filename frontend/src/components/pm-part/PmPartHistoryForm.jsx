@@ -25,7 +25,7 @@ import { useParts } from '../../hooks/useParts';
 import { useCreatePmPartHistory } from '../../hooks/usePmPartHistory';
 import { lookupPartsByDrawingNo } from '../../api/partsApi';
 import BarcodeScannerModal from './BarcodeScannerModal';
-import { JENIS_OPTIONS } from './constants';
+import { useJenisPenggantian } from '../../hooks/useJenisPenggantian';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -70,6 +70,7 @@ function buildInitialForm(presetPart) {
 // dikunci dari Monitoring") - itu bukan bug, cuma chrome panel-nya yang
 // salah pakai variable.
 function PmPartHistoryForm({ onSuccess, onCancel, presetPart, standalone = false }) {
+  const { activeOptions: jenisOptions } = useJenisPenggantian();
   const [form, setForm] = useState(() => buildInitialForm(presetPart));
   const [errors, setErrors] = useState({});
 
@@ -312,7 +313,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart, standalone = false
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {JENIS_OPTIONS.map((opt) => (
+              {jenisOptions.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </SelectItem>

@@ -13,6 +13,7 @@ const inventoryService = require('./inventoryService');
 const { recordAudit } = require('../utils/auditLog');
 const dateUtils = require('../utils/dateUtils');
 const AppError = require('../utils/AppError');
+const jenisQueries = require('../sql/jenisPenggantianQueries');
 
 async function listHistory({ lineId, partId, jenis, dateFrom, dateTo, page, limit }) {
   const pageNum = Number(page) > 0 ? Number(page) : 1;
@@ -25,16 +26,17 @@ async function listHistory({ lineId, partId, jenis, dateFrom, dateTo, page, limi
  * createHistory() supaya bisa di-unit-test langsung (sama pola dengan
  * determineHelperUpdate() di pmLineHistoryService.js).
  *
- * BROKEN sengaja dikecualikan (null) - part gagal duluan di luar jadwal
- * itu soal reliabilitas part, bukan soal ketepatan operator menjalankan PM.
+ * Jenis yang counts_in_ketepatan = false (mis. BROKEN, AUS - lihat master
+ * jenis_penggantian) dikecualikan (null): part gagal/aus di luar jadwal itu
+ * soal reliabilitas part, bukan soal ketepatan operator menjalankan PM.
  *
- * @param {'BROKEN'|'PM_EARLY'|'TERJADWAL'} jenisPenggantian
+ * @param {boolean} countsInKetepatan - flag dari master jenis_penggantian
  * @param {number} counterSaatDiganti
  * @param {number} targetShot
  * @returns {boolean|null}
  */
-function determineOnTime(jenisPenggantian, counterSaatDiganti, targetShot) {
-  if (jenisPenggantian === 'BROKEN') return null;
+function determineOnTime(countsInKetepatan, counterSaatDiganti, targetShot) {
+  if (!countsInKetepatan) return null;
   return Number(counterSaatDiganti) <= Number(targetShot);
 }
 
@@ -76,7 +78,12 @@ async function createHistory(data, userId) {
       throw AppError.badRequest('Validasi gagal', { part_id: 'Part tidak ditemukan' });
     }
 
-    const onTime = determineOnTime(data.jenis_penggantian, data.counter_saat_diganti, part.target_shot);
+    const jenis = await jenisQueries.findByCode(data.jenis_penggantian, client);
+    if (!jenis || !jenis.is_active) {
+      throw AppError.badRequest('Validasi gagal', { jenis_penggantian: 'Jenis Penggantian tidak valid atau sudah nonaktif' });
+    }
+
+    const onTime = determineOnTime(jenis.counts_in_ketepatan, data.counter_saat_diganti, part.target_shot);
     const created = await pmPartHistoryQueries.create({ ...data, user_id: userId, on_time: onTime }, client);
 
     const stock = await applyStockDeduction(part, created.id, userId, client);

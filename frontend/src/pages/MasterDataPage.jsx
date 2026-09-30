@@ -27,6 +27,7 @@ import LinesTab from '../components/masterdata/LinesTab';
 import PartsTab from '../components/masterdata/PartsTab';
 import SuppliersTab from '../components/masterdata/SuppliersTab';
 import ImportMasterDataTab from '../components/masterdata/ImportMasterDataTab';
+import JenisPenggantianTab from '../components/masterdata/JenisPenggantianTab';
 import PackageLockedNotice from '../components/PackageLockedNotice';
 
 const TABS = [
@@ -34,19 +35,22 @@ const TABS = [
   { key: 'parts', label: 'Parts' },
   { key: 'suppliers', label: 'Suppliers', packageRequired: 'B' },
   { key: 'import', label: 'Import Excel' },
+  // Admin only: kelola jenis penggantian PM Part (Terjadwal, PM Early, Broken, Aus, dst).
+  { key: 'jenis', label: 'Jenis Penggantian', adminOnly: true },
 ];
 
 function MasterDataPage() {
   usePageHeader({ title: 'Master Data Part' });
   const [activeTab, setActiveTab] = useState('lines');
-  const { hasPackage } = useAuth();
+  const { hasPackage, isAdmin } = useAuth();
+  const visibleTabs = TABS.filter((tab) => !tab.adminOnly || isAdmin);
   // polish: A10 (motion) - sliding tab indicator, lihat hooks/useTabIndicator.js
   const { containerRef, itemRef, indicatorStyle } = useTabIndicator(activeTab);
 
   return (
     <div className="rounded-xl border border-border bg-card p-4.5">
       <div ref={containerRef} className="relative mb-5 flex gap-1 border-b border-border">
-        {TABS.map((tab) => {
+        {visibleTabs.map((tab) => {
           const active = activeTab === tab.key;
           const locked = tab.packageRequired && !hasPackage(tab.packageRequired);
           return (
@@ -95,6 +99,7 @@ function MasterDataPage() {
       {activeTab === 'suppliers' &&
         (hasPackage('B') ? <SuppliersTab /> : <PackageLockedNotice featureName="Supplier Management" compact />)}
       {activeTab === 'import' && <ImportMasterDataTab />}
+      {activeTab === 'jenis' && isAdmin && <JenisPenggantianTab />}
     </div>
   );
 }

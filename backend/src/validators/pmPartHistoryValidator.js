@@ -1,8 +1,6 @@
 // src/validators/pmPartHistoryValidator.js
 const dateUtils = require('../utils/dateUtils');
 
-const JENIS_ENUM = ['BROKEN', 'PM_EARLY', 'TERJADWAL'];
-
 function validateCreateHistory(body) {
   const errors = {};
 
@@ -24,8 +22,10 @@ function validateCreateHistory(body) {
     errors.counter_saat_diganti = 'Counter Saat Diganti wajib diisi dan harus >= 0';
   }
 
-  if (!body || !JENIS_ENUM.includes(body.jenis_penggantian)) {
-    errors.jenis_penggantian = `Jenis Penggantian harus salah satu dari: ${JENIS_ENUM.join(', ')}`;
+  // Daftar jenis sekarang master data (tabel jenis_penggantian), jadi validasi
+  // "kode-nya ada & aktif" dilakukan di pmPartHistoryService.createHistory.
+  if (!body || typeof body.jenis_penggantian !== 'string' || body.jenis_penggantian.trim() === '') {
+    errors.jenis_penggantian = 'Jenis Penggantian wajib diisi';
   }
 
   if (!body || typeof body.pic_name !== 'string' || body.pic_name.trim() === '') {
@@ -37,4 +37,4 @@ function validateCreateHistory(body) {
   return { valid: Object.keys(errors).length === 0, errors };
 }
 
-module.exports = { validateCreateHistory, JENIS_ENUM };
+module.exports = { validateCreateHistory };

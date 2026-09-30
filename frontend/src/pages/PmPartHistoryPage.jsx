@@ -36,12 +36,13 @@ import SelectAllAcrossPagesBar from '../components/SelectAllAcrossPagesBar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { EmptyState } from '../components/ui/empty-state';
 import { FilterBar } from '../components/data-display/FilterBar';
-import { JENIS_LABEL } from '../components/pm-part/constants';
+import { useJenisPenggantian } from '../hooks/useJenisPenggantian';
 import { formatDate } from '../utils/formatDate';
 
 const LIMIT = 20;
 
 function PmPartHistoryPage() {
+  const { filterOptions: jenisFilterOptions, labelOf: jenisLabel } = useJenisPenggantian();
   const [lineId, setLineId] = useState('all');
   const [jenis, setJenis] = useState('all');
   const [page, setPage] = useState(1);
@@ -125,9 +126,9 @@ function PmPartHistoryPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Semua Jenis</SelectItem>
-            {Object.entries(JENIS_LABEL).map(([val, label]) => (
-              <SelectItem key={val} value={val}>
-                {label}
+            {jenisFilterOptions.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -230,7 +231,7 @@ function PmPartHistoryPage() {
                         <td className="px-2.5 py-2.5 font-[var(--font-mono)] text-[13px]">
                           {Number(item.counter_saat_diganti).toLocaleString('id-ID')}
                         </td>
-                        <td className="px-2.5 py-2.5 text-[13px]">{JENIS_LABEL[item.jenis_penggantian]}</td>
+                        <td className="px-2.5 py-2.5 text-[13px]">{jenisLabel(item.jenis_penggantian)}</td>
                         <td className="px-2.5 py-2.5 text-[13px]">{item.pic_name || '-'}</td>
                         <td className="px-2.5 py-2.5">
                           <OnTimeBadge onTime={item.on_time} />
