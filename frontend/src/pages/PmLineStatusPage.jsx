@@ -18,7 +18,7 @@
 // alasan Phase 7 mindahin buildPmPartColumns.jsx). Modal "Input PM"
 // (dengan/tanpa preset Line), Banner penjelasan formula, dan query TIDAK
 // disentuh.
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Plus, X, Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { usePmLineStatus } from '../hooks/usePmLineStatus';
@@ -44,6 +44,28 @@ function PmLineStatusPage() {
   // yang sama otomatis nampilin dropdown pilih Line + jenis PM karena
   // presetLine kosong (lihat isPrefilled di PmLineHistoryForm).
   const [showInputForm, setShowInputForm] = useState(false);
+
+  // Urutan: jadwal PM terdekat di paling atas. Yang dipakai = sisa hari
+  // terkecil antara Monthly dan Weekly (negatif = sudah lewat jadwal).
+  // Sisa hari kosong (null = belum pernah PM, statusnya otomatis DANGER)
+  // dianggap paling mendesak, jadi ikut di paling atas. Sama rata ->
+  // urut nama Line. Data Line sedikit & tidak dipaginasi, jadi cukup
+  // diurutkan di sini (endpoint yang sama juga dipakai Dashboard, sengaja
+  // tidak diubah urutannya).
+  const sortedLines = useMemo(() => {
+    if (!data) return data;
+    const urgency = (line) => {
+      const monthly = line.sisa_hari_monthly ?? -Infinity;
+      const weekly = line.sisa_hari_weekly ?? -Infinity;
+      return Math.min(monthly, weekly);
+    };
+    return [...data].sort((a, b) => {
+      const ua = urgency(a);
+      const ub = urgency(b);
+      if (ua !== ub) return ua < ub ? -1 : 1;
+      return String(a.line_name).localeCompare(String(b.line_name), undefined, { numeric: true });
+    });
+  }, [data]);
 
   const columns = buildPmLineColumns({
     onInputMonthly: (line) => setInputTarget({ line, jenisPm: 'MONTHLY' }),
@@ -127,7 +149,7 @@ function PmLineStatusPage() {
       <DataTable
         wrapHeaders
         columns={columns}
-        rows={data}
+        rows={sortedLines}
         getRowKey={(line) => line.line_id}
         isLoading={isLoading && !data}
         isRefreshing={isFetching && !isLoading}

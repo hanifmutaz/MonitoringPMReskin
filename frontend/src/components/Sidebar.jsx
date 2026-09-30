@@ -268,7 +268,7 @@ function NavGroup({ group, isOpen, onToggle, isGroupActive, summary, collapsed, 
           `<aside>`, bukan pop instan kayak sebelumnya (poin 11). */}
       <span
         className={`overflow-hidden whitespace-nowrap text-left transition-[max-width,opacity] duration-[250ms] ease-in-out ${
-          collapsed ? 'max-w-0 opacity-0' : 'max-w-[170px] flex-1 opacity-100'
+          collapsed ? 'max-w-0 opacity-0' : 'max-w-[200px] flex-1 opacity-100'
         }`}
       >
         {group.label}
