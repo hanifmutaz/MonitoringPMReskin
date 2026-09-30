@@ -35,7 +35,9 @@ function buildCounterCte(filteredPartsSelect) {
   --      supaya tidak dobel). Lihat migration 1700000026000.
   --  (b) MODE LAMA: MAX(tgl_ganti) kalau ADA riwayat, atau fallback ke
   --      tgl_pasang_awal kalau BELUM PERNAH diganti (migration 1700000025000).
-  --      Produksi dihitung tanggal >= baseline (perilaku lama, tidak diubah).
+  --      Kalau ada riwayat ganti: produksi dihitung tanggal > tgl_ganti (hari
+  --      penggantian TIDAK dihitung, konsisten dengan mode offset). Kalau
+  --      belum pernah diganti: tanggal >= tgl_pasang_awal (tidak diubah).
   -- count_from = tanggal pertama produksi yang ikut dijumlahkan.
   -- usage_start_date = titik awal buat hitung Pemakaian/Hari (tanpa counter_awal).
   part_baseline AS (
@@ -48,7 +50,12 @@ function buildCounterCte(filteredPartsSelect) {
         WHEN fp.counter_awal_tanggal IS NOT NULL
          AND (plg.last_tgl_ganti IS NULL OR plg.last_tgl_ganti <= fp.counter_awal_tanggal)
           THEN fp.counter_awal_tanggal + 1
-        ELSE COALESCE(plg.last_tgl_ganti, fp.tgl_pasang_awal)
+        -- Ada riwayat ganti: hitung mulai HARI SESUDAH tgl_ganti. Produksi di
+        -- hari penggantian sendiri masih dianggap milik Part lama (sama
+        -- seperti hari cutoff counter_awal di atas), jadi Counter Part baru
+        -- mulai dari 0 dan bertambah dari produksi hari berikutnya.
+        WHEN plg.last_tgl_ganti IS NOT NULL THEN plg.last_tgl_ganti + 1
+        ELSE fp.tgl_pasang_awal
       END AS count_from,
       CASE
         WHEN fp.counter_awal_tanggal IS NOT NULL
