@@ -66,7 +66,9 @@ function Topbar() {
   return (
     <header
       className="sticky top-0 z-40 flex h-[60px] shrink-0 items-center justify-between border-b border-border bg-background pr-4 lg:pr-8"
-      style={{ paddingLeft: isDesktop && !collapsed ? '32px' : '16px', transition: 'padding-left 250ms ease-in-out' }}
+      // Jarak tombol toggle ke tepi sidebar dirapatkan: sama 16px baik saat
+      // sidebar terbuka maupun collapsed (dulu 32px saat terbuka, kejauhan).
+      style={{ paddingLeft: '16px' }}
     >
       <div className="flex items-center gap-3.5">
         <button
