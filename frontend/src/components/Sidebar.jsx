@@ -187,7 +187,14 @@ function SubNavItem({ to, children, badgeCount, locked }) {
             </span>
           ) : (
             badgeCount > 0 && (
-              <span className="rounded-full bg-danger px-[7px] py-px font-[var(--font-mono)] text-[10px] font-bold text-white">
+              // Badge "soft": latar merah transparan + angka merah (bukan
+              // merah pekat + teks putih yang terlalu mencolok di tema
+              // gelap). Lebar minimal 20px + tinggi tetap supaya angka 1
+              // digit tetap bulat, bukan lonjong.
+              <span
+                aria-label={`${badgeCount} perlu perhatian`}
+                className="flex h-5 min-w-5 items-center justify-center rounded-full bg-danger-dim px-1.5 text-[11px] font-semibold leading-none tabular-nums text-danger"
+              >
                 {badgeCount}
               </span>
             )
@@ -202,14 +209,14 @@ function NavGroup({ group, isOpen, onToggle, isGroupActive, summary, collapsed, 
   const Icon = group.icon;
   const expandedOpen = isOpen && !collapsed;
 
-  // Total badge semua sub-item - ditampilkan di baris parent saat sub-item
-  // sedang tidak kelihatan (grup ditutup atau sidebar collapsed), supaya
-  // notif tidak "hilang" sebelum grupnya dibuka.
+  // Total badge semua sub-item - ditandai sebagai titik merah kecil di icon
+  // parent (bukan angka), supaya notif tetap kelihatan walau grup ditutup
+  // atau sidebar collapsed. Angka detailnya ada di sub-item.
   const groupBadge = group.items.reduce(
     (sum, item) => sum + (item.badgeKey ? Number(summary?.[item.badgeKey]) || 0 : 0),
     0
   );
-  const showGroupBadge = groupBadge > 0 && !expandedOpen;
+  const hasGroupBadge = groupBadge > 0;
 
   const button = (
     <button
@@ -246,7 +253,15 @@ function NavGroup({ group, isOpen, onToggle, isGroupActive, summary, collapsed, 
           : 'text-muted-foreground hover:bg-accent hover:text-foreground'
       }`}
     >
-      <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.8} />
+      <span className="relative shrink-0">
+        <Icon className="h-[17px] w-[17px]" strokeWidth={1.8} />
+        {hasGroupBadge && (
+          <span
+            aria-label={`${groupBadge} perlu perhatian`}
+            className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-card"
+          />
+        )}
+      </span>
       {/* Label & chevron TETAP di-render selalu (gak di-unmount pas
           collapsed) - cuma disusutin lewat max-width+opacity. Ini yang
           bikin transisi collapse/expand nyambung mulus sama animasi lebar
@@ -258,20 +273,6 @@ function NavGroup({ group, isOpen, onToggle, isGroupActive, summary, collapsed, 
       >
         {group.label}
       </span>
-      {showGroupBadge && !collapsed && (
-        <span
-          aria-label={`${groupBadge} perlu perhatian`}
-          className="rounded-full bg-danger px-[7px] py-px font-[var(--font-mono)] text-[10px] font-bold text-white"
-        >
-          {groupBadge}
-        </span>
-      )}
-      {showGroupBadge && collapsed && (
-        <span
-          aria-label={`${groupBadge} perlu perhatian`}
-          className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-card"
-        />
-      )}
       <ChevronDown
         className={`shrink-0 text-[var(--text-faint)] transition-[transform,max-width,opacity] duration-[250ms] ease-in-out ${
           expandedOpen ? 'rotate-180' : ''
@@ -286,7 +287,10 @@ function NavGroup({ group, isOpen, onToggle, isGroupActive, summary, collapsed, 
       {collapsed ? (
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>{button}</TooltipTrigger>
-          <TooltipContent side="right">{group.label}</TooltipContent>
+          <TooltipContent side="right">
+            {group.label}
+            {hasGroupBadge && ` (${groupBadge})`}
+          </TooltipContent>
         </Tooltip>
       ) : (
         button

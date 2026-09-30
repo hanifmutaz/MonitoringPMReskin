@@ -152,7 +152,7 @@ function buildPmLineColumns({ onInputMonthly, onInputWeekly, canEditDate = false
                   <CalendarDays size={15} />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Input Monthly</TooltipContent>
+              <TooltipContent>PM Monthly</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -167,7 +167,7 @@ function buildPmLineColumns({ onInputMonthly, onInputWeekly, canEditDate = false
                   <CalendarRange size={15} />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Input Weekly</TooltipContent>
+              <TooltipContent>PM Weekly</TooltipContent>
             </Tooltip>
           </div>
         </TooltipProvider>
