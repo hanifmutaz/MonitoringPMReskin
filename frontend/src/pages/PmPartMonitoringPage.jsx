@@ -171,7 +171,7 @@ function PmPartMonitoringPage() {
       />
 
       {gantiPartItem && (
-        <Modal title={`Ganti Part — ${gantiPartItem.drawing_no}`} onClose={() => setGantiPartItem(null)}>
+        <Modal title={`Ganti Part ${gantiPartItem.drawing_no}`} onClose={() => setGantiPartItem(null)}>
           <PmPartHistoryForm
             key={gantiPartItem.part_id}
             presetPart={gantiPartItem}

@@ -162,9 +162,9 @@ function PartSupplierModal({ part, onClose }) {
   });
 
   return (
-    <Modal title={`Supplier — ${part.drawing_no} (${part.jig_name})`} onClose={onClose} width={600}>
+    <Modal title={`Supplier ${part.drawing_no} (${part.jig_name})`} onClose={onClose} width={600}>
       <p className="mb-2.5 text-xs text-muted-foreground">
-        Bintang menandai Supplier <strong className="text-foreground">utama</strong> (biasa dipesen ke situ duluan) —
+        Bintang menandai Supplier <strong className="text-foreground">utama</strong> (biasa dipesen ke situ duluan),
         klik bintang buat pindah/lepas status utama.
       </p>
 
@@ -203,7 +203,7 @@ function PartSupplierModal({ part, onClose }) {
           </Select>
           {availableSuppliers.length === 0 && (
             <p className="mt-1 text-[11px] text-[var(--text-faint)]">
-              Semua Supplier aktif udah terhubung, atau belum ada Supplier — tambah dulu di tab Suppliers.
+              Semua Supplier aktif udah terhubung, atau belum ada Supplier, tambah dulu di tab Suppliers.
             </p>
           )}
         </div>

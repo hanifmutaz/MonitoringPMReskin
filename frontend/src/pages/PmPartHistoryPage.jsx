@@ -223,7 +223,7 @@ function PmPartHistoryPage() {
                         <td className="px-2.5 py-2.5">
                           <div className="font-[var(--font-mono)] text-[13px]">{item.line_name}</div>
                           <div className="text-xs text-[var(--text-dim)]">
-                            {item.part_name} ({item.drawing_no} — {item.jig_name})
+                            {item.part_name} ({item.drawing_no} / {item.jig_name})
                           </div>
                         </td>
                         <td className="px-2.5 py-2.5 font-[var(--font-mono)] text-[13px]">{item.shift || '-'}</td>

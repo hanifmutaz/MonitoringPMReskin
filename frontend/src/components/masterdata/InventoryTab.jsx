@@ -251,7 +251,7 @@ function ItemDetailModal({ itemId, onClose }) {
   const rop = (ropData || []).find((r) => r.id === itemId);
 
   return (
-    <Modal title={`${item.spare_part_number} — ${item.part_name}`} onClose={onClose} width={640}>
+    <Modal title={`${item.spare_part_number} ${item.part_name}`} onClose={onClose} width={640}>
       <div className="mb-4 flex flex-wrap gap-5">
         <div>
           <div className="text-xs text-muted-foreground">Stok Saat Ini</div>
@@ -308,7 +308,7 @@ function ItemDetailModal({ itemId, onClose }) {
           <ul className="m-0 list-disc pl-[18px] text-xs">
             {item.linked_parts.map((p) => (
               <li key={p.id}>
-                {p.line_name} — {p.jig_name} — {p.drawing_no} ({p.part_name})
+                {p.line_name} / {p.jig_name} / {p.drawing_no} ({p.part_name})
               </li>
             ))}
           </ul>
@@ -415,7 +415,7 @@ function InventoryTab() {
     <div>
       <p className="mb-4 text-xs text-muted-foreground">
         Stok spare part fisik di gudang. 1 Inventory Item bisa dipakai (di-link) oleh lebih dari 1 Part di tab
-        &ldquo;Parts&rdquo; — kalau spare part-nya identik (dipasang di jig/line berbeda tapi ambil dari stok yang
+        &ldquo;Parts&rdquo;, kalau spare part-nya identik (dipasang di jig/line berbeda tapi ambil dari stok yang
         sama).
       </p>
 

@@ -130,9 +130,9 @@ function ImportMasterDataTab() {
   return (
     <div>
       <p className="mb-4 text-xs text-muted-foreground">
-        Upload file Excel Master Data (.xlsx / .xlsm) untuk membuat Line, Part, dan CL Mapping sekaligus — tidak perlu
+        Upload file Excel Master Data (.xlsx / .xlsm) untuk membuat Line, Part, dan CL Mapping sekaligus, tidak perlu
         input manual satu-satu. Sistem akan menampilkan preview dulu sebelum data benar-benar disimpan. Kolom{' '}
-        <strong className="text-foreground">Tgl Pasang Awal</strong> wajib untuk Part baru — tanggal Part pertama
+        <strong className="text-foreground">Tgl Pasang Awal</strong> wajib untuk Part baru, yaitu tanggal Part pertama
         kali dipasang di mesin (baseline sistem mulai menghitung Counter/Sisa Shot). Kalau tanggal pasang tidak
         diketahui, isi pasangan kolom <strong className="text-foreground">Counter Awal</strong> +{' '}
         <strong className="text-foreground">Tanggal Counter Awal</strong>: Counter Awal = shot yang sudah terpakai
@@ -334,12 +334,12 @@ function ImportMasterDataTab() {
                         {row.errors?.join('; ')}
                         {!row.line_exists && !row.errors?.length && ' Line baru akan dibuat.'}
                         {row.line_exists && !row.part_exists && !row.errors?.length && ' Part baru di Line ini.'}
-                        {row.part_exists && !row.errors?.length && ' Part sudah ada — CL Mapping akan ditambahkan.'}
+                        {row.part_exists && !row.errors?.length && ' Part sudah ada, CL Mapping akan ditambahkan.'}
                         {row.part_exists &&
                           row.existing_tgl_pasang_awal &&
                           row.tgl_pasang_awal &&
                           row.tgl_pasang_awal !== row.existing_tgl_pasang_awal &&
-                          ` Tgl di sistem ${row.existing_tgl_pasang_awal} — ${overwriteTgl ? 'akan ditimpa.' : 'tidak diubah.'}`}
+                          ` Tgl di sistem ${row.existing_tgl_pasang_awal}, ${overwriteTgl ? 'akan ditimpa.' : 'tidak diubah.'}`}
                         {row.part_exists &&
                           row.existing_counter_awal_tanggal &&
                           row.counter_awal !== null &&
@@ -347,7 +347,7 @@ function ImportMasterDataTab() {
                           row.counter_awal_tanggal &&
                           (Number(row.counter_awal) !== Number(row.existing_counter_awal) ||
                             row.counter_awal_tanggal !== row.existing_counter_awal_tanggal) &&
-                          ` Counter Awal di sistem ${Number(row.existing_counter_awal).toLocaleString('id-ID')} (${row.existing_counter_awal_tanggal}) — ${overwriteCounter ? 'akan ditimpa.' : 'tidak diubah.'}`}
+                          ` Counter Awal di sistem ${Number(row.existing_counter_awal).toLocaleString('id-ID')} (${row.existing_counter_awal_tanggal}), ${overwriteCounter ? 'akan ditimpa.' : 'tidak diubah.'}`}
                       </td>
                     </tr>
                   );
@@ -392,7 +392,7 @@ function ImportMasterDataTab() {
             <span className="text-xs text-muted-foreground">
               {includedCount} baris dicentang untuk diimport
               {errorIncludedCount > 0 && (
-                <span className="text-danger"> — {errorIncludedCount} di antaranya masih error</span>
+                <span className="text-danger">, {errorIncludedCount} di antaranya masih error</span>
               )}
             </span>
             <Button

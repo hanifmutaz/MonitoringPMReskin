@@ -334,7 +334,7 @@ function SettingsPage() {
   const { data, isLoading, isError } = useSettings();
 
   const activeMenu = menu ? findSettingsMenu(menu) : null;
-  usePageHeader({ title: activeMenu ? `Settings — ${activeMenu.title}` : 'Settings' });
+  usePageHeader({ title: activeMenu ? `Settings ${activeMenu.title}` : 'Settings' });
 
   // Role tanpa grant apa pun: menu Settings disembunyikan di Sidebar, dan
   // kalau URL-nya diketik langsung tampil "Akses ditolak" (bukan redirect

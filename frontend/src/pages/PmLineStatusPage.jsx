@@ -101,7 +101,7 @@ function PmLineStatusPage() {
         <div className="rounded-xl border border-border bg-card p-4.5">
           <div className="mb-4">
             <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">
-              Input PM {inputTarget.jenisPm === 'MONTHLY' ? 'Monthly' : 'Weekly'} — {inputTarget.line.line_name}
+              Input PM {inputTarget.jenisPm === 'MONTHLY' ? 'Monthly' : 'Weekly'} {inputTarget.line.line_name}
             </h2>
           </div>
           <PmLineHistoryForm
@@ -125,6 +125,7 @@ function PmLineStatusPage() {
       )}
 
       <DataTable
+        wrapHeaders
         columns={columns}
         rows={data}
         getRowKey={(line) => line.line_id}

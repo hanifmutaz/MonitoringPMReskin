@@ -32,7 +32,7 @@ function ketepatanStatus(percentage) {
 
 function ketepatanCaption(percentage, total, defaultCaption) {
   if (percentage === null || percentage === undefined) return 'Belum ada event tahun ini';
-  return `${defaultCaption} — dari ${total} event`;
+  return `${defaultCaption}, dari ${total} event`;
 }
 
 const PERCENT_BADGE_CLASS = {
@@ -112,7 +112,7 @@ function KetepatanAttentionPanel({ data = [], isLoading }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-1.5">
           <TrendingDown size={16} />
-          Line Perlu Perhatian — Ketepatan PM Terendah (Tahun Berjalan)
+          Line Perlu Perhatian (Ketepatan PM Terendah, Tahun Berjalan)
         </CardTitle>
       </CardHeader>
       {data.length === 0 ? (

@@ -20,7 +20,7 @@ function FooterStatusBar() {
   return (
     <footer className="footer-status-bar">
       <span>{label}</span>
-      <span>&copy; {new Date().getFullYear()} Hirose Indonesia — PM Monitoring Web App</span>
+      <span>&copy; {new Date().getFullYear()} Hirose Indonesia PM Monitoring Web App</span>
     </footer>
   );
 }

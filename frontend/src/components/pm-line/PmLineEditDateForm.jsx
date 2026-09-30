@@ -38,7 +38,7 @@ function PmLineEditDateForm({ line, jenisPm, onCancel, onSuccess }) {
   return (
     <form onSubmit={handleSubmit} className="rounded-xl border border-border bg-card p-4.5">
       <h2 className="m-0 mb-1 font-[var(--font-display)] text-[15px] font-semibold">
-        Koreksi Tgl {jenisPm === 'MONTHLY' ? 'Monthly' : 'Weekly'} Terakhir — {line.line_name}
+        Koreksi Tgl {jenisPm === 'MONTHLY' ? 'Monthly' : 'Weekly'} Terakhir {line.line_name}
       </h2>
       <p className="m-0 mb-3.5 text-[12px] text-[var(--text-faint)]">
         Ini koreksi baseline, bukan input PM baru: riwayat PM tidak berubah, poin dihitung ulang dari tanggal baru, dan

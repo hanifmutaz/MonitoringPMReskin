@@ -205,7 +205,7 @@ function PartFormModal({ initial, lines, onClose }) {
             />
             <p className="mt-1 text-[11px] text-muted-foreground">
               {isEdit ? 'Opsional saat edit. ' : 'Wajib untuk Part baru (kecuali Counter Awal diisi). '}
-              Tanggal Part ini pertama kali dipasang di mesin (bukan tanggal input data) — jadi baseline sistem mulai
+              Tanggal Part ini pertama kali dipasang di mesin (bukan tanggal input data), jadi baseline sistem mulai
               menghitung Counter/Sisa Shot. Kalau sudah pernah diganti, riwayat penggantian terakhir yang dipakai
               duluan.
             </p>
@@ -246,7 +246,7 @@ function PartFormModal({ initial, lines, onClose }) {
 
           <div className="border-t border-[var(--border-soft)] pt-3 sm:col-span-2">
             <span className="text-xs text-muted-foreground">
-              Referensi Spare Part (opsional — manual, integrasi Inventory ditunda)
+              Referensi Spare Part (opsional, manual, integrasi Inventory ditunda)
             </span>
           </div>
 
@@ -322,7 +322,7 @@ function InventoryLinkSection({ part }) {
   return (
     <div className="mt-4 border-t border-[var(--border-soft)] pt-3">
       <p className="mb-2 text-xs text-muted-foreground">
-        Link ke Inventory Item (stok spare part fisik) — opsional, bisa dishare dengan Part lain kalau spare
+        Link ke Inventory Item (stok spare part fisik), opsional, bisa dishare dengan Part lain kalau spare
         part-nya identik.
       </p>
       <div className="flex gap-2">
@@ -334,7 +334,7 @@ function InventoryLinkSection({ part }) {
             <SelectItem value="none">Tidak di-link</SelectItem>
             {(inventoryData?.items || []).map((inv) => (
               <SelectItem key={inv.id} value={String(inv.id)}>
-                {inv.spare_part_number} — {inv.part_name} (stok: {inv.current_stock})
+                {inv.spare_part_number} / {inv.part_name} (stok: {inv.current_stock})
               </SelectItem>
             ))}
           </SelectContent>
@@ -431,7 +431,7 @@ function PartsTab() {
   return (
     <div>
       <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-        <KpiCard icon={<Package size={16} />} label="Total Part" value={data?.total ?? '—'} status="accent" />
+        <KpiCard icon={<Package size={16} />} label="Total Part" value={data?.total ?? '-'} status="accent" />
         <KpiCard icon={<ListChecks size={16} />} label="Line Aktif" value={lines.length} status="ok" />
       </div>
 

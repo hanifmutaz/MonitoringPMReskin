@@ -104,6 +104,7 @@ function DataTable({
   selection,
   getRowLabel,
   scrollRegionLabel,
+  wrapHeaders = false,
   className,
 }) {
   const hasRows = Array.isArray(rows) && rows.length > 0;
@@ -160,7 +161,10 @@ function DataTable({
                         key={col.key}
                         scope="col"
                         className={cn(
-                          'whitespace-nowrap px-2.5 py-2 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]',
+                          // wrapHeaders (opt-in): header boleh turun ke baris berikutnya
+                          // supaya tabel dengan banyak kolom muat tanpa scroll samping.
+                          wrapHeaders ? 'whitespace-normal align-bottom leading-tight' : 'whitespace-nowrap',
+                          'px-2.5 py-2 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]',
                           col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
                         )}
                       >

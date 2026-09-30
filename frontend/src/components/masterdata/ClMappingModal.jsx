@@ -91,7 +91,7 @@ function ClMappingModal({ part, onClose }) {
   const columns = buildClMappingColumns({ onRemove: handleRemove });
 
   return (
-    <Modal title={`CL Mapping — ${part.drawing_no} (${part.jig_name})`} onClose={onClose} width={560}>
+    <Modal title={`CL Mapping ${part.drawing_no} (${part.jig_name})`} onClose={onClose} width={560}>
       <div className="mb-4">
         <BulkDeleteBar
           count={selection.selectedCount}

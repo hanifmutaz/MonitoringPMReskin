@@ -32,7 +32,7 @@ const LIMIT = 20;
 
 function DiffModal({ entry, onClose }) {
   return (
-    <Modal title={`Detail Perubahan — ${TABLE_NAME_LABEL[entry.table_name] || entry.table_name} #${entry.record_id ?? '-'}`} onClose={onClose} width={640}>
+    <Modal title={`Detail Perubahan ${TABLE_NAME_LABEL[entry.table_name] || entry.table_name} #${entry.record_id ?? '-'}`} onClose={onClose} width={640}>
       {entry.action_detail && (
         <p className="mb-3 text-[13px]">{entry.action_detail}</p>
       )}

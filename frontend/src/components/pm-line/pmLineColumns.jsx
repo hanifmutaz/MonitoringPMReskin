@@ -8,7 +8,8 @@
 //   OnTimeBadge/StatusBadge (dot + bg-dim + text mono) - bukan gaya baru.
 import StatusBadge from '../data-display/StatusBadge';
 import { Button } from '../ui/button';
-import { Pencil } from 'lucide-react';
+import { Pencil, CalendarDays, CalendarRange } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { formatDate } from '../../utils/formatDate';
 
 function ketepatanTone(percentage) {
@@ -133,14 +134,43 @@ function buildPmLineColumns({ onInputMonthly, onInputWeekly, canEditDate = false
       header: '',
       srHeader: 'Aksi',
       render: (line) => (
-        <div className="flex gap-1.5">
-          <Button type="button" size="sm" variant="outline" onClick={() => onInputMonthly(line)}>
-            Input Monthly
-          </Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => onInputWeekly(line)}>
-            Input Weekly
-          </Button>
-        </div>
+        // Tombol icon-only (hemat lebar kolom, tabel tidak perlu scroll
+        // samping). Nama aksi muncul saat hover/fokus lewat Tooltip, dan
+        // tetap ada di aria-label untuk screen reader.
+        <TooltipProvider delayDuration={100}>
+          <div className="flex gap-1.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8"
+                  aria-label="Input Monthly"
+                  onClick={() => onInputMonthly(line)}
+                >
+                  <CalendarDays size={15} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Input Monthly</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8"
+                  aria-label="Input Weekly"
+                  onClick={() => onInputWeekly(line)}
+                >
+                  <CalendarRange size={15} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Input Weekly</TooltipContent>
+            </Tooltip>
+          </div>
+        </TooltipProvider>
       ),
     },
   ];

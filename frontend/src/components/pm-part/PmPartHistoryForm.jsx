@@ -191,7 +191,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart, standalone = false
           {scanCandidates && (
             <div className="mt-2 flex flex-col gap-1.5">
               <span className="text-xs text-muted-foreground">
-                Drawing No ini kepakai di {scanCandidates.length} Line/Jig berbeda — pilih yang dimaksud:
+                Drawing No ini kepakai di {scanCandidates.length} Line/Jig berbeda, pilih yang dimaksud:
               </span>
               {scanCandidates.map((c) => (
                 <Button
@@ -201,7 +201,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart, standalone = false
                   className="justify-start text-left"
                   onClick={() => applyScannedPart(c)}
                 >
-                  {c.line_name} — {c.jig_name} ({c.part_name})
+                  {c.line_name} / {c.jig_name} ({c.part_name})
                 </Button>
               ))}
             </div>
@@ -211,12 +211,12 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart, standalone = false
 
       {isLockedFromScan && lockedPart && (
         <div className="mb-3.5 rounded-lg border border-primary bg-[var(--accent-dim)] px-3.5 py-2.5 text-[13px]">
-          <strong>{lockedPart.drawing_no}</strong> — {lockedPart.part_name} ({lockedPart.jig_name}) di{' '}
+          <strong>{lockedPart.drawing_no}</strong> {lockedPart.part_name} ({lockedPart.jig_name}) di{' '}
           <strong>{lockedPart.line_name}</strong>
           <div className="mt-1 text-xs text-muted-foreground">
             {lockedPart.inventory_item_id
               ? `Stock saat ini: ${lockedPart.inv_current_stock ?? '-'} ${lockedPart.inv_spare_part_number ?? ''}. Akan dikurangi 1 otomatis saat disimpan.`
-              : 'Part ini belum di-link ke Inventory Item — stock TIDAK akan otomatis berkurang.'}
+              : 'Part ini belum di-link ke Inventory Item, stock TIDAK akan otomatis berkurang.'}
           </div>
           <Button type="button" variant="outline" size="sm" className="mt-2" onClick={resetScan}>
             Scan ulang / pilih manual
@@ -250,7 +250,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart, standalone = false
             <SelectContent>
               {(isLockedFromScan && lockedPart ? [lockedPart] : parts).map((p) => (
                 <SelectItem key={p.id} value={String(p.id)}>
-                  {p.drawing_no} ({p.jig_name}) — {p.part_name}
+                  {p.drawing_no} ({p.jig_name}) / {p.part_name}
                 </SelectItem>
               ))}
             </SelectContent>
