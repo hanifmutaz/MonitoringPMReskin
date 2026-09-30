@@ -51,7 +51,7 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
-const DEFAULT_LIMIT = 50;
+const DEFAULT_LIMIT = 20;
 
 const emptyForm = { spare_part_number: '', part_name: '', location: '', note: '', lead_time_days: '', initial_stock: '' };
 

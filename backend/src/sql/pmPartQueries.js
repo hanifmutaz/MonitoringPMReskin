@@ -95,7 +95,17 @@ const FINAL_SELECT = `
   LEFT JOIN part_baseline pb ON pb.part_id = fp.id
 `;
 
-async function findAllWithCounter({ lineId, search, limit, offset } = {}, runner = db) {
+// orderBy: 'wear_desc' = urutkan dari persentase pemakaian (counter / target_shot)
+// tertinggi ke terendah - dipakai halaman Monitoring PM Part. Default (tanpa
+// orderBy) tetap urut Line > Jig > Drawing seperti sebelumnya, supaya caller
+// lain (dashboard, export, dll) tidak berubah perilakunya.
+const WEAR_DESC_ORDER = `
+  (COALESCE(pcnt.counter, 0) + CASE WHEN pb.use_offset THEN COALESCE(fp.counter_awal, 0) ELSE 0 END)::numeric
+    / NULLIF(fp.target_shot, 0) DESC NULLS LAST,
+  l.line_name ASC, fp.jig_name ASC, fp.drawing_no ASC`;
+const DEFAULT_ORDER = 'l.line_name ASC, fp.jig_name ASC, fp.drawing_no ASC';
+
+async function findAllWithCounter({ lineId, search, limit, offset, orderBy } = {}, runner = db) {
   const conditions = ['p.is_active = TRUE'];
   const params = [];
 
@@ -128,7 +138,7 @@ async function findAllWithCounter({ lineId, search, limit, offset } = {}, runner
   const result = await runner.query(
     `${buildCounterCte(filteredPartsSelect)}
      ${FINAL_SELECT}
-     ORDER BY l.line_name ASC, fp.jig_name ASC, fp.drawing_no ASC
+     ORDER BY ${orderBy === 'wear_desc' ? WEAR_DESC_ORDER : DEFAULT_ORDER}
      ${limitOffsetClause}`,
     params
   );

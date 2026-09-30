@@ -4,7 +4,7 @@
 // dikonversi balik ke Number pas onValueChange sebelum dikirim ke parent).
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
-const DEFAULT_OPTIONS = [50, 100, 300, 500];
+const DEFAULT_OPTIONS = [20, 50, 100, 300, 500];
 
 function PageSizeSelector({ value, onChange, options = DEFAULT_OPTIONS }) {
   return (

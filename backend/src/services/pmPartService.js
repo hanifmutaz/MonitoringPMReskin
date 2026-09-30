@@ -110,7 +110,8 @@ async function listPmPart({ lineId, status, search, page, limit }) {
   if (!status) {
     const thresholds = await getThresholds();
     const [rows, total] = await Promise.all([
-      pmPartQueries.findAllWithCounter({ lineId, search, limit: limitNum, offset }),
+      // Monitoring PM Part: pemakaian tertinggi di paling atas.
+      pmPartQueries.findAllWithCounter({ lineId, search, limit: limitNum, offset, orderBy: 'wear_desc' }),
       pmPartQueries.countAll({ lineId, search }),
     ]);
     const items = rows.map((row) => computeMetrics(row, thresholds));

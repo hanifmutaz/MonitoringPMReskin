@@ -102,7 +102,7 @@ async function findByStatus({ status, lineId, search, limit, offset }, runner = 
      JOIN parts p ON p.id = s.part_id AND p.is_active = TRUE
      JOIN lines l ON l.id = s.line_id
      ${where}
-     ORDER BY l.line_name ASC, p.jig_name ASC, p.drawing_no ASC
+     ORDER BY s.wear_percentage DESC, l.line_name ASC, p.jig_name ASC, p.drawing_no ASC
      ${limitOffsetClause}`,
     params
   );

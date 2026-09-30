@@ -1,9 +1,11 @@
 // src/components/Sidebar.jsx
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Wrench, ClipboardList, Database, ShieldCheck, ChevronDown, LogOut, Lock } from 'lucide-react';
+import { LayoutDashboard, Wrench, ClipboardList, Database, ShieldCheck, Settings, ChevronDown, LogOut, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboardSummary } from '../hooks/useDashboardSummary';
+import { useCanAccessSettings } from '../hooks/useSettings';
+import { SETTINGS_MENU } from './settings/settingsCategories';
 import { useSidebar } from '../contexts/SidebarContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import Avatar from './Avatar';
@@ -124,17 +126,24 @@ const NAV_GROUPS = [
     ],
   },
   {
+    // Settings dipecah jadi beberapa submenu (kategori digabung per topik -
+    // lihat SETTINGS_MENU), bukan 1 halaman panjang.
+    // Group ini disembunyikan untuk role yang tidak boleh akses (bukan
+    // Admin & tidak di-grant edit setting apa pun) - lihat filter di
+    // Sidebar() di bawah, pakai useCanAccessSettings.
+    key: 'settings',
+    label: 'Settings',
+    icon: Settings,
+    settingsGroup: true,
+    items: SETTINGS_MENU.map((m) => ({ to: `/settings/${m.key}`, label: m.title })),
+  },
+  {
     key: 'admin',
     label: 'Administrasi',
     icon: ShieldCheck,
     items: [
-      // 'Settings' SENGAJA TIDAK adminOnly lagi (dulu 1 group ini semua
-      // adminOnly) - role non-Admin yang digrant akses lewat
-      // setting_role_access (migration 1700000022000) sekarang perlu bisa
-      // buka menu ini juga. 3 item lain (User Management/Recycle Bin/Audit
-      // Log) TETAP adminOnly: true, difilter per-item di bawah (bukan lagi
-      // per-group) - lihat NAV_GROUPS.map di bawah.
-      { to: '/settings', label: 'Settings' },
+      // 3 item ini adminOnly, difilter per-item di bawah. (Settings sudah
+      // dipindah jadi group sendiri di atas.)
       { to: '/users', label: 'User Management', adminOnly: true },
       { to: '/recycle-bin', label: 'Recycle Bin', adminOnly: true },
       { to: '/audit-log', label: 'Audit Log', adminOnly: true },
@@ -193,13 +202,22 @@ function NavGroup({ group, isOpen, onToggle, isGroupActive, summary, collapsed, 
   const Icon = group.icon;
   const expandedOpen = isOpen && !collapsed;
 
+  // Total badge semua sub-item - ditampilkan di baris parent saat sub-item
+  // sedang tidak kelihatan (grup ditutup atau sidebar collapsed), supaya
+  // notif tidak "hilang" sebelum grupnya dibuka.
+  const groupBadge = group.items.reduce(
+    (sum, item) => sum + (item.badgeKey ? Number(summary?.[item.badgeKey]) || 0 : 0),
+    0
+  );
+  const showGroupBadge = groupBadge > 0 && !expandedOpen;
+
   const button = (
     <button
       type="button"
       onClick={onToggle}
       aria-expanded={expandedOpen}
       aria-label={group.label}
-      className={`flex w-full cursor-pointer items-center rounded-lg border-0 bg-transparent text-sm no-underline transition-[background-color,color,padding,gap] duration-[250ms] ease-in-out ${
+      className={`relative flex w-full cursor-pointer items-center rounded-lg border-0 bg-transparent text-sm no-underline transition-[background-color,color,padding,gap] duration-[250ms] ease-in-out ${
         // FIX: pas collapsed, gap HARUS 0 - label & chevron di bawah cuma
         // disusutin lebarnya jadi 0 (max-w-0), bukan di-unmount, tapi kalau
         // gap-3 tetap kepasang, flexbox masih ngasih jarak 12px ke tiap sisi
@@ -240,6 +258,20 @@ function NavGroup({ group, isOpen, onToggle, isGroupActive, summary, collapsed, 
       >
         {group.label}
       </span>
+      {showGroupBadge && !collapsed && (
+        <span
+          aria-label={`${groupBadge} perlu perhatian`}
+          className="rounded-full bg-danger px-[7px] py-px font-[var(--font-mono)] text-[10px] font-bold text-white"
+        >
+          {groupBadge}
+        </span>
+      )}
+      {showGroupBadge && collapsed && (
+        <span
+          aria-label={`${groupBadge} perlu perhatian`}
+          className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-card"
+        />
+      )}
       <ChevronDown
         className={`shrink-0 text-[var(--text-faint)] transition-[transform,max-width,opacity] duration-[250ms] ease-in-out ${
           expandedOpen ? 'rotate-180' : ''
@@ -285,6 +317,7 @@ function NavGroup({ group, isOpen, onToggle, isGroupActive, summary, collapsed, 
 function Sidebar() {
   const { user, logout, isAdmin, hasPackage } = useAuth();
   const { data: summary } = useDashboardSummary();
+  const { canAccess: canAccessSettings } = useCanAccessSettings();
   const location = useLocation();
 
   const activeGroupKey = useMemo(() => {
@@ -388,6 +421,7 @@ function Sidebar() {
               collapsed vs expanded, gampang drift - poin 10). */}
           <div className="space-y-2.5">
             {NAV_GROUPS.filter((g) => !g.adminOnly || isAdmin)
+              .filter((g) => !g.settingsGroup || canAccessSettings)
               .map((group) => ({ ...group, items: group.items.filter((item) => !item.adminOnly || isAdmin) }))
               .filter((group) => group.items.length > 0)
               .map((group) => (

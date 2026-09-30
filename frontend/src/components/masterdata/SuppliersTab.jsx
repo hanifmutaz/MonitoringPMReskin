@@ -159,7 +159,7 @@ function SuppliersTab() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('name_asc');
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(50);
+  const [limit, setLimit] = useState(20);
   const debouncedSearch = useDebouncedValue(search, 400);
   const activeFilter = FILTERS.find((f) => f.key === filter);
 
@@ -340,7 +340,7 @@ function SuppliersTab() {
 
       {!isLoading && sorted.length > 0 && (
         <div className="mt-3 flex justify-end">
-          <PageSizeSelector value={limit} onChange={(v) => { setLimit(v); setPage(1); }} options={[10, 25, 50, 100]} />
+          <PageSizeSelector value={limit} onChange={(v) => { setLimit(v); setPage(1); }} options={[10, 20, 50, 100]} />
         </div>
       )}
 

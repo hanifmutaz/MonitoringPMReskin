@@ -1,86 +1,58 @@
 // src/pages/SettingsPage.jsx
 import { useState } from 'react';
-import {
-  Sliders,
-  Award,
-  CalendarClock,
-  Repeat,
-  RefreshCw,
-  LayoutGrid,
-  Users,
-  Mail,
-  Package,
-  Pencil,
-  Check,
-  X,
-  Lock,
-  ShieldCheck,
-  Loader2,
-} from 'lucide-react';
+import { useParams, Navigate } from 'react-router-dom';
+import { RefreshCw, Pencil, Check, X, Lock, ShieldCheck, Loader2 } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useAuth } from '../contexts/AuthContext';
-import { useSettings, useUpdateSetting, useUpdateSettingAccess, useSyncConmasNow } from '../hooks/useSettings';
+import { useSettings, useUpdateSetting, useUpdateSettingAccess, useSyncConmasNow, useCanAccessSettings } from '../hooks/useSettings';
+import ForbiddenState from '../components/ForbiddenState';
+import { CATEGORY_META, DEFAULT_SETTINGS_MENU_KEY, findSettingsMenu } from '../components/settings/settingsCategories';
 import { useRoles } from '../hooks/useRoles';
 import ToggleSwitch from '../components/ToggleSwitch';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 
-// Urutan & metadata 7 kategori sesuai MASTER DOCUMENT Bagian 4
-// + kategori 'notifikasi' dan 'inventory' (ditambah belakangan)
-const CATEGORY_META = {
-  threshold_pm_part: { no: 1, title: 'Threshold PM Part', icon: Sliders },
-  skema_poin_monthly: { no: 2, title: 'Skema Poin PM Monthly', icon: Award },
-  skema_poin_weekly: { no: 3, title: 'Skema Poin PM Weekly', icon: Award },
-  threshold_monthly_weekly: { no: 4, title: 'Threshold Monthly & Weekly', icon: CalendarClock },
-  relasi_monthly_weekly: { no: 5, title: 'Relasi Monthly ↔ Weekly', icon: Repeat },
-  sync_data_produksi: { no: 6, title: 'Sync Data Produksi', icon: RefreshCw },
-  dashboard_tampilan: { no: 7, title: 'Dashboard & Tampilan', icon: LayoutGrid },
-  user_role: { no: 8, title: 'User & Role', icon: Users },
-  notifikasi: { no: 9, title: 'Notifikasi Email', icon: Mail },
-  inventory: { no: 10, title: 'Inventory (ROP & Safety Stock)', icon: Package },
-};
-
 // Label manusiawi per setting key — settingnya sendiri fixed catalog dari
 // migration (bukan dibuat dinamis lewat UI), jadi cukup static map di sini
 // tanpa perlu tambah kolom `label` ke tabel app_settings.
 const SETTING_LABELS = {
-  // Threshold PM Part
-  pm_part_danger_multiplier: 'Pengali Danger',
-  pm_part_warning_multiplier: 'Pengali Warning',
-  pm_part_counter_include_reject: 'Reject Dihitung sebagai Shot Terpakai',
-  // Skema Poin PM Monthly
-  pm_monthly_point_full_run: 'Poin Full Run',
-  pm_monthly_point_cap: 'Batas Maksimal Poin',
-  // Skema Poin PM Weekly
-  pm_weekly_point_full_run: 'Poin Full Run',
-  // Threshold Monthly & Weekly
-  pm_monthly_danger_days: 'Batas Hari Danger (Monthly)',
-  pm_monthly_warning_days: 'Batas Hari Warning (Monthly)',
-  pm_weekly_total_days: 'Siklus PM Weekly',
-  pm_weekly_danger_days: 'Batas Hari Danger (Weekly)',
-  pm_weekly_warning_days: 'Batas Hari Warning (Weekly)',
-  // Relasi Monthly <-> Weekly
-  auto_reset_weekly_on_monthly: 'Auto-Reset Weekly saat Monthly',
-  // Sync Data Produksi
-  sync_interval_minutes: 'Interval Sync ke ConMas',
-  sync_lookback_days: 'Rentang Hari Cache Sync',
-  // Dashboard & Tampilan
-  dashboard_upcoming_pm_limit: 'Jumlah Item Upcoming PM',
-  dashboard_default_view: 'Filter Default Dashboard',
-  // User & Role
-  session_timeout_minutes: 'Timeout Sesi (Idle)',
-  allow_operator_edit_master_data: 'Operator Boleh Edit Master Data',
-  // Notifikasi
-  notif_pm_part_enabled: 'Notifikasi Email PM Part',
-  notif_pm_part_recipient_roles: 'Role Penerima Notifikasi PM Part',
-  notif_pm_part_interval_hours: 'Jeda Reminder PM Part (jam)',
-  notif_pm_part_repeat: 'Ulangi Reminder PM Part',
-  notif_inventory_enabled: 'Notifikasi Email Inventory',
-  notif_inventory_recipient_roles: 'Role Penerima Notifikasi Inventory',
-  notif_inventory_interval_hours: 'Jeda Reminder Inventory (jam)',
-  notif_inventory_repeat: 'Ulangi Reminder Inventory',
-  // Inventory
-  inventory_safety_stock_percentage: 'Persentase Safety Stock',
+  // Batas Status Part
+  pm_part_danger_multiplier: 'Batas Danger (sisa hari pakai)',
+  pm_part_warning_multiplier: 'Batas Warning (sisa hari pakai)',
+  pm_part_counter_include_reject: 'Hitung Reject sebagai Pemakaian',
+  // Poin PM Monthly
+  pm_monthly_point_full_run: 'Poin per Full Run',
+  pm_monthly_point_cap: 'Poin Maksimal',
+  // Poin PM Weekly
+  pm_weekly_point_full_run: 'Poin per Full Run',
+  // Batas Status Monthly & Weekly
+  pm_monthly_danger_days: 'Batas Danger Monthly (hari)',
+  pm_monthly_warning_days: 'Batas Warning Monthly (hari)',
+  pm_weekly_total_days: 'Lama Siklus Weekly (hari)',
+  pm_weekly_danger_days: 'Batas Danger Weekly (hari)',
+  pm_weekly_warning_days: 'Batas Warning Weekly (hari)',
+  // Hubungan Monthly & Weekly
+  auto_reset_weekly_on_monthly: 'Reset Weekly Otomatis saat Monthly',
+  // Sinkron Data Produksi
+  sync_interval_minutes: 'Jeda Sinkron ke ConMas',
+  sync_lookback_days: 'Data Produksi yang Disimpan (hari)',
+  // Tampilan Dashboard
+  dashboard_upcoming_pm_limit: 'Jumlah PM Mendatang di Dashboard',
+  dashboard_default_view: 'Tampilan Awal Dashboard',
+  // Akses & Sesi
+  session_timeout_minutes: 'Batas Waktu Tidak Aktif (menit)',
+  allow_operator_edit_master_data: 'Operator Boleh Ubah Master Data',
+  // Notifikasi Email
+  notif_pm_part_enabled: 'Kirim Email PM Part',
+  notif_pm_part_recipient_roles: 'Penerima Email PM Part',
+  notif_pm_part_interval_hours: 'Jeda Pengingat PM Part (jam)',
+  notif_pm_part_repeat: 'Ulangi Pengingat PM Part',
+  notif_inventory_enabled: 'Kirim Email Inventory',
+  notif_inventory_recipient_roles: 'Penerima Email Inventory',
+  notif_inventory_interval_hours: 'Jeda Pengingat Inventory (jam)',
+  notif_inventory_repeat: 'Ulangi Pengingat Inventory',
+  // Stok Pengaman
+  inventory_safety_stock_percentage: 'Persen Stok Pengaman',
 };
 
 function displayValue(setting) {
@@ -191,7 +163,11 @@ function SettingRow({ setting, canEdit, isAdmin }) {
             {!canEdit && <Lock size={11} className="text-[var(--text-faint)]" aria-label="Read-only" />}
           </div>
           {setting.description && <div className="text-xs text-muted-foreground">{setting.description}</div>}
-          <div className="mt-0.5 font-[var(--font-mono)] text-[10px] text-[var(--text-faint)]">{setting.key}</div>
+          {/* Nama teknis (key) cuma berguna buat Admin - disembunyikan dari
+              role lain biar tampilan tidak ramai. */}
+          {isAdmin && (
+            <div className="mt-0.5 font-[var(--font-mono)] text-[10px] text-[var(--text-faint)]">{setting.key}</div>
+          )}
           {error && <div className="mt-0.5 text-xs text-destructive">{error}</div>}
         </div>
 
@@ -329,19 +305,14 @@ function SyncNowButton() {
 }
 
 function CategoryCard({ categoryKey, settings, isAdmin, userRoleId }) {
-  const meta = CATEGORY_META[categoryKey] || { no: '-', title: categoryKey, icon: Sliders };
-  const Icon = meta.icon;
+  const meta = CATEGORY_META[categoryKey] || { title: categoryKey };
   return (
     <div className="rounded-xl border border-border bg-card p-4.5">
       <div className="mb-1 flex items-center justify-between gap-2">
-        <h2 className="m-0 flex items-center gap-2 font-[var(--font-display)] text-[15px] font-semibold">
-          <Icon size={16} />
-          <span className="font-[var(--font-mono)] text-[var(--text-faint)]">{String(meta.no).padStart(2, '0')}</span>
-          {meta.title}
-        </h2>
+        <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">{meta.title}</h2>
         {/* Tombol manual sync cuma relevan & cuma boleh dipakai Admin (route
             POST /settings/sync-conmas Admin only) - taruh di header kategori
-            "Sync Data Produksi" biar dekat sama setting interval-nya. */}
+            "Sinkron Data Produksi" biar dekat sama setting jedanya. */}
         {categoryKey === 'sync_data_produksi' && isAdmin && <SyncNowButton />}
       </div>
       {settings.map((s) => (
@@ -357,9 +328,34 @@ function CategoryCard({ categoryKey, settings, isAdmin, userRoleId }) {
 }
 
 function SettingsPage() {
-  usePageHeader({ title: 'Settings' });
+  const { menu } = useParams();
   const { user, isAdmin } = useAuth();
+  const { canAccess, isLoading: accessLoading } = useCanAccessSettings();
   const { data, isLoading, isError } = useSettings();
+
+  const activeMenu = menu ? findSettingsMenu(menu) : null;
+  usePageHeader({ title: activeMenu ? `Settings — ${activeMenu.title}` : 'Settings' });
+
+  // Role tanpa grant apa pun: menu Settings disembunyikan di Sidebar, dan
+  // kalau URL-nya diketik langsung tampil "Akses ditolak" (bukan redirect
+  // ke Dashboard). Tunggu useCanAccessSettings selesai dulu biar gak
+  // kedip "ditolak" sesaat pas data settings masih dimuat.
+  if (accessLoading) {
+    return <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>;
+  }
+  if (!canAccess) {
+    return <ForbiddenState />;
+  }
+
+  // /settings (tanpa submenu) atau key yang tidak dikenal -> submenu pertama.
+  // Key kategori lama (/settings/threshold_pm_part) -> submenu yang
+  // sekarang menampung kategori itu.
+  if (!activeMenu) {
+    return <Navigate to={`/settings/${DEFAULT_SETTINGS_MENU_KEY}`} replace />;
+  }
+  if (activeMenu.key !== menu) {
+    return <Navigate to={`/settings/${activeMenu.key}`} replace />;
+  }
 
   if (isError) {
     return (
@@ -372,26 +368,20 @@ function SettingsPage() {
     return <div className="py-8 text-center text-sm text-[var(--text-faint)]">Memuat data...</div>;
   }
 
-  const grouped = {};
-  for (const s of data) {
-    if (!grouped[s.category]) grouped[s.category] = [];
-    grouped[s.category].push(s);
-  }
-
-  const orderedCategories = Object.keys(grouped).sort(
-    (a, b) => (CATEGORY_META[a]?.no || 99) - (CATEGORY_META[b]?.no || 99)
-  );
-
   return (
     <div className="flex flex-col gap-4">
       {!isAdmin && (
         <div className="rounded-lg bg-[var(--panel-2)] px-3.5 py-2.5 text-xs text-muted-foreground">
-          Anda hanya bisa mengubah setting yang sudah di-grant Admin untuk role Anda — sisanya tampil read-only.
+          Anda hanya bisa mengubah setting yang sudah diizinkan Admin untuk role Anda. Sisanya hanya bisa dilihat.
         </div>
       )}
-      {orderedCategories.map((cat) => (
-        <CategoryCard key={cat} categoryKey={cat} settings={grouped[cat]} isAdmin={isAdmin} userRoleId={user?.role_id} />
-      ))}
+      {activeMenu.categories.map((cat) => {
+        const categorySettings = data.filter((s) => s.category === cat);
+        if (categorySettings.length === 0) return null;
+        return (
+          <CategoryCard key={cat} categoryKey={cat} settings={categorySettings} isAdmin={isAdmin} userRoleId={user?.role_id} />
+        );
+      })}
     </div>
   );
 }

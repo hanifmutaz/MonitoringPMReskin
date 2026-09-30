@@ -53,7 +53,7 @@ import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { todayString } from '../../utils/todayString';
 
-const DEFAULT_LIMIT = 50;
+const DEFAULT_LIMIT = 20;
 
 const emptyForm = {
   line_id: '',

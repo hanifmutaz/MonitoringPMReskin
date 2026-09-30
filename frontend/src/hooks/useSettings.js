@@ -1,5 +1,6 @@
 // src/hooks/useSettings.js
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../contexts/AuthContext';
 import { fetchSettings, updateSetting, updateSettingAccess, syncConmasNow } from '../api/settingsApi';
 
 export function useSettings() {
@@ -45,4 +46,20 @@ export function useSyncConmasNow() {
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
+}
+
+// Menu/halaman Settings boleh dibuka kalau user Admin, ATAU role-nya di-grant
+// edit minimal 1 setting (setting_role_access). Pakai queryKey ['settings']
+// yang sama dengan useSettings() - jadi Sidebar & SettingsPage berbagi cache,
+// tidak fetch dua kali. Admin tidak perlu fetch (selalu boleh).
+export function useCanAccessSettings() {
+  const { user, isAdmin } = useAuth();
+  const { data, isLoading } = useQuery({
+    queryKey: ['settings'],
+    queryFn: fetchSettings,
+    enabled: !isAdmin && !!user,
+  });
+  if (isAdmin) return { canAccess: true, isLoading: false };
+  const canAccess = (data || []).some((s) => (s.editable_role_ids || []).includes(user?.role_id));
+  return { canAccess, isLoading };
 }

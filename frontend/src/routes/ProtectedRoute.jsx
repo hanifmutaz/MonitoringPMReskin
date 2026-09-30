@@ -1,6 +1,7 @@
 // src/routes/ProtectedRoute.jsx
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import ForbiddenState from '../components/ForbiddenState';
 
 /**
  * @param {string[]} [allowedRoles] - kalau diisi, cuma role ini yang boleh
@@ -24,12 +25,15 @@ function ProtectedRoute({ allowedRoles, requiredPermission }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Role/permission tidak cocok -> tampilkan "Akses ditolak", BUKAN redirect
+  // ke Dashboard (dulu klik menu yang tidak boleh malah pindah ke Dashboard
+  // tanpa penjelasan).
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />;
+    return <ForbiddenState />;
   }
 
   if (requiredPermission && !hasPermission(requiredPermission)) {
-    return <Navigate to="/" replace />;
+    return <ForbiddenState />;
   }
 
   return <Outlet />;

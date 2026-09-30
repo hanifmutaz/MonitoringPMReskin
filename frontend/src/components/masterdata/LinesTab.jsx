@@ -165,7 +165,7 @@ function LinesTab() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('name_asc');
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(50);
+  const [limit, setLimit] = useState(20);
 
   const counts = useMemo(
     () => ({
@@ -325,7 +325,7 @@ function LinesTab() {
 
       {!isLoading && filtered.length > 0 && (
         <div className="mb-3 flex justify-end">
-          <PageSizeSelector value={limit} onChange={(v) => { setLimit(v); setPage(1); }} options={[10, 25, 50, 100]} />
+          <PageSizeSelector value={limit} onChange={(v) => { setLimit(v); setPage(1); }} options={[10, 20, 50, 100]} />
         </div>
       )}
 

@@ -84,8 +84,15 @@ function App() {
                 /settings & /users di bawah. */}
             <Route path="/profile" element={<ProfilePage />} />
 
+            {/* Settings: bukan Admin-only lagi - role yang di-grant edit
+                minimal 1 setting juga boleh buka (dicek di SettingsPage
+                lewat useCanAccessSettings, backend GET /settings memang
+                terbuka untuk semua role login). Submenu per kategori:
+                /settings/:category. */}
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/settings/:menu" element={<SettingsPage />} />
+
             <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
-              <Route path="/settings" element={<SettingsPage />} />
               <Route path="/users" element={<UserManagementPage />} />
               <Route path="/recycle-bin" element={<RecycleBinPage />} />
               <Route path="/audit-log" element={<AuditLogPage />} />
