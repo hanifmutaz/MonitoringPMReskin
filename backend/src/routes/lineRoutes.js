@@ -2,26 +2,24 @@
 const express = require('express');
 const lineController = require('../controllers/lineController');
 const requireAuth = require('../middlewares/authMiddleware');
-const requireRole = require('../middlewares/roleMiddleware');
-const requireMasterDataEditAccess = require('../middlewares/masterDataAccess');
+const requirePermission = require('../middlewares/permissionMiddleware');
+const { REFERENCE_DATA_READ } = require('../middlewares/permissionGroups');
 
 const router = express.Router();
 
 router.use(requireAuth);
 
-// GET - dibuka ke semua role yang sudah login (dulu hardcode 'Admin',
-// 'Operator' - efeknya role custom buatan Role Management gak pernah bisa
-// lihat Master Data Line sama sekali walau sudah digrant permission lewat
-// UI, karena middleware ini cek by NAME literal, bukan permission).
-// View-only di sini aman dilihat siapa saja yang punya akun aktif, sama
-// pola dengan pmLineRoutes.js/pmPartRoutes.js.
-router.get('/', lineController.list);
+// GET - data referensi: dibaca halaman Master Data DAN jadi dropdown di form
+// input PM/Inventory, jadi boleh untuk role yang punya salah satu permission
+// modul terkait (lihat REFERENCE_DATA_READ). Role tanpa satupun (mis.
+// Management yang cuma boleh Dashboard) ditolak.
+router.get('/', requirePermission.any(...REFERENCE_DATA_READ), lineController.list);
 
-// POST/PATCH - Admin, atau Operator jika allow_operator_edit_master_data=true
-router.post('/', requireMasterDataEditAccess, lineController.create);
-router.patch('/:id', requireMasterDataEditAccess, lineController.update);
+// POST/PATCH - butuh permission 'masterdata.edit' (Admin selalu lolos).
+router.post('/', requirePermission('masterdata.edit'), lineController.create);
+router.patch('/:id', requirePermission('masterdata.edit'), lineController.update);
 
-// DELETE - Admin only
-router.delete('/:id', requireRole('Admin'), lineController.remove);
+// DELETE - butuh permission 'masterdata.delete' (default: cuma Admin).
+router.delete('/:id', requirePermission('masterdata.delete'), lineController.remove);
 
 module.exports = router;

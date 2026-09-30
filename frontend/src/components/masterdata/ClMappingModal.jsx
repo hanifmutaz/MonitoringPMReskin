@@ -17,6 +17,7 @@ import { useState } from 'react';
 import { Plus, Trash2, Inbox } from 'lucide-react';
 import { useClMapping, useClMappingMutations } from '../../hooks/useClMapping';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useRowSelection } from '../../hooks/useRowSelection';
 import { useBulkDeleteMutation } from '../../hooks/useRecycleBin';
 import Modal from '../Modal';
@@ -55,6 +56,10 @@ function ClMappingModal({ part, onClose }) {
   const { data: mappings = [], isLoading } = useClMapping(part.id);
   const { create, remove } = useClMappingMutations(part.id);
   const confirm = useConfirm();
+  const { hasPermission, isAdmin } = useAuth();
+  const canEdit = hasPermission('masterdata.edit');
+  // Bulk delete = Recycle Bin engine (Admin-only di backend).
+  const canBulkDelete = isAdmin;
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
   const selection = useRowSelection(mappings.map((m) => m.id));
@@ -88,45 +93,49 @@ function ClMappingModal({ part, onClose }) {
     }
   }
 
-  const columns = buildClMappingColumns({ onRemove: handleRemove });
+  const columns = buildClMappingColumns({ onRemove: handleRemove }).filter((c) => canEdit || c.key !== 'actions');
 
   return (
     <Modal title={`CL Mapping ${part.drawing_no} (${part.jig_name})`} onClose={onClose} width={560}>
       <div className="mb-4">
-        <BulkDeleteBar
+        {canBulkDelete && (
+          <BulkDeleteBar
           count={selection.selectedCount}
           onDelete={handleBulkDelete}
           onClear={selection.clear}
           pending={bulkDelete.isPending}
           label="mapping"
         />
+        )}
         <DataTable
           columns={columns}
           rows={mappings}
           getRowKey={(m) => m.id}
           isLoading={isLoading}
-          selection={selection}
+          selection={canBulkDelete ? selection : undefined}
           emptyState={<EmptyState icon={Inbox} title="Belum ada CL No terpetakan" />}
         />
       </div>
 
-      <form onSubmit={handleAdd} className="flex flex-wrap items-end gap-2">
-        <div>
-          <Label className="mb-1.5">CL No</Label>
-          <Input value={form.cl_no} onChange={(e) => setForm({ ...form, cl_no: e.target.value })} required />
-        </div>
-        <div>
-          <Label className="mb-1.5">Product</Label>
-          <Input value={form.product_name} onChange={(e) => setForm({ ...form, product_name: e.target.value })} />
-        </div>
-        <div>
-          <Label className="mb-1.5">Jig</Label>
-          <Input value={form.jig_name} onChange={(e) => setForm({ ...form, jig_name: e.target.value })} />
-        </div>
-        <Button type="submit" size="icon" disabled={create.isPending} aria-label="Tambah mapping">
-          <Plus size={14} />
-        </Button>
-      </form>
+      {canEdit && (
+        <form onSubmit={handleAdd} className="flex flex-wrap items-end gap-2">
+          <div>
+            <Label className="mb-1.5">CL No</Label>
+            <Input value={form.cl_no} onChange={(e) => setForm({ ...form, cl_no: e.target.value })} required />
+          </div>
+          <div>
+            <Label className="mb-1.5">Product</Label>
+            <Input value={form.product_name} onChange={(e) => setForm({ ...form, product_name: e.target.value })} />
+          </div>
+          <div>
+            <Label className="mb-1.5">Jig</Label>
+            <Input value={form.jig_name} onChange={(e) => setForm({ ...form, jig_name: e.target.value })} />
+          </div>
+          <Button type="submit" size="icon" disabled={create.isPending} aria-label="Tambah mapping">
+            <Plus size={14} />
+          </Button>
+        </form>
+      )}
       {error && (
         <div className="mt-2.5 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{error}</div>
       )}

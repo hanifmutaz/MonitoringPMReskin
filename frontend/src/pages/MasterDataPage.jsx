@@ -34,7 +34,8 @@ const TABS = [
   { key: 'lines', label: 'Lines' },
   { key: 'parts', label: 'Parts' },
   { key: 'suppliers', label: 'Suppliers', packageRequired: 'B' },
-  { key: 'import', label: 'Import Excel' },
+  // Import menulis data -> butuh 'masterdata.edit'.
+  { key: 'import', label: 'Import Excel', permission: 'masterdata.edit' },
   // Admin only: kelola jenis penggantian PM Part (Terjadwal, PM Early, Broken, Aus, dst).
   { key: 'jenis', label: 'Jenis Penggantian', adminOnly: true },
 ];
@@ -42,8 +43,10 @@ const TABS = [
 function MasterDataPage() {
   usePageHeader({ title: 'Master Data Part' });
   const [activeTab, setActiveTab] = useState('lines');
-  const { hasPackage, isAdmin } = useAuth();
-  const visibleTabs = TABS.filter((tab) => !tab.adminOnly || isAdmin);
+  const { hasPackage, isAdmin, hasPermission } = useAuth();
+  const visibleTabs = TABS.filter(
+    (tab) => (!tab.adminOnly || isAdmin) && (!tab.permission || hasPermission(tab.permission))
+  );
   // polish: A10 (motion) - sliding tab indicator, lihat hooks/useTabIndicator.js
   const { containerRef, itemRef, indicatorStyle } = useTabIndicator(activeTab);
 

@@ -41,7 +41,6 @@ const SETTING_LABELS = {
   dashboard_default_view: 'Tampilan Awal Dashboard',
   // Akses & Sesi
   session_timeout_minutes: 'Batas Waktu Tidak Aktif (menit)',
-  allow_operator_edit_master_data: 'Operator Boleh Ubah Master Data',
   // Notifikasi Email
   notif_pm_part_enabled: 'Kirim Email PM Part',
   notif_pm_part_recipient_roles: 'Penerima Email PM Part',

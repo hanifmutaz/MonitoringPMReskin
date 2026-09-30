@@ -31,7 +31,7 @@ function RopBadge({ rop }) {
   return <span className="rounded px-1.5 py-0.5 text-[11px] font-medium bg-ok-dim text-ok">OK</span>;
 }
 
-function buildInventoryColumns({ ropById, onDetail, onEdit, onDelete }) {
+function buildInventoryColumns({ ropById, onDetail, onEdit, onDelete, canManage = true }) {
   return [
     {
       key: 'item',
@@ -80,12 +80,16 @@ function buildInventoryColumns({ ropById, onDetail, onEdit, onDelete }) {
           <Button type="button" variant="outline" size="icon" className="h-7 w-7" title="Detail & Mutasi Stok" onClick={() => onDetail(item)}>
             <History size={13} />
           </Button>
-          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(item)} aria-label={`Edit ${item.part_name}`}>
+          {canManage && (
+            <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(item)} aria-label={`Edit ${item.part_name}`}>
             <Pencil size={13} />
           </Button>
-          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(item)} aria-label={`Hapus ${item.part_name}`}>
+          )}
+          {canManage && (
+            <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(item)} aria-label={`Hapus ${item.part_name}`}>
             <Trash2 size={13} />
           </Button>
+          )}
         </div>
       ),
     },

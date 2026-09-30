@@ -72,6 +72,9 @@ import Avatar from './Avatar';
 // Data/logic (routing, badgeCount dari useDashboardSummary, logout,
 // isAdmin gating) TETAP SAMA - cuma markup/struktur nav yang berubah.
 
+// Mirror backend inventoryRoutes.js (canReadInventory) & App.jsx.
+const INVENTORY_ACCESS = ['inventory.view', 'inventory.input', 'inventory.manage'];
+
 const NAV_GROUPS = [
   {
     key: 'dashboard',
@@ -94,8 +97,8 @@ const NAV_GROUPS = [
       // sertakan tombol scan barcode). Route /pm-part/form TETAP HIDUP
       // (App.jsx) buat kompatibilitas link lama/QR fisik, cuma gak lagi
       // muncul di menu.
-      { to: '/pm-part', label: 'Monitoring PM Part', badgeKey: 'status_danger' },
-      { to: '/pm-part/history', label: 'History PM Part' },
+      { to: '/pm-part', label: 'Monitoring PM Part', badgeKey: 'status_danger', permission: 'pm_part.view' },
+      { to: '/pm-part/history', label: 'History PM Part', permission: 'pm_part.view' },
     ],
   },
   {
@@ -107,8 +110,8 @@ const NAV_GROUPS = [
       // sekarang jadi tombol toolbar "+ Input PM" di PmLineStatusPage (buka
       // modal form yang sama, tanpa preset - user pilih Line & jenis PM di
       // situ). Route /pm-line/form TETAP HIDUP, cuma gak lagi muncul di menu.
-      { to: '/pm-line', label: 'Monitoring PM Monthly and Weekly', badgeKey: 'lines_critical' },
-      { to: '/pm-line/history', label: 'History PM Monthly and Weekly' },
+      { to: '/pm-line', label: 'Monitoring PM Monthly and Weekly', badgeKey: 'lines_critical', permission: 'pm_line.view' },
+      { to: '/pm-line/history', label: 'History PM Monthly and Weekly', permission: 'pm_line.view' },
     ],
   },
   {
@@ -116,13 +119,13 @@ const NAV_GROUPS = [
     label: 'Data',
     icon: Database,
     items: [
-      { to: '/master-data', label: 'Master Data Part' },
+      { to: '/master-data', label: 'Master Data Part', permission: 'masterdata.view' },
       // packageRequired: fitur Paket B - kalau instance ini Paket A, item
       // ini di-render grayed-out + badge "Paket B" (bukan disembunyikan,
       // lihat SubNavItem di bawah) TAPI TETAP bisa diklik/navigable - route
       // di App.jsx yang render UpgradePage, bukan Sidebar yang nge-block.
-      { to: '/inventory', label: 'Inventory', packageRequired: 'B' },
-      { to: '/inventory/history', label: 'History Inventory', packageRequired: 'B' },
+      { to: '/inventory', label: 'Inventory', packageRequired: 'B', anyPermission: INVENTORY_ACCESS },
+      { to: '/inventory/history', label: 'History Inventory', packageRequired: 'B', anyPermission: INVENTORY_ACCESS },
     ],
   },
   {
@@ -142,11 +145,12 @@ const NAV_GROUPS = [
     label: 'Administrasi',
     icon: ShieldCheck,
     items: [
-      // 3 item ini adminOnly, difilter per-item di bawah. (Settings sudah
+      // User Management & Recycle Bin adminOnly, Audit Log pakai permission
+      // 'auditlog.view' - difilter per-item di bawah (canSeeItem). (Settings sudah
       // dipindah jadi group sendiri di atas.)
       { to: '/users', label: 'User Management', adminOnly: true },
       { to: '/recycle-bin', label: 'Recycle Bin', adminOnly: true },
-      { to: '/audit-log', label: 'Audit Log', adminOnly: true },
+      { to: '/audit-log', label: 'Audit Log', permission: 'auditlog.view' },
     ],
   },
 ];
@@ -319,10 +323,20 @@ function NavGroup({ group, isOpen, onToggle, isGroupActive, summary, collapsed, 
 }
 
 function Sidebar() {
-  const { user, logout, isAdmin, hasPackage } = useAuth();
+  const { user, logout, isAdmin, hasPackage, hasPermission } = useAuth();
   const { data: summary } = useDashboardSummary();
   const { canAccess: canAccessSettings } = useCanAccessSettings();
   const location = useLocation();
+
+  // Item menu tampil kalau lolos adminOnly + permission (single/any). Dashboard
+  // gak punya syarat apa pun jadi selalu tampil untuk semua role yang login;
+  // grup yang itemnya habis otomatis ikut hilang (filter di bawah).
+  function canSeeItem(item) {
+    if (item.adminOnly && !isAdmin) return false;
+    if (item.permission && !hasPermission(item.permission)) return false;
+    if (item.anyPermission && !item.anyPermission.some((key) => hasPermission(key))) return false;
+    return true;
+  }
 
   const activeGroupKey = useMemo(() => {
     const found = NAV_GROUPS.find((g) => g.items.some((item) => item.to === location.pathname));
@@ -426,7 +440,7 @@ function Sidebar() {
           <div className="space-y-2.5">
             {NAV_GROUPS.filter((g) => !g.adminOnly || isAdmin)
               .filter((g) => !g.settingsGroup || canAccessSettings)
-              .map((group) => ({ ...group, items: group.items.filter((item) => !item.adminOnly || isAdmin) }))
+              .map((group) => ({ ...group, items: group.items.filter(canSeeItem) }))
               .filter((group) => group.items.length > 0)
               .map((group) => (
               <NavGroup

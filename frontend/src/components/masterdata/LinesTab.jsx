@@ -31,6 +31,7 @@ import { useLineMutations } from '../../hooks/useLineMutations';
 import { useRowSelection } from '../../hooks/useRowSelection';
 import { useBulkDeleteMutation } from '../../hooks/useRecycleBin';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 import Modal from '../Modal';
 import KpiCard from '../KpiCard';
@@ -153,6 +154,12 @@ function LineFormModal({ initial, onClose }) {
 }
 
 function LinesTab() {
+  const { hasPermission, isAdmin } = useAuth();
+  const canEdit = hasPermission('masterdata.edit');
+  const canDelete = hasPermission('masterdata.delete');
+  // Bulk delete lewat Recycle Bin engine (POST /recycle-bin/:entity/bulk-delete)
+  // yang Admin-only di backend - jadi checkbox + bar-nya cuma buat Admin.
+  const canBulkDelete = isAdmin;
   const { data: lines = [], isLoading } = useQuery({
     queryKey: ['lines', { isActive: 'all' }],
     queryFn: () => fetchLines({}),
@@ -242,6 +249,8 @@ function LinesTab() {
   // sites (PmLineStatusPage.jsx/PmPartMonitoringPage.jsx) - columns are
   // cheap to rebuild each render, no measured perf need for memo here.
   const columns = buildLinesColumns({
+    canEdit,
+    canDelete,
     onToggleActive: handleToggleActive,
     onEdit: (line) => setModalState({ mode: 'edit', line }),
     onDelete: handleDelete,
@@ -297,9 +306,11 @@ function LinesTab() {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={() => setModalState({ mode: 'create' })}>
+          {canEdit && (
+            <Button onClick={() => setModalState({ mode: 'create' })}>
             <Plus size={14} /> Tambah Line
           </Button>
+          )}
         </div>
       </div>
 
@@ -315,13 +326,17 @@ function LinesTab() {
         </div>
       )}
 
-      <BulkDeleteBar
+      {canBulkDelete && (
+
+        <BulkDeleteBar
         count={selection.selectedCount}
         onDelete={handleBulkDelete}
         onClear={selection.clear}
         pending={bulkDelete.isPending}
         label="Line"
       />
+
+      )}
 
       {!isLoading && filtered.length > 0 && (
         <div className="mb-3 flex justify-end">
@@ -338,7 +353,7 @@ function LinesTab() {
         limit={limit}
         total={filtered.length}
         onPageChange={setPage}
-        selection={selection}
+        selection={canBulkDelete ? selection : undefined}
         emptyState={
           hasActiveFilter ? (
             <DataTableNoResult description="Tidak ada Line yang cocok." onReset={handleResetFilter} />

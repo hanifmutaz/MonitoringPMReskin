@@ -43,6 +43,7 @@
 import { useState } from 'react';
 import { Plus, X, Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
+import { useAuth } from '../contexts/AuthContext';
 import { usePmPartList } from '../hooks/usePmPartList';
 import { useLines } from '../hooks/useLines';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -62,6 +63,9 @@ const LIMIT = 20;
 
 function PmPartMonitoringPage() {
   usePageHeader({ title: 'Monitoring PM Part' });
+  const { hasPermission } = useAuth();
+  // Input penggantian (toolbar + tombol Ganti Part per baris) butuh 'pm_part.submit'.
+  const canSubmit = hasPermission('pm_part.submit');
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -126,9 +130,11 @@ function PmPartMonitoringPage() {
 
       <FilterBar
         actions={
-          <Button type="button" size="sm" onClick={() => setShowInputForm(true)}>
-            <Plus size={14} /> Input Penggantian Part
-          </Button>
+          canSubmit ? (
+            <Button type="button" size="sm" onClick={() => setShowInputForm(true)}>
+              <Plus size={14} /> Input Penggantian Part
+            </Button>
+          ) : undefined
         }
       >
         <SearchBar value={search} onChange={handleFilterChange(setSearch)} placeholder="Cari drawing no / nama part..." />
@@ -151,7 +157,7 @@ function PmPartMonitoringPage() {
       </FilterBar>
 
       <DataTable
-        columns={buildPmPartColumns(setGantiPartItem)}
+        columns={buildPmPartColumns(canSubmit ? setGantiPartItem : null)}
         rows={data?.items}
         getRowKey={(item) => item.part_id}
         isLoading={isLoading && !data}

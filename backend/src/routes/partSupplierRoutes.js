@@ -5,18 +5,18 @@
 const express = require('express');
 const partSupplierController = require('../controllers/partSupplierController');
 const requireAuth = require('../middlewares/authMiddleware');
-const requireMasterDataEditAccess = require('../middlewares/masterDataAccess');
+const requirePermission = require('../middlewares/permissionMiddleware');
 
 const router = express.Router();
 
 router.use(requireAuth);
 
-// PATCH/DELETE - Role sama semua: Admin, atau Operator jika
-// allow_operator_edit_master_data=true. Beda dengan DELETE Line/Part/Supplier
-// (Admin-only) - ini ngehapus RELASI (kayak cl-mapping), bukan master
-// record, jadi ikut akses yang sama dengan bikin relasinya (POST .../suppliers).
-router.patch('/:id/notes', requireMasterDataEditAccess, partSupplierController.updateNotes);
-router.patch('/:id/primary', requireMasterDataEditAccess, partSupplierController.setPrimary);
-router.delete('/:id', requireMasterDataEditAccess, partSupplierController.remove);
+// PATCH/DELETE - semua pakai 'masterdata.edit'. Beda dengan DELETE
+// Line/Part/Supplier ('masterdata.delete') - ini ngehapus RELASI (kayak
+// cl-mapping), bukan master record, jadi ikut akses yang sama dengan bikin
+// relasinya (POST .../suppliers).
+router.patch('/:id/notes', requirePermission('masterdata.edit'), partSupplierController.updateNotes);
+router.patch('/:id/primary', requirePermission('masterdata.edit'), partSupplierController.setPrimary);
+router.delete('/:id', requirePermission('masterdata.edit'), partSupplierController.remove);
 
 module.exports = router;

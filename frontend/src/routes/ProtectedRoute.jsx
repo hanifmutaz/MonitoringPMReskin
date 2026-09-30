@@ -10,10 +10,12 @@ import ForbiddenState from '../components/ForbiddenState';
  * permission key ini (atau Admin) yang boleh lewat (mis. 'dashboard.multi_site').
  * Beda dari allowedRoles: ini permission granular yang bisa di-assign Admin
  * ke role manapun lewat UI Role Management, bukan hardcode nama role.
+ * @param {string[]} [requiredAnyPermission] - lolos kalau user punya SALAH SATU
+ * permission di daftar (atau Admin). Mirror `requirePermission.any` di backend.
  * Backend TETAP jadi penegak utama (Dev Rules §12) - ini cuma UX, sembunyiin
  * menu/route yang emang gak bisa diakses dari sisi tampilan.
  */
-function ProtectedRoute({ allowedRoles, requiredPermission }) {
+function ProtectedRoute({ allowedRoles, requiredPermission, requiredAnyPermission }) {
   const { isAuthenticated, loading, user, hasPermission } = useAuth();
   const location = useLocation();
 
@@ -33,6 +35,10 @@ function ProtectedRoute({ allowedRoles, requiredPermission }) {
   }
 
   if (requiredPermission && !hasPermission(requiredPermission)) {
+    return <ForbiddenState />;
+  }
+
+  if (requiredAnyPermission && !requiredAnyPermission.some((key) => hasPermission(key))) {
     return <ForbiddenState />;
   }
 

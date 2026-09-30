@@ -108,6 +108,25 @@ async function updateUser(id, fields, actorUserId) {
       }
     }
 
+    // Guard: minimal harus tersisa 1 Admin aktif. Kena kalau user yang diubah
+    // ini Admin aktif DAN update-nya bikin dia bukan Admin lagi (ganti role)
+    // atau nonaktif.
+    if (before.is_active) {
+      const beforeRoleName = await userQueries.findRoleNameById(before.role_id, client);
+      if (beforeRoleName === 'Admin') {
+        const nextRoleId = fields.role_id !== undefined ? fields.role_id : before.role_id;
+        const nextRoleName =
+          nextRoleId === before.role_id ? beforeRoleName : await userQueries.findRoleNameById(nextRoleId, client);
+        const losesAdmin = nextRoleName !== 'Admin' || fields.is_active === false;
+        if (losesAdmin) {
+          const others = await userQueries.countOtherActiveAdmins(id, client);
+          if (others === 0) {
+            throw AppError.conflict('Tidak bisa: ini satu-satunya Admin aktif. Jadikan user lain Admin dulu.');
+          }
+        }
+      }
+    }
+
     if (fields.username !== undefined && fields.username !== before.username) {
       const exists = await userQueries.usernameExists(fields.username, client);
       if (exists) {

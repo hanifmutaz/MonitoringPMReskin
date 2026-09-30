@@ -27,6 +27,7 @@ import { usePmPartHistoryList } from '../hooks/usePmPartHistory';
 import { useLines } from '../hooks/useLines';
 import { useRowSelection } from '../hooks/useRowSelection';
 import { useBulkDeleteMutation } from '../hooks/useRecycleBin';
+import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmDialogContext';
 import { fetchPmPartHistoryList } from '../api/pmPartHistoryApi';
 import Pagination from '../components/Pagination';
@@ -61,6 +62,8 @@ function PmPartHistoryPage() {
   const { data, isLoading, isError } = usePmPartHistoryList(params);
   const pageIds = data?.items?.map((h) => h.id) ?? [];
   const selection = useRowSelection(pageIds);
+  // Hapus massal = Recycle Bin engine, Admin-only di backend.
+  const { isAdmin: canBulkDelete } = useAuth();
   // 'pm-part-history' - entity ini yang PALING KRITIS di antara 3 tabel
   // history: counter wear part dihitung LIVE dari MAX(tgl_ganti) tabel ini
   // (COUNTER_CTE di pmPartQueries.js, filter deleted_at IS NULL sudah
@@ -148,7 +151,9 @@ function PmPartHistoryPage() {
           </div>
         )}
 
-        <BulkDeleteBar
+        {canBulkDelete && (
+
+          <BulkDeleteBar
           count={selection.selectedCount}
           onDelete={handleBulkDelete}
           onClear={selection.clear}
@@ -156,7 +161,9 @@ function PmPartHistoryPage() {
           label="Riwayat"
         />
 
-        {data && selection.allOnPageSelected && (
+        )}
+
+        {canBulkDelete && data && selection.allOnPageSelected && (
           <SelectAllAcrossPagesBar
             pageCount={pageIds.length}
             total={data.total}
@@ -183,18 +190,20 @@ function PmPartHistoryPage() {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b border-border">
-                      <th scope="col" className="w-[36px] px-2.5 py-2">
-                        <input
-                          type="checkbox"
-                          checked={selection.allOnPageSelected}
-                          ref={(el) => {
-                            if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
-                          }}
-                          onChange={selection.toggleAllOnPage}
-                          aria-label="Pilih semua baris di halaman ini"
-                          className="h-3.5 w-3.5 accent-[var(--accent)]"
-                        />
-                      </th>
+                      {canBulkDelete && (
+                        <th scope="col" className="w-[36px] px-2.5 py-2">
+                          <input
+                            type="checkbox"
+                            checked={selection.allOnPageSelected}
+                            ref={(el) => {
+                              if (el) el.indeterminate = selection.someOnPageSelected && !selection.allOnPageSelected;
+                            }}
+                            onChange={selection.toggleAllOnPage}
+                            aria-label="Pilih semua baris di halaman ini"
+                            className="h-3.5 w-3.5 accent-[var(--accent)]"
+                          />
+                        </th>
+                      )}
                       {['Tanggal', 'Line / Part', 'Shift', 'Counter', 'Jenis', 'PIC', 'Ketepatan', 'Remark', 'Oleh'].map(
                         (h) => (
                           <th
@@ -211,15 +220,17 @@ function PmPartHistoryPage() {
                   <tbody>
                     {data.items.map((item) => (
                       <tr key={item.id} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
-                        <td className="px-2.5 py-2.5">
-                          <input
-                            type="checkbox"
-                            checked={selection.isSelected(item.id)}
-                            onChange={() => selection.toggle(item.id)}
-                            aria-label={`Pilih riwayat ${item.line_name} - ${item.part_name}`}
-                            className="h-3.5 w-3.5 accent-[var(--accent)]"
-                          />
-                        </td>
+                        {canBulkDelete && (
+                          <td className="px-2.5 py-2.5">
+                            <input
+                              type="checkbox"
+                              checked={selection.isSelected(item.id)}
+                              onChange={() => selection.toggle(item.id)}
+                              aria-label={`Pilih riwayat ${item.line_name} - ${item.part_name}`}
+                              className="h-3.5 w-3.5 accent-[var(--accent)]"
+                            />
+                          </td>
+                        )}
                         <td className="px-2.5 py-2.5 font-[var(--font-mono)] text-[13px]">{formatDate(item.tgl_ganti)}</td>
                         <td className="px-2.5 py-2.5">
                           <div className="font-[var(--font-mono)] text-[13px]">{item.line_name}</div>

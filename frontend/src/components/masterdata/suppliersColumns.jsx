@@ -7,7 +7,7 @@
 import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from '../ui/button';
 
-function buildSuppliersColumns({ onEdit, onDelete, onToggleActive }) {
+function buildSuppliersColumns({ onEdit, onDelete, onToggleActive, canEdit = true, canDelete = true }) {
   return [
     {
       key: 'supplier_name',
@@ -39,6 +39,7 @@ function buildSuppliersColumns({ onEdit, onDelete, onToggleActive }) {
           <input
             type="checkbox"
             checked={s.is_active}
+            disabled={!canEdit}
             onChange={(e) => onToggleActive(s, e.target.checked)}
             className="h-3.5 w-3.5 accent-[var(--accent)]"
           />
@@ -51,12 +52,16 @@ function buildSuppliersColumns({ onEdit, onDelete, onToggleActive }) {
       header: 'Aksi',
       render: (s) => (
         <div className="flex gap-1">
-          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(s)} aria-label={`Edit ${s.supplier_name}`}>
+          {canEdit && (
+            <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(s)} aria-label={`Edit ${s.supplier_name}`}>
             <Pencil size={13} />
           </Button>
-          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(s)} aria-label={`Hapus ${s.supplier_name}`}>
+          )}
+          {canDelete && (
+            <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(s)} aria-label={`Hapus ${s.supplier_name}`}>
             <Trash2 size={13} />
           </Button>
+          )}
         </div>
       ),
     },

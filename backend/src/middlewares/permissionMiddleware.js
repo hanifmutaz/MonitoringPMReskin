@@ -22,4 +22,28 @@ function requirePermission(permissionKey) {
   };
 }
 
+/**
+ * Lolos kalau user punya SALAH SATU permission di daftar (atau Admin '*').
+ * Dipakai buat endpoint yang legit dibutuhkan beberapa modul sekaligus,
+ * mis. GET /lines yang jadi dropdown di form input PM DAN halaman Master
+ * Data, atau create Inventory yang boleh lewat 'inventory.input' ATAUPUN
+ * 'inventory.manage'.
+ *
+ * Contoh: router.post('/', requireAuth, requirePermission.any('inventory.input', 'inventory.manage'), ctrl.create)
+ */
+function requireAnyPermission(...permissionKeys) {
+  return function anyPermissionCheck(req, res, next) {
+    if (!req.user) {
+      throw AppError.unauthorized('Token tidak ada');
+    }
+    const perms = req.user.permissions || [];
+    if (perms.includes('*') || permissionKeys.some((key) => perms.includes(key))) {
+      return next();
+    }
+    throw AppError.forbidden(`Role Anda tidak punya akses (butuh salah satu dari: ${permissionKeys.join(', ')})`);
+  };
+}
+
+requirePermission.any = requireAnyPermission;
+
 module.exports = requirePermission;

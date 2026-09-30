@@ -33,6 +33,7 @@ import { useInventoryItemDetail, useInventoryMovements } from '../../hooks/useIn
 import { useInventoryMutations } from '../../hooks/useInventoryMutations';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useRowSelection } from '../../hooks/useRowSelection';
 import { useBulkDeleteMutation } from '../../hooks/useRecycleBin';
 import { RopBadge, buildInventoryColumns, inventoryMovementColumns } from './inventoryColumns';
@@ -242,6 +243,8 @@ function AdjustStockForm({ item, onDone }) {
 }
 
 function ItemDetailModal({ itemId, onClose }) {
+  const { hasPermission } = useAuth();
+  const canInput = hasPermission('inventory.manage') || hasPermission('inventory.input');
   const { data: item } = useInventoryItemDetail(itemId);
   const { data: movementData, isLoading: isMovementsLoading } = useInventoryMovements(itemId, { page: 1, limit: 20 });
   const { data: ropData } = useInventoryRopStatus();
@@ -317,7 +320,7 @@ function ItemDetailModal({ itemId, onClose }) {
 
       <div className="mb-4 border-t border-[var(--border-soft)] pt-3">
         <div className="mb-2 text-xs text-muted-foreground">Catat mutasi stok baru</div>
-        <AdjustStockForm item={item} />
+        {canInput && <AdjustStockForm item={item} />}
       </div>
 
       <div className="border-t border-[var(--border-soft)] pt-3">
@@ -343,6 +346,12 @@ function ItemDetailModal({ itemId, onClose }) {
 }
 
 function InventoryTab() {
+  const { hasPermission, isAdmin } = useAuth();
+  // Input = tambah item + catat stok; Manage = edit + hapus (sudah termasuk input).
+  const canManage = hasPermission('inventory.manage');
+  const canInput = canManage || hasPermission('inventory.input');
+  // Bulk delete lewat Recycle Bin engine yang Admin-only di backend.
+  const canBulkDelete = isAdmin;
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(DEFAULT_LIMIT);
@@ -379,6 +388,7 @@ function InventoryTab() {
   }, [ropData]);
 
   const columns = buildInventoryColumns({
+    canManage,
     ropById,
     onDetail: (item) => setDetailItemId(item.id),
     onEdit: (item) => setModalState({ mode: 'edit', item }),
@@ -443,9 +453,11 @@ function InventoryTab() {
             }}
           />
         </div>
-        <Button onClick={() => setModalState({ mode: 'create' })}>
+        {canInput && (
+          <Button onClick={() => setModalState({ mode: 'create' })}>
           <Plus size={14} /> Tambah Inventory Item
         </Button>
+        )}
       </div>
 
       {actionError && (
@@ -460,7 +472,9 @@ function InventoryTab() {
         </div>
       )}
 
-      <BulkDeleteBar
+      {canBulkDelete && (
+
+        <BulkDeleteBar
         count={selection.selectedCount}
         onDelete={handleBulkDelete}
         onClear={selection.clear}
@@ -468,7 +482,9 @@ function InventoryTab() {
         label="Inventory Item"
       />
 
-      {data && selection.allOnPageSelected && (
+      )}
+
+      {canBulkDelete && data && selection.allOnPageSelected && (
         <SelectAllAcrossPagesBar
           pageCount={pageIds.length}
           total={data.total}
@@ -483,7 +499,7 @@ function InventoryTab() {
         getRowKey={(item) => item.id}
         isLoading={isLoading && !data}
         isRefreshing={isFetching && !isLoading}
-        selection={selection}
+        selection={canBulkDelete ? selection : undefined}
         page={data?.page}
         limit={data?.limit}
         total={data?.total}

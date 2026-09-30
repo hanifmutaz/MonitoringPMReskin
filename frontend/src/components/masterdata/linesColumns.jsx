@@ -8,7 +8,7 @@
 import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from '../ui/button';
 
-function buildLinesColumns({ onToggleActive, onEdit, onDelete }) {
+function buildLinesColumns({ onToggleActive, onEdit, onDelete, canEdit = true, canDelete = true }) {
   return [
     {
       key: 'line_name',
@@ -23,6 +23,7 @@ function buildLinesColumns({ onToggleActive, onEdit, onDelete }) {
           <input
             type="checkbox"
             checked={line.is_active}
+            disabled={!canEdit}
             onChange={(e) => onToggleActive(line, e.target.checked)}
             className="h-3.5 w-3.5 accent-[var(--accent)]"
           />
@@ -52,12 +53,16 @@ function buildLinesColumns({ onToggleActive, onEdit, onDelete }) {
       header: 'Aksi',
       render: (line) => (
         <div className="flex gap-1">
-          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(line)} aria-label={`Edit ${line.line_name}`}>
+          {canEdit && (
+            <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(line)} aria-label={`Edit ${line.line_name}`}>
             <Pencil size={13} />
           </Button>
-          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(line)} aria-label={`Hapus ${line.line_name}`}>
+          )}
+          {canDelete && (
+            <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(line)} aria-label={`Hapus ${line.line_name}`}>
             <Trash2 size={13} />
           </Button>
+          )}
         </div>
       ),
     },

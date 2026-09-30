@@ -133,6 +133,22 @@ async function findRoleNameById(roleId, runner = db) {
   return result.rows[0] ? result.rows[0].name : null;
 }
 
+/**
+ * Jumlah user Admin AKTIF selain `excludeUserId`. Dipakai guard "minimal harus
+ * ada satu Admin aktif" (userManagementService.updateUser) - supaya tidak ada
+ * jalan (ganti role / nonaktifkan) yang bikin sistem tanpa Admin sama sekali.
+ */
+async function countOtherActiveAdmins(excludeUserId, runner = db) {
+  const result = await runner.query(
+    `SELECT COUNT(*)::int AS count
+     FROM users u
+     JOIN roles r ON r.id = u.role_id
+     WHERE r.name = 'Admin' AND u.is_active = TRUE AND u.deleted_at IS NULL AND u.id <> $1`,
+    [excludeUserId]
+  );
+  return result.rows[0].count;
+}
+
 async function createUser({ username, passwordHash, fullName, roleId, email, status }, runner = db) {
   const result = await runner.query(
     `INSERT INTO users (username, password_hash, role_id, full_name, email, status, is_active)
@@ -232,6 +248,7 @@ module.exports = {
   usernameExists,
   roleExists,
   findRoleNameById,
+  countOtherActiveAdmins,
   createUser,
   updateUser,
   findActiveEmailsByRoles,

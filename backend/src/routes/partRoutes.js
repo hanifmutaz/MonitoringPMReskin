@@ -4,54 +4,56 @@ const partController = require('../controllers/partController');
 const clMappingController = require('../controllers/clMappingController');
 const partSupplierController = require('../controllers/partSupplierController');
 const requireAuth = require('../middlewares/authMiddleware');
-const requireRole = require('../middlewares/roleMiddleware');
-const requireMasterDataEditAccess = require('../middlewares/masterDataAccess');
+const requirePermission = require('../middlewares/permissionMiddleware');
+const { REFERENCE_DATA_READ } = require('../middlewares/permissionGroups');
 const { requireLicensePackage } = require('../middlewares/licenseMiddleware');
 
 const router = express.Router();
 
 router.use(requireAuth);
 
-// Parts - GET: dibuka ke semua role yang sudah login (lihat catatan sama di
-// lineRoutes.js - requireRole('Admin','Operator') hardcode bikin role
-// custom kejegal 403 walau sudah digrant permission lewat Role Management).
-router.get('/', partController.list);
+// Parts - GET: data referensi, lihat REFERENCE_DATA_READ + catatan di lineRoutes.js.
+router.get('/', requirePermission.any(...REFERENCE_DATA_READ), partController.list);
 
 // Lookup exact-match by Drawing No (hasil scan barcode kamera iPad) - akses
 // sama dengan list biasa, cuma beda cara matching (exact, bukan ILIKE).
-router.get('/lookup', partController.lookupByDrawingNo);
+router.get('/lookup', requirePermission.any(...REFERENCE_DATA_READ), partController.lookupByDrawingNo);
 
-// Parts - POST/PATCH: Admin, atau Operator jika allow_operator_edit_master_data=true
-router.post('/', requireMasterDataEditAccess, partController.create);
-router.patch('/:id', requireMasterDataEditAccess, partController.update);
+// Parts - POST/PATCH: permission 'masterdata.edit'
+router.post('/', requirePermission('masterdata.edit'), partController.create);
+router.patch('/:id', requirePermission('masterdata.edit'), partController.update);
 
-// Parts - DELETE: Admin only
-router.delete('/:id', requireRole('Admin'), partController.remove);
+// Parts - DELETE: permission 'masterdata.delete' (default: cuma Admin)
+router.delete('/:id', requirePermission('masterdata.delete'), partController.remove);
 
-// Part-CL Mapping (nested) - GET: dibuka ke semua role yang sudah login
-// (sama alasan di atas).
-router.get('/:partId/cl-mapping', clMappingController.list);
+// Part-CL Mapping (nested) - GET: data referensi (sama alasan di atas).
+router.get('/:partId/cl-mapping', requirePermission.any(...REFERENCE_DATA_READ), clMappingController.list);
 
 // Part-CL Mapping (nested) - POST: sama seperti POST /parts
-router.post('/:partId/cl-mapping', requireMasterDataEditAccess, clMappingController.create);
+router.post('/:partId/cl-mapping', requirePermission('masterdata.edit'), clMappingController.create);
 
 // Part-Supplier (nested) - daftar supplier per Part, "pesen kemana buat
 // part ini" - fitur Paket B (sama alasan dengan supplierRoutes.js), beda
 // dari cl-mapping di atas yang tetap Paket A. requireLicensePackage('B')
 // dicek SEBELUM role/permission, gantiin akses "sama persis dengan
 // cl-mapping" yang lama.
-router.get('/:partId/suppliers', requireLicensePackage('B'), partSupplierController.list);
+router.get(
+  '/:partId/suppliers',
+  requireLicensePackage('B'),
+  requirePermission.any(...REFERENCE_DATA_READ),
+  partSupplierController.list
+);
 router.post(
   '/:partId/suppliers',
   requireLicensePackage('B'),
-  requireMasterDataEditAccess,
+  requirePermission('masterdata.edit'),
   partSupplierController.create
 );
 
 // Link/unlink Part ke Inventory Item - dianggap Master Data (konfigurasi
 // relasi, bukan transaksi stok) - sama akses dengan edit Part.
 const inventoryController = require('../controllers/inventoryController');
-router.patch('/:partId/inventory-link', requireMasterDataEditAccess, inventoryController.linkPart);
+router.patch('/:partId/inventory-link', requirePermission('masterdata.edit'), inventoryController.linkPart);
 
 // NOTE: bulk-import (POST /parts/bulk-import) SENGAJA belum diimplementasikan
 // di Fase 2. Sesuai 03_API_SPECIFICATION.md §4, endpoint ini "dipakai sekali

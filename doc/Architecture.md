@@ -142,7 +142,7 @@ diambil sadar demi konsistensi arsitektur.
 | Registrasi & approval | User daftar mandiri, status pending sampai Admin approve + assign role | `RegisterPage.jsx`, `userManagementService.js` |
 | Otorisasi (role) | Role di-refresh dari DB tiap request | `authMiddleware.js`, `roleMiddleware.js` |
 | Otorisasi (permission) | Granular per fitur lewat `role_permissions`; Admin selalu bypass (superuser) | `permissionMiddleware.js` (`requirePermission()`), `roleManagementService.js` |
-| Master Data access | Toggle terpisah (`allow_operator_edit_master_data`), sengaja TIDAK masuk sistem permission baru | `masterDataAccess.js`, `settingsService.js` |
+| Master Data access | Permission `masterdata.view/edit/delete` (menggantikan toggle `allow_operator_edit_master_data` + cek nama role, migration `1700000028000`) | `permissionMiddleware.js`, `permissionGroups.js` |
 | Security headers | Helmet (CSP, HSTS, X-Frame-Options, dll) | `app.js` |
 | Rate limiting | Per-IP, khusus endpoint login | `loginRateLimiter.js` |
 | Audit trail | Append-only (DB trigger), granular per aksi | `auditLog.js`, migration `1700000004000` |
@@ -154,20 +154,31 @@ diambil sadar demi konsistensi arsitektur.
 
 Ditambahkan lewat migration `1700000011000_add-role-permissions.sql`:
 
-- `roles.is_system` menandai **Admin** & **Operator** sebagai role bawaan yang
-  tidak boleh di-rename/dihapus (sebagian kode masih hardcode cek by name).
-  Role baru buatan Admin lewat UI selalu `is_system = FALSE`.
+- `roles.is_system` menandai **Admin** sebagai role bawaan yang tidak boleh
+  di-rename/dihapus (superuser bypass dicek by name). Sejak migration
+  `1700000028000`, Operator bukan role sistem lagi. Role baru buatan Admin
+  lewat UI selalu `is_system = FALSE`.
 - `permissions` — katalog fixed capability. Permission baru harus lewat
   migration (nempel ke fitur baru di kode); **assign** permission ke role
   bisa dari UI Role Management.
 - `role_permissions` — many-to-many role ↔ permission. Role Admin tidak
   wajib punya row di sini karena `requirePermission()` selalu bypass total
   untuk role Admin.
-- Katalog permission saat ini: `pm_part.submit`, `pm_line.submit`,
-  `inventory.manage`. Operator di-seed persis dengan behavior sebelum
-  migration ini, supaya user existing tidak kehilangan akses.
-- Settings & User Management sengaja **tetap Admin-only hardcode** — belum
-  dibuka granular di tahap ini karena dianggap terlalu sensitif.
+- Katalog permission (migration `1700000011000`, `013`, `028`):
+  - Input: `pm_part.submit`, `pm_line.submit`, `inventory.input` (tambah item +
+    catat stok, tanpa edit/hapus).
+  - Edit/hapus: `inventory.manage` (edit + hapus, sudah termasuk input),
+    `masterdata.edit`, `masterdata.delete`.
+  - Lihat per modul: `pm_part.view`, `pm_line.view`, `masterdata.view`,
+    `inventory.view`, `auditlog.view`. Dashboard terbuka untuk semua role login.
+  - Lain: `dashboard.multi_site`.
+  Endpoint yang dipakai beberapa modul (GET Lines/Parts/Suppliers) memakai
+  `requirePermission.any(...REFERENCE_DATA_READ)`. Migration `028` men-seed
+  perilaku lama supaya tidak ada yang kehilangan akses diam-diam.
+- Settings (per-key grant), User Management, Recycle Bin (termasuk hapus
+  massal dari halaman Master Data/Inventory/History), dan Jenis Penggantian
+  tetap **Admin-only**. Audit Log bisa didelegasikan lewat `auditlog.view`.
+- Guard: minimal harus ada 1 Admin aktif (`userManagementService.updateUser`).
 
 ## Integrasi ConMas
 

@@ -13,8 +13,10 @@ import WearRing from './WearRing';
 import StatusBadge from '../data-display/StatusBadge';
 import { Button } from '../ui/button';
 
+// onGantiPart null/undefined = user tanpa permission 'pm_part.submit' -> kolom
+// aksi (tombol Ganti Part) tidak dirender sama sekali.
 function buildPmPartColumns(onGantiPart) {
-  return [
+  const columns = [
     {
       key: 'wear',
       header: '',
@@ -84,6 +86,7 @@ function buildPmPartColumns(onGantiPart) {
       ),
     },
   ];
+  return onGantiPart ? columns : columns.filter((c) => c.key !== 'actions');
 }
 
 export default buildPmPartColumns;

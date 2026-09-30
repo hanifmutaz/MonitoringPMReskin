@@ -21,6 +21,7 @@ import { Plus, Building2, CheckCircle2, XCircle, Inbox } from 'lucide-react';
 import { useSuppliers } from '../../hooks/useSuppliers';
 import { useSupplierMutations } from '../../hooks/useSupplierMutations';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useRowSelection } from '../../hooks/useRowSelection';
 import { useBulkDeleteMutation } from '../../hooks/useRecycleBin';
@@ -155,6 +156,12 @@ function SupplierFormModal({ initial, onClose }) {
 }
 
 function SuppliersTab() {
+  const { hasPermission, isAdmin } = useAuth();
+  const canEdit = hasPermission('masterdata.edit');
+  const canDelete = hasPermission('masterdata.delete');
+  // Bulk delete lewat Recycle Bin engine (POST /recycle-bin/:entity/bulk-delete)
+  // yang Admin-only di backend - jadi checkbox + bar-nya cuma buat Admin.
+  const canBulkDelete = isAdmin;
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('name_asc');
@@ -219,6 +226,8 @@ function SuppliersTab() {
   }
 
   const columns = buildSuppliersColumns({
+    canEdit,
+    canDelete,
     onEdit: (s) => setModalState({ mode: 'edit', supplier: s }),
     onDelete: handleDelete,
     onToggleActive: (s, checked) => update.mutate({ id: s.id, payload: { is_active: checked } }),
@@ -292,9 +301,11 @@ function SuppliersTab() {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={() => setModalState({ mode: 'create' })}>
+          {canEdit && (
+            <Button onClick={() => setModalState({ mode: 'create' })}>
             <Plus size={14} /> Tambah Supplier
           </Button>
+          )}
         </div>
       </div>
 
@@ -310,7 +321,9 @@ function SuppliersTab() {
         </div>
       )}
 
-      <BulkDeleteBar
+      {canBulkDelete && (
+
+        <BulkDeleteBar
         count={selection.selectedCount}
         onDelete={handleBulkDelete}
         onClear={selection.clear}
@@ -318,13 +331,15 @@ function SuppliersTab() {
         label="Supplier"
       />
 
+      )}
+
       <DataTable
         columns={columns}
         rows={paged}
         getRowKey={(s) => s.id}
         isLoading={isLoading}
         isRefreshing={isFetching && !isLoading}
-        selection={selection}
+        selection={canBulkDelete ? selection : undefined}
         page={page}
         limit={limit}
         total={sorted.length}

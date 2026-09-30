@@ -18,7 +18,7 @@ function formatTglPasang(value) {
   return y && m && d ? `${d}/${m}/${y}` : null;
 }
 
-function buildPartsColumns({ onClMapping, onSupplier, onEdit, onDelete }) {
+function buildPartsColumns({ onClMapping, onSupplier, onEdit, onDelete, canEdit = true, canDelete = true }) {
   return [
     {
       key: 'line',
@@ -138,12 +138,16 @@ function buildPartsColumns({ onClMapping, onSupplier, onEdit, onDelete }) {
           >
             <Truck size={13} />
           </Button>
-          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(part)} aria-label={`Edit ${part.drawing_no}`}>
+          {canEdit && (
+            <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onEdit(part)} aria-label={`Edit ${part.drawing_no}`}>
             <Pencil size={13} />
           </Button>
-          <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(part)} aria-label={`Hapus ${part.drawing_no}`}>
+          )}
+          {canDelete && (
+            <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => onDelete(part)} aria-label={`Hapus ${part.drawing_no}`}>
             <Trash2 size={13} />
           </Button>
+          )}
         </div>
       ),
     },

@@ -6,12 +6,10 @@ const requirePermission = require('../middlewares/permissionMiddleware');
 
 const router = express.Router();
 
-// View-only - dibuka untuk semua role yang sudah login (Admin, Operator,
-// atau role custom apa pun) - monitoring status Line aman dilihat siapa saja
-// yang punya akun aktif di sistem ini.
+// View-only - butuh permission 'pm_line.view' (Admin selalu lolos).
 router.use(requireAuth);
 
-router.get('/', pmLineController.status);
+router.get('/', requirePermission('pm_line.view'), pmLineController.status);
 
 // Koreksi Tgl PM Terakhir - permission 'pm_line.edit_date' sengaja TIDAK ada di
 // katalog Role Management, jadi efektifnya cuma Admin (wildcard '*').

@@ -2,8 +2,8 @@
 //
 // Role bisa dibuat dari aplikasi (dikonfirmasi user), dengan akses granular
 // per fitur lewat permission (bukan cuma label buat notifikasi). Role
-// bawaan (Admin, Operator) dilindungi dari rename/delete - lihat
-// migration 1700000011000 untuk alasan lengkapnya.
+// bawaan (Admin) dilindungi dari rename/delete - lihat migration
+// 1700000011000 dan 1700000028000 untuk alasan lengkapnya.
 
 const db = require('../config/db');
 const roleQueries = require('../sql/roleQueries');
@@ -69,7 +69,7 @@ async function updateRole(id, { name, permissions }, userId) {
     const before = await roleQueries.findById(id, client);
     if (!before) throw AppError.notFound('Role tidak ditemukan');
     if (before.is_system) {
-      throw AppError.conflict('Role bawaan (Admin/Operator) tidak bisa diubah namanya, tapi permission tetap bisa disesuaikan');
+      throw AppError.conflict('Role Admin tidak bisa diubah namanya');
     }
 
     let updated = before;
@@ -108,9 +108,8 @@ async function updateRole(id, { name, permissions }, userId) {
 }
 
 /**
- * Update permission SAJA (dipakai buat role bawaan Admin/Operator - nama
- * tidak bisa diubah, tapi Operator boleh disesuaikan permission-nya kalau
- * Admin mau perluas/persempit akses default Operator).
+ * Update permission SAJA (tanpa ubah nama). Role Admin ditolak: selalu
+ * superuser, permission-nya tidak bisa diatur.
  */
 async function updateRolePermissions(id, permissions, userId) {
   const client = await db.getClient();
@@ -157,7 +156,7 @@ async function deleteRole(id, userId) {
     const before = await roleQueries.findById(id, client);
     if (!before) throw AppError.notFound('Role tidak ditemukan');
     if (before.is_system) {
-      throw AppError.conflict('Role bawaan (Admin/Operator) tidak bisa dihapus');
+      throw AppError.conflict('Role Admin tidak bisa dihapus');
     }
 
     const userCount = await roleQueries.countUsersByRole(id, client);

@@ -3,7 +3,7 @@ const express = require('express');
 const multer = require('multer');
 const masterDataImportController = require('../controllers/masterDataImportController');
 const requireAuth = require('../middlewares/authMiddleware');
-const requireMasterDataEditAccess = require('../middlewares/masterDataAccess');
+const requirePermission = require('../middlewares/permissionMiddleware');
 const AppError = require('../utils/AppError');
 
 // File di-simpan di memory (bukan disk) - cukup buat file Excel Master Data
@@ -34,9 +34,8 @@ function handleUpload(req, res, next) {
   });
 }
 
-// Preview & Commit - Admin selalu boleh, Operator boleh kalau
-// allow_operator_edit_master_data = true (sama seperti akses Master Data lain)
-router.post('/preview', requireMasterDataEditAccess, handleUpload, masterDataImportController.preview);
-router.post('/commit', requireMasterDataEditAccess, masterDataImportController.commit);
+// Preview & Commit - permission 'masterdata.edit' (sama seperti akses Master Data lain)
+router.post('/preview', requirePermission('masterdata.edit'), handleUpload, masterDataImportController.preview);
+router.post('/commit', requirePermission('masterdata.edit'), masterDataImportController.commit);
 
 module.exports = router;

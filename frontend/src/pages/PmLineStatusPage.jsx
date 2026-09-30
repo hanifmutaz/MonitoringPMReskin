@@ -37,6 +37,8 @@ function PmLineStatusPage() {
   const { data, isLoading, isFetching, isError } = usePmLineStatus({});
   const { hasPermission } = useAuth();
   const canEditDate = hasPermission('pm_line.edit_date'); // efektifnya Admin ('*')
+  // Input PM (tombol toolbar + ikon Monthly/Weekly per baris) butuh 'pm_line.submit'.
+  const canSubmit = hasPermission('pm_line.submit');
   const [editDateTarget, setEditDateTarget] = useState(null); // { line, jenisPm }
   const [inputTarget, setInputTarget] = useState(null); // { line, jenisPm }
   // Modal "Input PM" TANPA preset - dipindah kesini dari menu Sidebar
@@ -70,6 +72,7 @@ function PmLineStatusPage() {
   const columns = buildPmLineColumns({
     onInputMonthly: (line) => setInputTarget({ line, jenisPm: 'MONTHLY' }),
     onInputWeekly: (line) => setInputTarget({ line, jenisPm: 'WEEKLY' }),
+    canSubmit,
     canEditDate,
     onEditMonthlyDate: (line) => setEditDateTarget({ line, jenisPm: 'MONTHLY' }),
     onEditWeeklyDate: (line) => setEditDateTarget({ line, jenisPm: 'WEEKLY' }),
@@ -99,23 +102,25 @@ function PmLineStatusPage() {
         awal tahun ini.
       </Banner>
 
-      <div className="flex justify-end">
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => (anyFormOpen ? closeAllForms() : setShowInputForm(true))}
-        >
-          {anyFormOpen ? (
-            <>
-              <X size={14} /> Tutup Form
-            </>
-          ) : (
-            <>
-              <Plus size={14} /> Input PM
-            </>
-          )}
-        </Button>
-      </div>
+      {canSubmit && (
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => (anyFormOpen ? closeAllForms() : setShowInputForm(true))}
+          >
+            {anyFormOpen ? (
+              <>
+                <X size={14} /> Tutup Form
+              </>
+            ) : (
+              <>
+                <Plus size={14} /> Input PM
+              </>
+            )}
+          </Button>
+        </div>
+      )}
 
       {showInputForm && <PmLineHistoryForm onCancel={closeAllForms} onSuccess={closeAllForms} />}
 

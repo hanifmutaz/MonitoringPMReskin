@@ -36,6 +36,9 @@ const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
+// Mirror backend inventoryRoutes.js (canReadInventory).
+const INVENTORY_ACCESS = ['inventory.view', 'inventory.input', 'inventory.manage'];
+
 function App() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -49,35 +52,50 @@ function App() {
             <Route path="/dashboard/pm-part" element={<DashboardPmPartPage />} />
             <Route path="/dashboard/pm-line" element={<DashboardPmLineWeeklyPage />} />
 
-            <Route path="/pm-part" element={<PmPartMonitoringPage />} />
-            <Route path="/pm-part/form" element={<PmPartFormPage />} />
-            <Route path="/pm-part/history" element={<PmPartHistoryPage />} />
+            {/* Akses per modul pakai permission (bukan nama role) - Admin
+                selalu lolos ('*'). Dashboard di atas terbuka untuk semua
+                role yang login. */}
+            <Route element={<ProtectedRoute requiredPermission="pm_part.view" />}>
+              <Route path="/pm-part" element={<PmPartMonitoringPage />} />
+              <Route path="/pm-part/history" element={<PmPartHistoryPage />} />
+            </Route>
+            <Route element={<ProtectedRoute requiredPermission="pm_part.submit" />}>
+              <Route path="/pm-part/form" element={<PmPartFormPage />} />
+            </Route>
 
-            <Route path="/pm-line" element={<PmLineStatusPage />} />
-            <Route path="/pm-line/form" element={<PmLineFormPage />} />
-            <Route path="/pm-line/history" element={<PmLineHistoryPage />} />
+            <Route element={<ProtectedRoute requiredPermission="pm_line.view" />}>
+              <Route path="/pm-line" element={<PmLineStatusPage />} />
+              <Route path="/pm-line/history" element={<PmLineHistoryPage />} />
+            </Route>
+            <Route element={<ProtectedRoute requiredPermission="pm_line.submit" />}>
+              <Route path="/pm-line/form" element={<PmLineFormPage />} />
+            </Route>
 
-            <Route path="/master-data" element={<MasterDataPage />} />
+            <Route element={<ProtectedRoute requiredPermission="masterdata.view" />}>
+              <Route path="/master-data" element={<MasterDataPage />} />
+            </Route>
             {/* Inventory = fitur Paket B (lihat diagram "Satu Sistem, Dua
                 Paket") - instance Paket A tetap sampai ke halaman ini kalau
                 klik menu Sidebar (yang grayed-out + badge "Paket B"), tapi
                 PackageRoute render UpgradePage di tempat, bukan redirect. */}
-            <Route
-              path="/inventory"
-              element={
-                <PackageRoute requiredPackage="B" featureName="Inventory Integration">
-                  <InventoryPage />
-                </PackageRoute>
-              }
-            />
-            <Route
-              path="/inventory/history"
-              element={
-                <PackageRoute requiredPackage="B" featureName="History Inventory">
-                  <InventoryHistoryPage />
-                </PackageRoute>
-              }
-            />
+            <Route element={<ProtectedRoute requiredAnyPermission={INVENTORY_ACCESS} />}>
+              <Route
+                path="/inventory"
+                element={
+                  <PackageRoute requiredPackage="B" featureName="Inventory Integration">
+                    <InventoryPage />
+                  </PackageRoute>
+                }
+              />
+              <Route
+                path="/inventory/history"
+                element={
+                  <PackageRoute requiredPackage="B" featureName="History Inventory">
+                    <InventoryHistoryPage />
+                  </PackageRoute>
+                }
+              />
+            </Route>
 
             {/* Di luar ProtectedRoute allowedRoles - SEMUA role yang login
                 boleh akses profil sendiri, gak digating per-role kayak
@@ -95,6 +113,9 @@ function App() {
             <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
               <Route path="/users" element={<UserManagementPage />} />
               <Route path="/recycle-bin" element={<RecycleBinPage />} />
+            </Route>
+            {/* Audit Log bisa didelegasikan ke role non-Admin lewat permission. */}
+            <Route element={<ProtectedRoute requiredPermission="auditlog.view" />}>
               <Route path="/audit-log" element={<AuditLogPage />} />
             </Route>
           </Route>

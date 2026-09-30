@@ -36,7 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 
 const emptyForm = { supplier_id: '', notes: '' };
 
-function buildPartSupplierColumns({ onTogglePrimary, onRemove, setPrimaryPending }) {
+function buildPartSupplierColumns({ onTogglePrimary, onRemove, setPrimaryPending, canEdit = true }) {
   return [
     {
       key: 'primary',
@@ -47,7 +47,7 @@ function buildPartSupplierColumns({ onTogglePrimary, onRemove, setPrimaryPending
           type="button"
           title={l.is_primary ? 'Supplier utama - klik buat lepas' : 'Jadikan Supplier utama'}
           onClick={() => onTogglePrimary(l)}
-          disabled={setPrimaryPending}
+          disabled={setPrimaryPending || !canEdit}
           className={cn(
             'flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50',
             l.is_primary ? 'text-warn' : 'text-[var(--text-faint)]'
@@ -98,7 +98,10 @@ function buildPartSupplierColumns({ onTogglePrimary, onRemove, setPrimaryPending
 }
 
 function PartSupplierModal({ part, onClose }) {
-  const { hasPackage } = useAuth();
+  const { hasPackage, hasPermission, isAdmin } = useAuth();
+  const canEdit = hasPermission('masterdata.edit');
+  // Bulk delete = Recycle Bin engine (Admin-only di backend).
+  const canBulkDelete = isAdmin;
   // Fitur Paket B - dicek PALING ATAS, SEBELUM hooks data fetching di bawah
   // dipanggil dengan enabled:false biar gak nembak API yang bakal ke-block
   // backend juga (licenseMiddleware.js). Modal tetap kebuka (tombol
@@ -159,7 +162,8 @@ function PartSupplierModal({ part, onClose }) {
     onTogglePrimary: handleTogglePrimary,
     onRemove: handleRemove,
     setPrimaryPending: setPrimary.isPending,
-  });
+    canEdit,
+  }).filter((c) => canEdit || c.key !== 'actions');
 
   return (
     <Modal title={`Supplier ${part.drawing_no} (${part.jig_name})`} onClose={onClose} width={600}>
@@ -169,56 +173,60 @@ function PartSupplierModal({ part, onClose }) {
       </p>
 
       <div className="mb-4">
-        <BulkDeleteBar
+        {canBulkDelete && (
+          <BulkDeleteBar
           count={selection.selectedCount}
           onDelete={handleBulkDelete}
           onClear={selection.clear}
           pending={bulkDelete.isPending}
           label="Supplier link"
         />
+        )}
         <DataTable
           columns={columns}
           rows={links}
           getRowKey={(l) => l.id}
           isLoading={isLoading}
-          selection={selection}
+          selection={canBulkDelete ? selection : undefined}
           emptyState={<EmptyState icon={Inbox} title="Belum ada Supplier terhubung ke Part ini" />}
         />
       </div>
 
-      <form onSubmit={handleAdd} className="flex flex-wrap items-end gap-2">
-        <div className="min-w-[180px] flex-1">
-          <Label className="mb-1.5">Supplier</Label>
-          <Select value={form.supplier_id} onValueChange={(v) => setForm({ ...form, supplier_id: v })}>
-            <SelectTrigger aria-label="Pilih Supplier">
-              <SelectValue placeholder="Pilih Supplier" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableSuppliers.map((s) => (
-                <SelectItem key={s.id} value={String(s.id)}>
-                  {s.supplier_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {availableSuppliers.length === 0 && (
-            <p className="mt-1 text-[11px] text-[var(--text-faint)]">
-              Semua Supplier aktif udah terhubung, atau belum ada Supplier, tambah dulu di tab Suppliers.
-            </p>
-          )}
-        </div>
-        <div className="min-w-[180px] flex-1">
-          <Label className="mb-1.5">Catatan (opsional)</Label>
-          <Input
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            placeholder="mis. lead time 2 minggu"
-          />
-        </div>
-        <Button type="submit" size="icon" disabled={create.isPending || !form.supplier_id} aria-label="Tambah Supplier">
-          <Plus size={14} />
-        </Button>
-      </form>
+      {canEdit && (
+        <form onSubmit={handleAdd} className="flex flex-wrap items-end gap-2">
+          <div className="min-w-[180px] flex-1">
+            <Label className="mb-1.5">Supplier</Label>
+            <Select value={form.supplier_id} onValueChange={(v) => setForm({ ...form, supplier_id: v })}>
+              <SelectTrigger aria-label="Pilih Supplier">
+                <SelectValue placeholder="Pilih Supplier" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableSuppliers.map((s) => (
+                  <SelectItem key={s.id} value={String(s.id)}>
+                    {s.supplier_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {availableSuppliers.length === 0 && (
+              <p className="mt-1 text-[11px] text-[var(--text-faint)]">
+                Semua Supplier aktif udah terhubung, atau belum ada Supplier, tambah dulu di tab Suppliers.
+              </p>
+            )}
+          </div>
+          <div className="min-w-[180px] flex-1">
+            <Label className="mb-1.5">Catatan (opsional)</Label>
+            <Input
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="mis. lead time 2 minggu"
+            />
+          </div>
+          <Button type="submit" size="icon" disabled={create.isPending || !form.supplier_id} aria-label="Tambah Supplier">
+            <Plus size={14} />
+          </Button>
+        </form>
+      )}
       {error && (
         <div className="mt-2.5 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{error}</div>
       )}

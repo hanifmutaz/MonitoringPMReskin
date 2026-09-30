@@ -34,6 +34,7 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useRowSelection } from '../../hooks/useRowSelection';
 import { useBulkDeleteMutation } from '../../hooks/useRecycleBin';
 import { useConfirm } from '../../contexts/ConfirmDialogContext';
+import { useAuth } from '../../contexts/AuthContext';
 import Modal from '../Modal';
 import KpiCard from '../KpiCard';
 import SearchBar from '../SearchBar';
@@ -351,6 +352,12 @@ function InventoryLinkSection({ part }) {
 }
 
 function PartsTab() {
+  const { hasPermission, isAdmin } = useAuth();
+  const canEdit = hasPermission('masterdata.edit');
+  const canDelete = hasPermission('masterdata.delete');
+  // Bulk delete lewat Recycle Bin engine (POST /recycle-bin/:entity/bulk-delete)
+  // yang Admin-only di backend - jadi checkbox + bar-nya cuma buat Admin.
+  const canBulkDelete = isAdmin;
   const [search, setSearch] = useState('');
   const [lineId, setLineId] = useState('all');
   const [page, setPage] = useState(1);
@@ -422,6 +429,8 @@ function PartsTab() {
   // Not memoized, same convention as LinesTab/pmLineColumns/pmPartColumns
   // call sites - columns are cheap to rebuild each render.
   const columns = buildPartsColumns({
+    canEdit,
+    canDelete,
     onClMapping: setClMappingPart,
     onSupplier: setSupplierPart,
     onEdit: (part) => setModalState({ mode: 'edit', part }),
@@ -472,9 +481,11 @@ function PartsTab() {
             }}
           />
         </div>
-        <Button onClick={() => setModalState({ mode: 'create' })}>
+        {canEdit && (
+          <Button onClick={() => setModalState({ mode: 'create' })}>
           <Plus size={14} /> Tambah Part
         </Button>
+        )}
       </div>
 
       {deleteError && (
@@ -489,7 +500,9 @@ function PartsTab() {
         </div>
       )}
 
-      <BulkDeleteBar
+      {canBulkDelete && (
+
+        <BulkDeleteBar
         count={selection.selectedCount}
         onDelete={handleBulkDelete}
         onClear={selection.clear}
@@ -497,7 +510,9 @@ function PartsTab() {
         label="Part"
       />
 
-      {data && selection.allOnPageSelected && (
+      )}
+
+      {canBulkDelete && data && selection.allOnPageSelected && (
         <SelectAllAcrossPagesBar
           pageCount={pageIds.length}
           total={data.total}
@@ -517,7 +532,7 @@ function PartsTab() {
         limit={data?.limit}
         total={data?.total}
         onPageChange={setPage}
-        selection={selection}
+        selection={canBulkDelete ? selection : undefined}
         emptyState={
           hasActiveFilter ? (
             <DataTableNoResult description="Tidak ada Part yang cocok." onReset={handleResetFilter} />

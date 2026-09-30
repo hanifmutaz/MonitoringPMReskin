@@ -2,11 +2,13 @@
 const express = require('express');
 const auditLogController = require('../controllers/auditLogController');
 const requireAuth = require('../middlewares/authMiddleware');
-const requireRole = require('../middlewares/roleMiddleware');
+const requirePermission = require('../middlewares/permissionMiddleware');
 
 const router = express.Router();
 
-router.use(requireAuth, requireRole('Admin'));
+// Butuh permission 'auditlog.view' (Admin selalu lolos) - bisa didelegasikan
+// ke role non-Admin (mis. Supervisor) tanpa jadi Admin.
+router.use(requireAuth, requirePermission('auditlog.view'));
 
 router.get('/', auditLogController.list);
 

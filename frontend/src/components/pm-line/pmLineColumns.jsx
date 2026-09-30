@@ -68,8 +68,17 @@ function DateWithEdit({ value, canEdit, onEdit, label }) {
   );
 }
 
-function buildPmLineColumns({ onInputMonthly, onInputWeekly, canEditDate = false, onEditMonthlyDate, onEditWeeklyDate }) {
-  return [
+// canSubmit=false (user tanpa permission 'pm_line.submit') -> kolom aksi input
+// (Input Monthly/Weekly) tidak dirender.
+function buildPmLineColumns({
+  onInputMonthly,
+  onInputWeekly,
+  canSubmit = true,
+  canEditDate = false,
+  onEditMonthlyDate,
+  onEditWeeklyDate,
+}) {
+  const columns = [
     {
       key: 'line',
       header: 'Line',
@@ -174,6 +183,7 @@ function buildPmLineColumns({ onInputMonthly, onInputWeekly, canEditDate = false
       ),
     },
   ];
+  return canSubmit ? columns : columns.filter((c) => c.key !== 'actions');
 }
 
 export default buildPmLineColumns;

@@ -41,6 +41,7 @@ import { usePmLineHistoryList } from '../hooks/usePmLineHistory';
 import { useLines } from '../hooks/useLines';
 import { useRowSelection } from '../hooks/useRowSelection';
 import { useBulkDeleteMutation } from '../hooks/useRecycleBin';
+import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmDialogContext';
 import { fetchPmLineHistoryList } from '../api/pmLineHistoryApi';
 import PmLineHistoryForm from '../components/pm-line/PmLineHistoryForm';
@@ -102,6 +103,8 @@ function PmLineHistoryPage() {
   const { data, isLoading, isFetching, isError } = usePmLineHistoryList(params);
   const pageIds = data?.items?.map((h) => h.id) ?? [];
   const selection = useRowSelection(pageIds);
+  // Hapus massal = Recycle Bin engine, Admin-only di backend.
+  const { isAdmin: canBulkDelete } = useAuth();
   // Entity registry-nya 'pm-line-history' (lihat recycleBinRegistry.js) -
   // dipakai sama query key react-query yang di-invalidate abis bulk-delete
   // (lihat ENTITY_QUERY_KEYS di useRecycleBin.js: ikut nyegerin ['pm-line']
@@ -199,7 +202,9 @@ function PmLineHistoryPage() {
         <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{bulkError}</div>
       )}
 
-      <BulkDeleteBar
+      {canBulkDelete && (
+
+        <BulkDeleteBar
         count={selection.selectedCount}
         onDelete={handleBulkDelete}
         onClear={selection.clear}
@@ -207,7 +212,9 @@ function PmLineHistoryPage() {
         label="Riwayat"
       />
 
-      {data && selection.allOnPageSelected && (
+      )}
+
+      {canBulkDelete && data && selection.allOnPageSelected && (
         <SelectAllAcrossPagesBar
           pageCount={pageIds.length}
           total={data.total}
@@ -227,7 +234,7 @@ function PmLineHistoryPage() {
         limit={data?.limit}
         total={data?.total}
         onPageChange={setPage}
-        selection={selection}
+        selection={canBulkDelete ? selection : undefined}
         emptyState={
           hasActiveFilter ? (
             <DataTableNoResult onReset={handleResetFilter} />
