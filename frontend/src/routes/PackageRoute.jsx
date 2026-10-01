@@ -6,6 +6,7 @@
 // PackageRoute gating fitur yang BOLEH diliat infonya (buat upsell) tapi
 // belum bisa dipakai datanya. Dipasang di DALAM ProtectedRoute (App.jsx)
 // - auth tetap dicek duluan.
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import UpgradePage from '../pages/UpgradePage';
 
@@ -15,9 +16,13 @@ import UpgradePage from '../pages/UpgradePage';
  * @param {React.ReactNode} children
  */
 function PackageRoute({ requiredPackage, featureName, children }) {
-  const { hasPackage } = useAuth();
+  const { hasPackage, isAdmin } = useAuth();
 
   if (!hasPackage(requiredPackage)) {
+    // Non-admin gak boleh tau fitur ini ada (menunya juga disembunyikan di
+    // Sidebar) - redirect ke '/', sama kayak ProtectedRoute. Admin tetap
+    // dapat UpgradePage.
+    if (!isAdmin) return <Navigate to="/" replace />;
     return <UpgradePage featureName={featureName} />;
   }
 

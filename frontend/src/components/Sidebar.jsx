@@ -333,6 +333,9 @@ function Sidebar() {
   // grup yang itemnya habis otomatis ikut hilang (filter di bawah).
   function canSeeItem(item) {
     if (item.adminOnly && !isAdmin) return false;
+    // Item fitur paket yang gak dimiliki instance: cuma Admin yang liat
+    // (grayed-out + gembok, buat upsell). Non-admin gak liat sama sekali.
+    if (item.packageRequired && !hasPackage(item.packageRequired) && !isAdmin) return false;
     if (item.permission && !hasPermission(item.permission)) return false;
     if (item.anyPermission && !item.anyPermission.some((key) => hasPermission(key))) return false;
     return true;
