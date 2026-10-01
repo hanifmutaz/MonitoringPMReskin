@@ -80,10 +80,15 @@ function BarcodeScannerModal({ open, onClose, onDetected }) {
       })
       .catch((err) => {
         if (cancelled) return;
+        // Kamera (getUserMedia) hanya jalan di secure context (HTTPS /
+        // localhost). Di http://<IP> browser menyembunyikan mediaDevices.
+        const insecure = typeof window !== 'undefined' && window.isSecureContext === false;
         setError(
-          err?.name === 'NotAllowedError'
-            ? 'Akses kamera ditolak. Izinkan akses kamera di pengaturan browser untuk scan barcode.'
-            : 'Gagal membuka kamera. Pastikan device punya kamera dan tidak dipakai aplikasi lain.'
+          insecure
+            ? 'Scan kamera butuh HTTPS. Situs ini diakses lewat HTTP, jadi browser memblokir kamera. Hubungi admin sistem.'
+            : err?.name === 'NotAllowedError'
+              ? 'Akses kamera ditolak. Izinkan akses kamera di pengaturan browser untuk scan barcode.'
+              : 'Gagal membuka kamera. Pastikan device punya kamera dan tidak dipakai aplikasi lain.'
         );
       });
 
