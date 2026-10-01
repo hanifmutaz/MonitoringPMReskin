@@ -45,7 +45,11 @@ function MasterDataPage() {
   const [activeTab, setActiveTab] = useState('lines');
   const { hasPackage, isAdmin, hasPermission } = useAuth();
   const visibleTabs = TABS.filter(
-    (tab) => (!tab.adminOnly || isAdmin) && (!tab.permission || hasPermission(tab.permission))
+    (tab) =>
+      (!tab.adminOnly || isAdmin) &&
+      (!tab.permission || hasPermission(tab.permission)) &&
+      // Tab fitur paket yang gak dimiliki: cuma Admin yang liat (locked).
+      (!tab.packageRequired || hasPackage(tab.packageRequired) || isAdmin)
   );
   // polish: A10 (motion) - sliding tab indicator, lihat hooks/useTabIndicator.js
   const { containerRef, itemRef, indicatorStyle } = useTabIndicator(activeTab);
