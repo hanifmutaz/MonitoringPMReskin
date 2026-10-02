@@ -1,20 +1,92 @@
 // src/pages/TvDashboardPage.jsx
-// Dashboard TV area teknisi (1 layar, tanpa sidebar): status PM Part, Monthly,
-// Weekly + daftar yang harus dikerjakan. Auto-refresh 60 detik, tanpa endpoint baru.
-// Ukuran panel dibuat kecil & jumlah baris dibatasi supaya tidak ada yang kepotong.
+// Mode TV "PM Monitoring" (1 layar, tanpa sidebar): KPI part/line/inventory,
+// prioritas hari ini, PM terdekat, top part perlu perhatian, jadwal PM 8 hari.
+// Auto-refresh 60 detik, tanpa endpoint baru. Dibuka lewat tombol "Mode TV" di
+// Topbar (route /tv). Ukuran & jumlah baris dibatasi supaya tidak kepotong.
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import dayjs from 'dayjs';
 import 'dayjs/locale/id';
-import { Package, ShieldAlert, AlertTriangle, CheckCircle2, ShieldCheck, WifiOff } from 'lucide-react';
-import { useTvLineSummary, useTvPartSummary, useTvUpcoming, useTvSyncStatus } from '../hooks/useTvDashboard';
+import {
+  Wrench, Package, ShieldAlert, AlertTriangle, CheckCircle2, CalendarClock, Boxes, Target,
+  ClipboardList, Clock, Settings, CalendarDays, Info, WifiOff, Maximize, Minimize, ArrowLeft,
+} from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  useTvLineSummary, useTvPartSummary, useTvUpcoming, useTvSyncStatus, useTvSummary, useTvInventoryNeedOrder,
+} from '../hooks/useTvDashboard';
 
 dayjs.locale('id');
 
-const TONE = { OK: 'text-ok', WARNING: 'text-warn', DANGER: 'text-danger' };
 const num = (v) => (v === undefined || v === null ? '-' : Number(v).toLocaleString('id-ID'));
 const WORST = { DANGER: 0, WARNING: 1, OK: 2 };
+const TONE = { OK: 'text-ok', WARNING: 'text-warn', DANGER: 'text-danger' };
+const PILL = { OK: 'bg-ok text-black', WARNING: 'bg-warn text-black', DANGER: 'bg-danger text-white' };
+const LINE_LABEL = { OK: 'Normal', WARNING: 'Perlu PM', DANGER: 'Kritis' };
+const PART_LABEL = { OK: 'OK', WARNING: 'Warning', DANGER: 'Danger' };
+const TAG_TONE = { M: 'text-warn', W: 'text-[var(--accent)]', P: 'text-[#8b5cf6]' };
 
-function Clock() {
+const dayDiff = (date) => dayjs(date).startOf('day').diff(dayjs().startOf('day'), 'day');
+
+function sisaLabel(n) {
+  if (n === null || n === undefined) return '-';
+  if (n < 0) return `Lewat ${-n} hari`;
+  return n === 0 ? 'Hari ini' : `${n} hari`;
+}
+
+// Ketepatan PM (tahun berjalan) gabungan Part + Monthly + Weekly, dibobot jumlah data.
+function overallCompliance(s) {
+  if (!s) return null;
+  const sets = [
+    [s.ketepatan_pm_part_percentage, s.ketepatan_pm_part_total],
+    [s.ketepatan_pm_monthly_percentage, s.ketepatan_pm_monthly_total],
+    [s.ketepatan_pm_weekly_percentage, s.ketepatan_pm_weekly_total],
+  ];
+  let total = 0;
+  let acc = 0;
+  for (const [pct, tot] of sets) {
+    const t = Number(tot) || 0;
+    if (!t || pct === null || pct === undefined) continue;
+    total += t;
+    acc += Number(pct) * t;
+  }
+  return total ? acc / total : null;
+}
+
+// Gabungan line-summary.attention (yang non-OK) + upcoming (jadwal 7 hari), 1 baris per Line+Jenis.
+function buildNextActions(attention, upcoming) {
+  const map = new Map();
+  const put = (line, jenis, sisa, status) => {
+    if (sisa === null || sisa === undefined) return;
+    const key = `${line}|${jenis}`;
+    if (!map.has(key)) map.set(key, { key, line, jenis, sisa, status });
+  };
+  for (const l of attention) {
+    put(l.line_name, 'Monthly', l.sisa_hari_monthly, l.status_monthly);
+    put(l.line_name, 'Weekly', l.sisa_hari_weekly, l.status_weekly);
+  }
+  for (const u of upcoming) {
+    if (u.type === 'PM_LINE_MONTHLY') put(u.line_name, 'Monthly', dayDiff(u.estimated_date), u.status);
+    if (u.type === 'PM_LINE_WEEKLY') put(u.line_name, 'Weekly', dayDiff(u.estimated_date), u.status);
+  }
+  return [...map.values()].sort((a, b) => a.sisa - b.sisa || WORST[a.status] - WORST[b.status]);
+}
+
+function useFullscreen() {
+  const [full, setFull] = useState(() => !!document.fullscreenElement);
+  useEffect(() => {
+    const onChange = () => setFull(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+  const toggle = () => {
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    else document.documentElement.requestFullscreen?.()?.catch?.(() => {});
+  };
+  return [full, toggle];
+}
+
+function Clock_() {
   const [now, setNow] = useState(() => dayjs());
   useEffect(() => {
     const t = setInterval(() => setNow(dayjs()), 1000);
@@ -22,200 +94,298 @@ function Clock() {
   }, []);
   return (
     <div className="text-right">
-      <div className="font-[var(--font-display)] text-3xl font-semibold leading-none tabular-nums">{now.format('HH:mm:ss')}</div>
-      <div className="mt-1 text-sm text-muted-foreground">{now.format('dddd, D MMMM YYYY')}</div>
+      <div className="text-sm text-muted-foreground">{now.format('dddd, D MMMM YYYY')}</div>
+      <div className="font-[var(--font-display)] text-4xl font-semibold leading-none tabular-nums">{now.format('HH:mm:ss')}</div>
     </div>
   );
 }
 
-function Kpi({ icon, label, value, cls }) {
+function Kpi({ icon, label, sub, value, cls }) {
   return (
-    <div className={`flex items-center gap-4 rounded-2xl px-5 py-3 ${cls}`}>
-      {icon}
-      <div>
-        <div className="text-sm font-medium">{label}</div>
+    <div className={`flex min-w-0 items-center gap-3 rounded-2xl border border-current/30 px-4 py-3 ${cls}`}>
+      <div className="shrink-0">{icon}</div>
+      <div className="min-w-0">
+        <div className="text-sm font-semibold leading-tight">{label}</div>
+        {sub && <div className="text-xs leading-tight opacity-80">{sub}</div>}
         <div className="font-[var(--font-display)] text-4xl font-semibold leading-tight tabular-nums text-foreground">{value}</div>
       </div>
     </div>
   );
 }
 
-function Panel({ title, children, className = '' }) {
+function Panel({ icon, title, aside, children, className = '' }) {
   return (
     <section className={`flex min-h-0 flex-col rounded-2xl border border-border bg-card p-4 ${className}`}>
-      <h2 className="m-0 mb-2 font-[var(--font-display)] text-lg font-semibold">{title}</h2>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2 className="m-0 flex items-center gap-2 font-[var(--font-display)] text-lg font-semibold">
+          <span className="text-[var(--accent)]">{icon}</span>
+          {title}
+        </h2>
+        {aside && <span className="text-sm text-muted-foreground">{aside}</span>}
+      </div>
       <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
     </section>
   );
 }
 
-function MiniDonut({ title, unit, ok = 0, warning = 0, danger = 0 }) {
-  const total = ok + warning + danger;
-  const p = (n) => (total ? (n / total) * 100 : 0);
-  const bg = total
-    ? `conic-gradient(var(--ok) 0 ${p(ok)}%, var(--warn) ${p(ok)}% ${p(ok) + p(warning)}%, var(--danger) ${p(ok) + p(warning)}% 100%)`
-    : 'var(--panel-3)';
-  const rows = [['Sehat', ok, 'bg-ok'], ['Perlu Perhatian', warning, 'bg-warn'], ['Kritis', danger, 'bg-danger']];
-  return (
-    <Panel title={title}>
-      <div className="flex h-full items-center justify-center gap-6">
-        <div className="flex h-[120px] w-[120px] shrink-0 items-center justify-center rounded-full" style={{ background: bg }}>
-          <div className="flex h-[78px] w-[78px] flex-col items-center justify-center rounded-full bg-card">
-            <div className="font-[var(--font-display)] text-2xl font-semibold leading-none">{total}</div>
-            <div className="text-[11px] text-[var(--text-faint)]">{unit}</div>
-          </div>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          {rows.map(([label, v, dot]) => (
-            <div key={label} className="flex items-center gap-2.5 text-sm">
-              <span className={`h-2.5 w-2.5 rounded-full ${dot}`} />
-              <span className="w-32 text-muted-foreground">{label}</span>
-              <span className="font-[var(--font-display)] text-lg font-semibold">{v}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </Panel>
-  );
+const Th = ({ children, right, center }) => (
+  <th className={`border-b border-border px-2 py-1.5 text-xs font-normal text-[var(--text-faint)] ${right ? 'text-right' : center ? 'text-center' : 'text-left'}`}>{children}</th>
+);
+
+function Pill({ status, label }) {
+  return <span className={`inline-block min-w-[72px] rounded px-2 py-0.5 text-center text-xs font-semibold ${PILL[status]}`}>{label}</span>;
 }
 
-function AllGood({ text }) {
+function AllGood({ title, text }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 text-ok">
-      <ShieldCheck size={40} />
-      <div className="text-lg font-medium">{text}</div>
+    <div className="flex h-full flex-col items-center justify-center gap-2 rounded-xl border border-ok/40 bg-ok-dim px-4 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-ok text-black"><CheckCircle2 size={40} /></div>
+      <div className="font-[var(--font-display)] text-xl font-semibold text-ok">{title}</div>
+      <div className="text-sm text-muted-foreground">{text}</div>
     </div>
   );
 }
 
-function eta(date) {
-  if (!date) return '-';
-  const d = dayjs(date).startOf('day').diff(dayjs().startOf('day'), 'day');
-  return d < 0 ? `Lewat ${-d} hari` : d === 0 ? 'Hari ini' : `${d} hari lagi`;
+function TvButton({ children, ...props }) {
+  return (
+    <button
+      type="button"
+      className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm text-muted-foreground transition-colors hover:bg-[var(--panel-2)] hover:text-foreground"
+      {...props}
+    >
+      {children}
+    </button>
+  );
 }
-
-function days(n) {
-  if (n === null || n === undefined) return '-';
-  return n < 0 ? `Lewat ${-n} hari` : `${n} hari`;
-}
-
-const Th = ({ children, right }) => (
-  <th className={`border-b border-border px-2 py-1.5 font-[var(--font-mono)] text-xs font-normal uppercase text-[var(--text-faint)] ${right ? 'text-right' : 'text-left'}`}>{children}</th>
-);
 
 function TvDashboardPage() {
+  const { hasPackage, hasPermission } = useAuth();
+  const [isFull, toggleFull] = useFullscreen();
+
+  const canSeeInventory = hasPackage('B')
+    && (hasPermission('inventory.view') || hasPermission('inventory.input') || hasPermission('inventory.manage'));
+
   const line = useTvLineSummary();
   const part = useTvPartSummary();
   const upcoming = useTvUpcoming().data ?? [];
-  const sync = useTvSyncStatus().data;
+  const syncQ = useTvSyncStatus();
+  const summary = useTvSummary().data;
+  const needOrder = useTvInventoryNeedOrder(canSeeInventory).data;
 
+  const sync = syncQ.data;
   const ld = line.data;
   const pd = part.data;
   const failed = (line.isError && !ld) || (part.isError && !pd);
   const stale = line.isError || part.isError;
+  const connected = sync?.status === 'success';
 
   const topParts = (pd?.top_attention ?? []).slice(0, 10);
-  const attention = [...(ld?.attention ?? [])]
-    .sort((a, b) => Math.min(WORST[a.status_monthly], WORST[a.status_weekly]) - Math.min(WORST[b.status_monthly], WORST[b.status_weekly])
-      || Math.min(a.sisa_hari_monthly ?? 99, a.sisa_hari_weekly ?? 99) - Math.min(b.sisa_hari_monthly ?? 99, b.sisa_hari_weekly ?? 99));
-  const lineRows = attention.slice(0, 8);
+  const nextActions = buildNextActions(ld?.attention ?? [], upcoming);
+  const nextRows = nextActions.slice(0, 8);
+
+  const lineUpcoming = new Set(upcoming.filter((u) => u.type !== 'PM_PART').map((u) => u.line_name)).size;
+  const compliance = overallCompliance(summary);
+
+  const priority = [
+    ...nextActions.filter((r) => r.sisa <= 0).map((r) => ({
+      key: `l-${r.key}`, title: r.line, sub: `PM ${r.jenis}`, info: sisaLabel(r.sisa), status: r.status,
+    })),
+    ...topParts.filter((p) => p.status === 'DANGER').map((p) => ({
+      key: `p-${p.part_id}`, title: p.line_name, sub: p.jig_name || p.part_name, info: `Sisa ${num(p.remaining_shot)} shot`, status: 'DANGER',
+    })),
+  ];
 
   const dayCols = Array.from({ length: 8 }, (_, i) => {
     const d = dayjs().add(i, 'day');
-    const items = upcoming.filter((u) => u.estimated_date === d.format('YYYY-MM-DD'));
-    const worst = items.some((u) => u.status === 'DANGER') ? 'DANGER' : items.length ? 'WARNING' : null;
-    return { key: d.format('YYYY-MM-DD'), label: d.format('ddd D'), count: items.length, worst };
+    const iso = d.format('YYYY-MM-DD');
+    const seen = new Map();
+    for (const u of upcoming) {
+      if (u.estimated_date !== iso) continue;
+      const tag = u.type === 'PM_LINE_MONTHLY' ? 'M' : u.type === 'PM_LINE_WEEKLY' ? 'W' : 'P';
+      const k = `${u.line_name}|${tag}`;
+      const prev = seen.get(k);
+      if (!prev || WORST[u.status] < WORST[prev.status]) seen.set(k, { key: k, line: u.line_name, tag, status: u.status });
+    }
+    const entries = [...seen.values()].sort((a, b) => a.line.localeCompare(b.line));
+    return { key: iso, d, entries, lineCount: new Set(entries.map((e) => e.line)).size, sunday: d.day() === 0 };
   });
 
+  const kpis = [
+    { key: 'total', icon: <Package size={30} />, label: 'Total Part Monitoring', value: num(pd?.total_parts), cls: 'bg-[var(--accent-dim)] text-[var(--accent)]' },
+    { key: 'danger', icon: <ShieldAlert size={30} />, label: 'Danger Part', value: num(pd?.status_danger), cls: 'bg-danger-dim text-danger' },
+    { key: 'warn', icon: <AlertTriangle size={30} />, label: 'Warning Part', value: num(pd?.status_warning), cls: 'bg-warn-dim text-warn' },
+    { key: 'ok', icon: <CheckCircle2 size={30} />, label: 'OK Part', value: num(pd?.status_ok), cls: 'bg-ok-dim text-ok' },
+    { key: 'line', icon: <CalendarClock size={30} />, label: 'Line Perlu PM', sub: '(7 Hari)', value: num(lineUpcoming), cls: 'bg-[rgba(139,92,246,0.14)] text-[#8b5cf6]' },
+    ...(canSeeInventory
+      ? [{ key: 'inv', icon: <Boxes size={30} />, label: 'Inventory Need Order', value: num(needOrder ?? 0), cls: 'bg-[rgba(6,182,212,0.14)] text-[#06b6d4]' }]
+      : []),
+    { key: 'comp', icon: <Target size={30} />, label: 'PM Compliance', sub: '(Tahun Ini)', value: compliance === null ? '-' : `${compliance.toFixed(1)}%`, cls: 'bg-[var(--accent-dim)] text-[var(--accent)]' },
+  ];
+
+  const lastSync = sync?.last_synced_at ? dayjs(sync.last_synced_at) : null;
+  const lastSyncText = lastSync ? lastSync.format(lastSync.isSame(dayjs(), 'day') ? 'HH:mm' : 'D MMM HH:mm') : '-';
+
   return (
-    <div className="grid h-screen grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] gap-3 overflow-hidden bg-background p-4 text-foreground">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="m-0 font-[var(--font-display)] text-3xl font-semibold">PM Monitoring - Area Teknisi</h1>
-          <div className="text-sm text-muted-foreground">
-            Last sync {sync?.last_synced_at ? dayjs(sync.last_synced_at).format('D MMM YYYY HH:mm') : '-'}
-            {sync?.rows_synced ? ` (${num(sync.rows_synced)} data produksi)` : ''}
+    <div className="grid h-screen grid-rows-[auto_auto_minmax(0,1fr)_auto_auto] gap-3 overflow-hidden bg-background p-4 text-foreground">
+      <header className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Wrench size={44} className="text-[var(--accent)]" strokeWidth={2.2} />
+          <div>
+            <h1 className="m-0 font-[var(--font-display)] text-4xl font-semibold leading-tight">PM Monitoring</h1>
+            <div className="text-sm text-muted-foreground">Jaga kondisi mesin, lakukan PM sesuai jadwal</div>
           </div>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-5">
           {stale && <div className="flex items-center gap-2 rounded-lg bg-warn-dim px-3 py-2 text-sm text-warn"><WifiOff size={16} /> Data mungkin tidak terbaru</div>}
-          <Clock />
+          <div className="flex items-center gap-2">
+            <Link to="/" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm text-muted-foreground transition-colors hover:bg-[var(--panel-2)] hover:text-foreground">
+              <ArrowLeft size={16} /> Keluar TV
+            </Link>
+            <TvButton onClick={toggleFull} aria-label={isFull ? 'Keluar layar penuh' : 'Layar penuh'}>
+              {isFull ? <Minimize size={16} /> : <Maximize size={16} />} {isFull ? 'Normal' : 'Layar Penuh'}
+            </TvButton>
+          </div>
+          <Clock_ />
+          <div className="h-12 w-px bg-border" />
+          <div className="flex items-start gap-2">
+            <span className={`mt-1 h-3.5 w-3.5 rounded-full ${syncQ.isLoading ? 'bg-[var(--text-faint)]' : connected ? 'bg-ok' : 'bg-danger'}`} />
+            <div>
+              <div className={`font-semibold leading-tight ${syncQ.isLoading ? 'text-muted-foreground' : connected ? 'text-ok' : 'text-danger'}`}>
+                {syncQ.isLoading ? 'Menghubungkan...' : connected ? 'Produksi Terhubung' : 'Produksi Terputus'}
+              </div>
+              <div className="text-xs text-muted-foreground">Last Sync: {lastSyncText}</div>
+              {sync?.rows_synced ? <div className="text-xs text-muted-foreground">({num(sync.rows_synced)} data produksi)</div> : null}
+            </div>
+          </div>
         </div>
       </header>
 
       {failed ? (
-        <div className="row-span-4 flex items-center justify-center rounded-2xl border border-border bg-card text-xl text-muted-foreground">
+        <div className="row-span-3 flex items-center justify-center rounded-2xl border border-border bg-card text-xl text-muted-foreground">
           Gagal memuat data. Mencoba lagi otomatis... (jika terus muncul, login ulang)
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-4 gap-3">
-            <Kpi icon={<Package size={32} />} label="Total Part Monitoring" value={num(pd?.total_parts)} cls="bg-[var(--accent-dim)] text-[var(--accent)]" />
-            <Kpi icon={<ShieldAlert size={32} />} label="Danger Part" value={num(pd?.status_danger)} cls="bg-danger-dim text-danger" />
-            <Kpi icon={<AlertTriangle size={32} />} label="Warning Part" value={num(pd?.status_warning)} cls="bg-warn-dim text-warn" />
-            <Kpi icon={<CheckCircle2 size={32} />} label="OK Part" value={num(pd?.status_ok)} cls="bg-ok-dim text-ok" />
+          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${kpis.length}, minmax(0, 1fr))` }}>
+            {kpis.map(({ key, ...k }) => <Kpi key={key} {...k} />)}
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <MiniDonut title="Status PM Part" unit="Part" ok={pd?.status_ok} warning={pd?.status_warning} danger={pd?.status_danger} />
-            <MiniDonut title="Status PM Monthly" unit="Line" ok={ld?.monthly.OK} warning={ld?.monthly.WARNING} danger={ld?.monthly.DANGER} />
-            <MiniDonut title="Status PM Weekly" unit="Line" ok={ld?.weekly.OK} warning={ld?.weekly.WARNING} danger={ld?.weekly.DANGER} />
-          </div>
+          <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1.65fr)] gap-3">
+            <Panel icon={<ClipboardList size={22} />} title="Prioritas Hari Ini" aside={dayjs().format('dddd, D MMMM YYYY')}>
+              {priority.length === 0 ? (
+                <AllGood title="Tidak ada PM hari ini" text="Semua mesin dalam kondisi aman. Tetap lakukan pengecekan rutin dan jaga kondisi mesin." />
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  {priority.slice(0, 7).map((p) => (
+                    <div key={p.key} className={`flex items-center justify-between gap-2 rounded-lg px-3 py-1.5 ${p.status === 'DANGER' ? 'bg-danger-dim' : 'bg-warn-dim'}`}>
+                      <div className="min-w-0">
+                        <div className="font-[var(--font-mono)] font-semibold">{p.title}</div>
+                        <div className="truncate text-xs text-muted-foreground">{p.sub}</div>
+                      </div>
+                      <div className={`shrink-0 text-sm font-semibold ${TONE[p.status]}`}>{p.info}</div>
+                    </div>
+                  ))}
+                  {priority.length > 7 && <div className="pt-1 text-center text-xs text-[var(--text-faint)]">+{priority.length - 7} lainnya</div>}
+                </div>
+              )}
+            </Panel>
 
-          <div className="grid min-h-0 grid-cols-[3fr_2fr] gap-3">
-            <Panel title="Top 10 Part Perlu Perhatian">
-              {topParts.length === 0 ? <AllGood text="Semua part aman" /> : (
+            <Panel icon={<Clock size={22} />} title="PM Terdekat (Next Action)">
+              {nextRows.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-muted-foreground">Belum ada jadwal PM Line</div>
+              ) : (
                 <table className="w-full border-collapse text-sm">
-                  <thead><tr><Th>Line</Th><Th>Jig / Station</Th><Th>Drawing No</Th><Th right>Sisa Shot</Th><Th right>ETA PM</Th></tr></thead>
+                  <thead><tr><Th>No</Th><Th>Line</Th><Th>Jenis PM</Th><Th center>Sisa Hari</Th><Th center>Status</Th></tr></thead>
                   <tbody>
-                    {topParts.map((p) => (
-                      <tr key={p.part_id} className="border-b border-[var(--border-soft)]">
-                        <td className="px-2 py-1 font-[var(--font-mono)]">{p.line_name}</td>
-                        <td className="px-2 py-1">{p.jig_name || p.part_name}</td>
-                        <td className="px-2 py-1 font-[var(--font-mono)]">{p.drawing_no}</td>
-                        <td className={`px-2 py-1 text-right font-[var(--font-mono)] font-semibold ${TONE[p.status]}`}>{num(p.remaining_shot)}</td>
-                        <td className="px-2 py-1 text-right">{eta(p.estimated_pm_date)}</td>
+                    {nextRows.map((r, i) => (
+                      <tr key={r.key} className="border-b border-[var(--border-soft)]">
+                        <td className="px-2 py-1 text-muted-foreground">{i + 1}</td>
+                        <td className="px-2 py-1 font-[var(--font-mono)]">{r.line}</td>
+                        <td className="px-2 py-1">{r.jenis}</td>
+                        <td className={`px-2 py-1 text-center font-semibold ${TONE[r.status]}`}>{sisaLabel(r.sisa)}</td>
+                        <td className="px-2 py-1 text-center"><Pill status={r.status} label={LINE_LABEL[r.status]} /></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               )}
             </Panel>
-            <Panel title="Line Perlu PM Monthly / Weekly">
-              {lineRows.length === 0 ? <AllGood text="Semua line OK" /> : (
-                <>
-                  <table className="w-full border-collapse text-sm">
-                    <thead><tr><Th>Line</Th><Th right>Monthly</Th><Th right>Weekly</Th></tr></thead>
-                    <tbody>
-                      {lineRows.map((l) => (
-                        <tr key={l.line_id} className="border-b border-[var(--border-soft)]">
-                          <td className="px-2 py-1 font-[var(--font-mono)]">{l.line_name}</td>
-                          <td className={`px-2 py-1 text-right font-[var(--font-mono)] font-semibold ${TONE[l.status_monthly]}`}>{days(l.sisa_hari_monthly)}</td>
-                          <td className={`px-2 py-1 text-right font-[var(--font-mono)] font-semibold ${TONE[l.status_weekly]}`}>{days(l.sisa_hari_weekly)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {attention.length > lineRows.length && <div className="pt-1 text-center text-xs text-[var(--text-faint)]">+{attention.length - lineRows.length} line lainnya</div>}
-                </>
+
+            <Panel icon={<Settings size={22} />} title="Top 10 Part Perlu Perhatian">
+              {topParts.length === 0 ? (
+                <AllGood title="Semua part aman" text="Tidak ada part berstatus Warning atau Danger." />
+              ) : (
+                <table className="w-full border-collapse text-sm">
+                  <thead><tr><Th>No</Th><Th>Line</Th><Th>Jig / Station</Th><Th right>Sisa Shot</Th><Th right>ETA PM</Th><Th center>Status</Th></tr></thead>
+                  <tbody>
+                    {topParts.map((p, i) => (
+                      <tr key={p.part_id} className="border-b border-[var(--border-soft)]">
+                        <td className="px-2 py-1 text-muted-foreground">{i + 1}</td>
+                        <td className="px-2 py-1 font-[var(--font-mono)]">{p.line_name}</td>
+                        <td className="px-2 py-1">{p.jig_name || p.part_name}</td>
+                        <td className={`px-2 py-1 text-right font-[var(--font-mono)] font-semibold ${TONE[p.status]}`}>{num(p.remaining_shot)}</td>
+                        <td className="px-2 py-1 text-right">{p.estimated_pm_date ? sisaLabel(dayDiff(p.estimated_pm_date)) : '-'}</td>
+                        <td className="px-2 py-1 text-center"><Pill status={p.status} label={PART_LABEL[p.status]} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </Panel>
           </div>
 
-          <Panel title="Jadwal PM Part 7 Hari ke Depan">
-            <div className="grid grid-cols-8 gap-2">
-              {dayCols.map((d) => (
-                <div key={d.key} className="rounded-xl bg-[var(--panel-2)] py-2 text-center">
-                  <div className="font-[var(--font-mono)] text-xs uppercase text-[var(--text-faint)]">{d.label}</div>
-                  <div className={`font-[var(--font-display)] text-2xl font-semibold ${d.worst ? TONE[d.worst] : 'text-[var(--text-faint)]'}`}>{d.count}</div>
+          <div className="grid grid-cols-[minmax(0,1fr)_240px] gap-3">
+            <Panel icon={<CalendarDays size={22} />} title="Jadwal PM 7 Hari Ke Depan" aside="(Berdasarkan Tanggal Due)">
+              <div className="grid grid-cols-8 gap-2">
+                {dayCols.map((c) => (
+                  <div key={c.key} className="flex h-[132px] min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-[var(--panel-2)]">
+                    <div className={`py-1 text-center ${c.sunday ? 'bg-danger-dim text-danger' : 'bg-[var(--accent-dim)] text-[var(--accent)]'}`}>
+                      <div className="text-sm font-semibold leading-tight">{c.d.format('dddd')}</div>
+                      <div className="text-xs leading-tight opacity-80">{c.d.format('D MMM YYYY')}</div>
+                    </div>
+                    {c.entries.length === 0 ? (
+                      <div className="flex flex-1 flex-col items-center justify-center text-xs text-[var(--text-faint)]">
+                        <div className="text-base">-</div>Tidak ada jadwal
+                      </div>
+                    ) : (
+                      <div className="flex min-h-0 flex-1 flex-col justify-between px-2 py-1.5">
+                        <div className="flex flex-col gap-0.5 text-sm font-semibold">
+                          {c.entries.slice(0, 3).map((e) => (
+                            <div key={e.key} className="flex items-center justify-between gap-1">
+                              <span className="truncate font-[var(--font-mono)]">{e.line}</span>
+                              <span className={TAG_TONE[e.tag]}>({e.tag})</span>
+                            </div>
+                          ))}
+                          {c.entries.length > 3 && <div className="text-xs font-normal text-[var(--text-faint)]">+{c.entries.length - 3} lagi</div>}
+                        </div>
+                        <div className="text-center text-xs font-semibold text-[var(--accent)]">{c.lineCount} line</div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Panel>
+
+            <Panel icon={<Info size={22} />} title="Keterangan">
+              <div className="flex flex-col gap-1 text-sm">
+                <div><span className={`inline-block w-8 font-semibold ${TAG_TONE.M}`}>(M)</span> PM Monthly</div>
+                <div><span className={`inline-block w-8 font-semibold ${TAG_TONE.W}`}>(W)</span> PM Weekly</div>
+                <div><span className={`inline-block w-8 font-semibold ${TAG_TONE.P}`}>(P)</span> PM Part</div>
+                <div className="mt-1 flex flex-col gap-1">
+                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-danger" /> Kritis / Segera dilakukan</div>
+                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-warn" /> Perlu Perhatian</div>
+                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-ok" /> Normal / Aman</div>
                 </div>
-              ))}
-            </div>
-          </Panel>
+              </div>
+            </Panel>
+          </div>
         </>
       )}
 
-      <footer className="sr-only">Update otomatis tiap 60 detik</footer>
+      <footer className="flex items-center justify-between text-sm text-[var(--text-faint)]">
+        <span>PM Monitoring System <span className="mx-2">|</span> Keep the Machine Running</span>
+        <span className="italic">Preventive Maintenance for Stable Production</span>
+      </footer>
     </div>
   );
 }

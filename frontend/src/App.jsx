@@ -48,7 +48,7 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
 
         <Route element={<ProtectedRoute />}>
-          {/* Mode TV (monitor area teknisi): fullscreen, di luar MainLayout
+          {/* Mode TV (PM Monitoring, monitor/TV): fullscreen, di luar MainLayout
               (tanpa sidebar/topbar). Tetap butuh login, view-only. */}
           <Route path="/tv" element={<TvDashboardPage />} />
 

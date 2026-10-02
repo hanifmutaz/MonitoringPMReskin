@@ -1,5 +1,6 @@
 // src/components/Topbar.jsx
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Monitor, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useCurrentPageHeader } from '../contexts/PageHeaderContext';
 import { useSidebar } from '../contexts/SidebarContext';
 import NotificationBell from './NotificationBell';
@@ -100,6 +101,17 @@ function Topbar() {
           tampil juga (bukan page-specific). Urutan kanan: [actions][🌙][🔔]. */}
       <div className="flex items-center gap-2">
         {actions}
+        {/* Mode TV (/tv): tampilan fullscreen buat monitor. Sebelumnya route-nya
+            ada tapi gak ada tombol yang nunjuk ke sana, jadi user gak tau cara
+            bukanya. Label disembunyiin di layar sempit (icon-only). */}
+        <Link
+          to="/tv"
+          title="Buka PM Monitoring layar penuh (Mode TV)"
+          className="inline-flex h-9 items-center gap-2 rounded-md border border-border px-2.5 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-accent hover:text-foreground sm:px-3"
+        >
+          <Monitor className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} />
+          <span className="hidden sm:inline">Mode TV</span>
+        </Link>
         <ThemeToggle />
         <NotificationBell />
       </div>
