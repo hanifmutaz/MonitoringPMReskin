@@ -4,7 +4,7 @@
 // Auto-refresh 60 detik, tanpa endpoint baru. Dibuka lewat tombol "Mode TV" di
 // Topbar (route /tv). Ukuran & jumlah baris dibatasi supaya tidak kepotong.
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import 'dayjs/locale/id';
 import {
@@ -24,7 +24,37 @@ const TONE = { OK: 'text-ok', WARNING: 'text-warn', DANGER: 'text-danger' };
 const PILL = { OK: 'bg-ok text-black', WARNING: 'bg-warn text-black', DANGER: 'bg-danger text-white' };
 const LINE_LABEL = { OK: 'Normal', WARNING: 'Perlu PM', DANGER: 'Kritis' };
 const PART_LABEL = { OK: 'OK', WARNING: 'Warning', DANGER: 'Danger' };
-const TAG_TONE = { M: 'text-warn', W: 'text-[var(--accent)]', P: 'text-[#8b5cf6]' };
+// Warna jenis PM sengaja BEDA dari warna status (merah/oranye/hijau) biar gak ketuker.
+const TAG_TONE = { M: 'text-[#8b5cf6]', W: 'text-[var(--accent)]', P: 'text-[#06b6d4]' };
+const JENIS_CHIP = {
+  Monthly: 'bg-[rgba(139,92,246,0.16)] text-[#8b5cf6]',
+  Weekly: 'bg-[var(--accent-dim)] text-[var(--accent)]',
+};
+
+// Jumlah baris tabel (PM Terdekat & Top Part): ?rows=N, default 15, disimpan di localStorage.
+const ROW_OPTIONS = [10, 15, 20, 30];
+const DEFAULT_ROWS = 15;
+const ROWS_KEY = 'tv.rows';
+const clampRows = (n) => (Number.isFinite(n) ? Math.min(50, Math.max(5, Math.round(n))) : DEFAULT_ROWS);
+function readStoredRows() {
+  try { return clampRows(Number(localStorage.getItem(ROWS_KEY)) || DEFAULT_ROWS); } catch { return DEFAULT_ROWS; }
+}
+
+// Skala UI mengikuti ukuran layar (basis 1920x1080 = 16px) supaya TV beda resolusi
+// tetap proporsional. Semua ukuran Tailwind berbasis rem jadi ikut membesar/mengecil.
+function useScaleToScreen() {
+  useEffect(() => {
+    const el = document.documentElement;
+    const prev = el.style.fontSize;
+    const apply = () => {
+      const px = Math.min(window.innerWidth / 120, window.innerHeight / 67.5);
+      el.style.fontSize = `${Math.min(32, Math.max(11, px))}px`;
+    };
+    apply();
+    window.addEventListener('resize', apply);
+    return () => { window.removeEventListener('resize', apply); el.style.fontSize = prev; };
+  }, []);
+}
 
 const dayDiff = (date) => dayjs(date).startOf('day').diff(dayjs().startOf('day'), 'day');
 
@@ -117,23 +147,23 @@ function Panel({ icon, title, aside, children, className = '' }) {
   return (
     <section className={`flex min-h-0 flex-col rounded-2xl border border-border bg-card p-4 ${className}`}>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="m-0 flex items-center gap-2 font-[var(--font-display)] text-lg font-semibold">
+        <h2 className="m-0 flex items-center gap-2 whitespace-nowrap font-[var(--font-display)] text-lg font-semibold">
           <span className="text-[var(--accent)]">{icon}</span>
           {title}
         </h2>
-        {aside && <span className="text-sm text-muted-foreground">{aside}</span>}
+        {aside && <span className="whitespace-nowrap text-sm text-muted-foreground">{aside}</span>}
       </div>
-      <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:thin]">{children}</div>
     </section>
   );
 }
 
 const Th = ({ children, right, center }) => (
-  <th className={`border-b border-border px-2 py-1.5 text-xs font-normal text-[var(--text-faint)] ${right ? 'text-right' : center ? 'text-center' : 'text-left'}`}>{children}</th>
+  <th className={`sticky top-0 z-10 whitespace-nowrap border-b border-border bg-card px-2 py-1.5 text-xs font-normal text-[var(--text-faint)] ${right ? 'text-right' : center ? 'text-center' : 'text-left'}`}>{children}</th>
 );
 
 function Pill({ status, label }) {
-  return <span className={`inline-block min-w-[72px] rounded px-2 py-0.5 text-center text-xs font-semibold ${PILL[status]}`}>{label}</span>;
+  return <span className={`inline-block min-w-[4.5rem] rounded px-2 py-0.5 text-center text-xs font-semibold ${PILL[status]}`}>{label}</span>;
 }
 
 function AllGood({ title, text }) {
@@ -151,6 +181,13 @@ const tvIconBtn = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-md 
 function TvDashboardPage() {
   const { hasPackage, hasPermission } = useAuth();
   const [isFull, toggleFull] = useFullscreen();
+  useScaleToScreen();
+  const [params, setParams] = useSearchParams();
+  const rows = clampRows(Number(params.get('rows')) || readStoredRows());
+  const changeRows = (n) => {
+    try { localStorage.setItem(ROWS_KEY, String(n)); } catch { /* storage bisa diblok, abaikan */ }
+    setParams((prev) => { const next = new URLSearchParams(prev); next.set('rows', String(n)); return next; }, { replace: true });
+  };
 
   const canSeeInventory = hasPackage('B')
     && (hasPermission('inventory.view') || hasPermission('inventory.input') || hasPermission('inventory.manage'));
@@ -170,9 +207,9 @@ function TvDashboardPage() {
   const connected = sync?.status === 'success';
 
   // Sisa shot paling sedikit (semua status). Fallback ke top_attention kalau backend belum update.
-  const topParts = (pd?.top_lowest_shot ?? pd?.top_attention ?? []).slice(0, 10);
+  const topParts = (pd?.top_lowest_shot ?? pd?.top_attention ?? []).slice(0, rows);
   const nextActions = buildNextActions(ld?.attention ?? [], upcoming);
-  const nextRows = nextActions.slice(0, 8);
+  const nextRows = nextActions.slice(0, rows);
 
   const lineUpcoming = new Set(upcoming.filter((u) => u.type !== 'PM_PART').map((u) => u.line_name)).size;
   const compliance = overallCompliance(summary);
@@ -229,6 +266,16 @@ function TvDashboardPage() {
         <div className="flex items-center gap-5">
           {stale && <div className="flex items-center gap-2 rounded-lg bg-warn-dim px-3 py-2 text-sm text-warn"><WifiOff size={16} /> Data mungkin tidak terbaru</div>}
           <div className="flex items-center gap-2">
+            <select
+              value={ROW_OPTIONS.includes(rows) ? rows : ''}
+              onChange={(e) => changeRows(Number(e.target.value))}
+              className="h-9 rounded-md border border-border bg-card px-2 text-sm text-muted-foreground hover:bg-[var(--panel-2)] hover:text-foreground"
+              title="Jumlah baris tabel"
+              aria-label="Jumlah baris tabel"
+            >
+              {!ROW_OPTIONS.includes(rows) && <option value="">{rows} baris</option>}
+              {ROW_OPTIONS.map((n) => <option key={n} value={n}>{n} baris</option>)}
+            </select>
             <Link to="/" className={tvIconBtn} title="Keluar TV" aria-label="Keluar dari Mode TV">
               <ArrowLeft size={18} />
             </Link>
@@ -285,14 +332,18 @@ function TvDashboardPage() {
               {nextRows.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-muted-foreground">Belum ada jadwal PM Line</div>
               ) : (
-                <table className="w-full border-collapse text-sm">
+                <table className="w-full whitespace-nowrap border-collapse text-sm">
                   <thead><tr><Th>No</Th><Th>Line</Th><Th>Jenis PM</Th><Th center>Sisa Hari</Th><Th center>Status</Th></tr></thead>
                   <tbody>
                     {nextRows.map((r, i) => (
                       <tr key={r.key} className="border-b border-[var(--border-soft)]">
                         <td className="px-2 py-1 text-muted-foreground">{i + 1}</td>
                         <td className="px-2 py-1 font-[var(--font-mono)]">{r.line}</td>
-                        <td className="px-2 py-1">{r.jenis}</td>
+                        <td className="px-2 py-1">
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${JENIS_CHIP[r.jenis]}`}>
+                            <span className="h-1.5 w-1.5 rounded-full bg-current" />{r.jenis}
+                          </span>
+                        </td>
                         <td className={`px-2 py-1 text-center font-semibold ${TONE[r.status]}`}>{sisaLabel(r.sisa)}</td>
                         <td className="px-2 py-1 text-center"><Pill status={r.status} label={LINE_LABEL[r.status]} /></td>
                       </tr>
@@ -302,12 +353,12 @@ function TvDashboardPage() {
               )}
             </Panel>
 
-            <Panel icon={<Settings size={22} />} title="Top 10 Part Perlu Perhatian">
+            <Panel icon={<Settings size={22} />} title={`Top ${rows} Part Perlu Perhatian`}>
               {topParts.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-muted-foreground">Belum ada data part</div>
               ) : (
-                <table className="w-full border-collapse text-sm">
-                  <thead><tr><Th>No</Th><Th>Line</Th><Th>Jig / Station</Th><Th right>Sisa Shot</Th><Th right>ETA PM</Th><Th center>Status</Th></tr></thead>
+                <table className="w-full border-collapse text-sm [&_td]:whitespace-nowrap">
+                  <thead><tr><Th>No</Th><Th>Line</Th><Th>Jig / Station</Th><Th right>Sisa Shot</Th><Th center>Status</Th></tr></thead>
                   <tbody>
                     {topParts.map((p, i) => (
                       <tr key={p.part_id} className="border-b border-[var(--border-soft)]">
@@ -315,7 +366,6 @@ function TvDashboardPage() {
                         <td className="px-2 py-1 font-[var(--font-mono)]">{p.line_name}</td>
                         <td className="px-2 py-1">{p.jig_name || p.part_name}</td>
                         <td className={`px-2 py-1 text-right font-[var(--font-mono)] font-semibold ${TONE[p.status]}`}>{num(p.remaining_shot)}</td>
-                        <td className="px-2 py-1 text-right">{p.estimated_pm_date ? sisaLabel(dayDiff(p.estimated_pm_date)) : '-'}</td>
                         <td className="px-2 py-1 text-center"><Pill status={p.status} label={PART_LABEL[p.status]} /></td>
                       </tr>
                     ))}
@@ -325,11 +375,11 @@ function TvDashboardPage() {
             </Panel>
           </div>
 
-          <div className="grid grid-cols-[minmax(0,1fr)_240px] gap-3">
+          <div className="grid grid-cols-[minmax(0,1fr)_15rem] gap-3">
             <Panel icon={<CalendarDays size={22} />} title="Jadwal PM 7 Hari Ke Depan" aside="(Berdasarkan Tanggal Due)">
               <div className="grid grid-cols-8 gap-2">
                 {dayCols.map((c) => (
-                  <div key={c.key} className="flex h-[132px] min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-[var(--panel-2)]">
+                  <div key={c.key} className="flex h-[8.25rem] min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-[var(--panel-2)]">
                     <div className={`py-1 text-center ${c.sunday ? 'bg-danger-dim text-danger' : 'bg-[var(--accent-dim)] text-[var(--accent)]'}`}>
                       <div className="text-sm font-semibold leading-tight">{c.d.format('dddd')}</div>
                       <div className="text-xs leading-tight opacity-80">{c.d.format('D MMM YYYY')}</div>

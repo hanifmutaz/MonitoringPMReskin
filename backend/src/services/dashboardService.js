@@ -226,13 +226,13 @@ async function getPartSummary() {
     .sort((a, b) => a.remaining_shot - b.remaining_shot)
     .slice(0, 10);
 
-  // 10 part dengan sisa shot paling sedikit, APA PUN statusnya (OK ikut). Dipakai
+  // Part dengan sisa shot paling sedikit (maks 50), APA PUN statusnya (OK ikut). Dipakai
   // mode TV supaya panel "Top 10" tetap terisi walau belum ada Warning/Danger.
   // top_attention (cuma Warning/Danger) tetap dipertahankan buat CriticalAlertsPanel.
   const topLowestShot = [...partMetrics]
     .filter((p) => Number.isFinite(p.remaining_shot))
     .sort((a, b) => a.remaining_shot - b.remaining_shot)
-    .slice(0, 10);
+    .slice(0, 50); // frontend TV yang memotong sesuai pilihan jumlah baris
 
   return {
     total_parts: partMetrics.length,
