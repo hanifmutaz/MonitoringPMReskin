@@ -103,14 +103,14 @@ function Topbar() {
         {actions}
         {/* Mode TV (/tv): tampilan fullscreen buat monitor. Sebelumnya route-nya
             ada tapi gak ada tombol yang nunjuk ke sana, jadi user gak tau cara
-            bukanya. Label disembunyiin di layar sempit (icon-only). */}
+            bukanya. Icon-only (sama gaya tombol ThemeToggle/bell), nama ada di tooltip. */}
         <Link
           to="/tv"
-          title="Buka PM Monitoring layar penuh (Mode TV)"
-          className="inline-flex h-9 items-center gap-2 rounded-md border border-border px-2.5 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-accent hover:text-foreground sm:px-3"
+          aria-label="Buka Mode TV (layar penuh)"
+          title="Mode TV"
+          className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-transparent bg-transparent text-muted-foreground no-underline transition-colors duration-200 hover:border-border hover:bg-accent hover:text-foreground"
         >
           <Monitor className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} />
-          <span className="hidden sm:inline">Mode TV</span>
         </Link>
         <ThemeToggle />
         <NotificationBell />

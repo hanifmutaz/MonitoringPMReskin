@@ -250,6 +250,18 @@ describe('dashboardService', () => {
       const result = await dashboardService.getPartSummary();
       assert.equal(result.top_attention.length, 10);
     });
+
+    test('top_lowest_shot: 10 part sisa shot terkecil, status OK ikut, urut naik', async () => {
+      const parts = Array.from({ length: 15 }, (_, i) => part({ part_name: `P${i}`, status: 'OK', remaining_shot: (15 - i) * 100 }));
+      mock.method(pmPartService, 'getAllComputedMetrics', async () => parts);
+
+      const result = await dashboardService.getPartSummary();
+
+      assert.equal(result.top_attention.length, 0);
+      assert.equal(result.top_lowest_shot.length, 10);
+      assert.equal(result.top_lowest_shot[0].remaining_shot, 100);
+      assert.equal(result.top_lowest_shot[9].remaining_shot, 1000);
+    });
   });
 
   describe('getLineSummary', () => {

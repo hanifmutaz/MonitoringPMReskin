@@ -146,17 +146,7 @@ function AllGood({ title, text }) {
   );
 }
 
-function TvButton({ children, ...props }) {
-  return (
-    <button
-      type="button"
-      className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm text-muted-foreground transition-colors hover:bg-[var(--panel-2)] hover:text-foreground"
-      {...props}
-    >
-      {children}
-    </button>
-  );
-}
+const tvIconBtn = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground no-underline transition-colors hover:bg-[var(--panel-2)] hover:text-foreground';
 
 function TvDashboardPage() {
   const { hasPackage, hasPermission } = useAuth();
@@ -179,7 +169,8 @@ function TvDashboardPage() {
   const stale = line.isError || part.isError;
   const connected = sync?.status === 'success';
 
-  const topParts = (pd?.top_attention ?? []).slice(0, 10);
+  // Sisa shot paling sedikit (semua status). Fallback ke top_attention kalau backend belum update.
+  const topParts = (pd?.top_lowest_shot ?? pd?.top_attention ?? []).slice(0, 10);
   const nextActions = buildNextActions(ld?.attention ?? [], upcoming);
   const nextRows = nextActions.slice(0, 8);
 
@@ -190,7 +181,7 @@ function TvDashboardPage() {
     ...nextActions.filter((r) => r.sisa <= 0).map((r) => ({
       key: `l-${r.key}`, title: r.line, sub: `PM ${r.jenis}`, info: sisaLabel(r.sisa), status: r.status,
     })),
-    ...topParts.filter((p) => p.status === 'DANGER').map((p) => ({
+    ...(pd?.top_attention ?? []).filter((p) => p.status === 'DANGER').map((p) => ({
       key: `p-${p.part_id}`, title: p.line_name, sub: p.jig_name || p.part_name, info: `Sisa ${num(p.remaining_shot)} shot`, status: 'DANGER',
     })),
   ];
@@ -238,12 +229,12 @@ function TvDashboardPage() {
         <div className="flex items-center gap-5">
           {stale && <div className="flex items-center gap-2 rounded-lg bg-warn-dim px-3 py-2 text-sm text-warn"><WifiOff size={16} /> Data mungkin tidak terbaru</div>}
           <div className="flex items-center gap-2">
-            <Link to="/" className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm text-muted-foreground transition-colors hover:bg-[var(--panel-2)] hover:text-foreground">
-              <ArrowLeft size={16} /> Keluar TV
+            <Link to="/" className={tvIconBtn} title="Keluar TV" aria-label="Keluar dari Mode TV">
+              <ArrowLeft size={18} />
             </Link>
-            <TvButton onClick={toggleFull} aria-label={isFull ? 'Keluar layar penuh' : 'Layar penuh'}>
-              {isFull ? <Minimize size={16} /> : <Maximize size={16} />} {isFull ? 'Normal' : 'Layar Penuh'}
-            </TvButton>
+            <button type="button" onClick={toggleFull} className={tvIconBtn} title={isFull ? 'Keluar layar penuh' : 'Layar penuh'} aria-label={isFull ? 'Keluar layar penuh' : 'Layar penuh'}>
+              {isFull ? <Minimize size={18} /> : <Maximize size={18} />}
+            </button>
           </div>
           <Clock_ />
           <div className="h-12 w-px bg-border" />
@@ -313,7 +304,7 @@ function TvDashboardPage() {
 
             <Panel icon={<Settings size={22} />} title="Top 10 Part Perlu Perhatian">
               {topParts.length === 0 ? (
-                <AllGood title="Semua part aman" text="Tidak ada part berstatus Warning atau Danger." />
+                <div className="flex h-full items-center justify-center text-muted-foreground">Belum ada data part</div>
               ) : (
                 <table className="w-full border-collapse text-sm">
                   <thead><tr><Th>No</Th><Th>Line</Th><Th>Jig / Station</Th><Th right>Sisa Shot</Th><Th right>ETA PM</Th><Th center>Status</Th></tr></thead>
