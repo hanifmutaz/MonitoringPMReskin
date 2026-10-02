@@ -22,8 +22,8 @@ const num = (v) => (v === undefined || v === null ? '-' : Number(v).toLocaleStri
 const WORST = { DANGER: 0, WARNING: 1, OK: 2 };
 const TONE = { OK: 'text-ok', WARNING: 'text-warn', DANGER: 'text-danger' };
 const PILL = { OK: 'bg-ok text-black', WARNING: 'bg-warn text-black', DANGER: 'bg-danger text-white' };
-const LINE_LABEL = { OK: 'Normal', WARNING: 'Perlu PM', DANGER: 'Kritis' };
-const PART_LABEL = { OK: 'OK', WARNING: 'Warning', DANGER: 'Danger' };
+// Label status SERAGAM di semua tabel: OK / Warning / Danger.
+const STATUS_LABEL = { OK: 'OK', WARNING: 'Warning', DANGER: 'Danger' };
 // Warna jenis PM sengaja BEDA dari warna status (merah/oranye/hijau) dan saling
 // berjauhan hue-nya (magenta vs cyan) biar kebaca jelas dari jauh di TV.
 const TAG_TONE = { M: 'text-[#e040fb]', W: 'text-[#00bcd4]', P: 'text-[#94a3b8]' };
@@ -344,7 +344,7 @@ function TvDashboardPage() {
                           <span className={`inline-block min-w-[4.5rem] rounded-full px-2.5 py-0.5 text-center text-xs font-semibold ${JENIS_CHIP[r.jenis]}`}>{r.jenis}</span>
                         </td>
                         <td className={`px-2 py-1 text-center font-semibold ${TONE[r.status]}`}>{sisaLabel(r.sisa)}</td>
-                        <td className="px-2 py-1 text-center"><Pill status={r.status} label={LINE_LABEL[r.status]} /></td>
+                        <td className="px-2 py-1 text-center"><Pill status={r.status} label={STATUS_LABEL[r.status]} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -365,7 +365,7 @@ function TvDashboardPage() {
                         <td className="px-2 py-1 font-[var(--font-mono)]">{p.line_name}</td>
                         <td className="px-2 py-1">{p.jig_name || p.part_name}</td>
                         <td className={`px-2 py-1 text-right font-[var(--font-mono)] font-semibold ${TONE[p.status]}`}>{num(p.remaining_shot)}</td>
-                        <td className="px-2 py-1 text-center"><Pill status={p.status} label={PART_LABEL[p.status]} /></td>
+                        <td className="px-2 py-1 text-center"><Pill status={p.status} label={STATUS_LABEL[p.status]} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -412,9 +412,9 @@ function TvDashboardPage() {
                 <div><span className={`inline-block w-8 font-semibold ${TAG_TONE.W}`}>(W)</span> PM Weekly</div>
                 <div><span className={`inline-block w-8 font-semibold ${TAG_TONE.P}`}>(P)</span> PM Part</div>
                 <div className="mt-1 flex flex-col gap-1">
-                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-danger" /> Kritis / Segera dilakukan</div>
-                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-warn" /> Perlu Perhatian</div>
-                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-ok" /> Normal / Aman</div>
+                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-danger" /> Danger: segera dilakukan</div>
+                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-warn" /> Warning: perlu perhatian</div>
+                  <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-ok" /> OK: normal / aman</div>
                 </div>
               </div>
             </Panel>
