@@ -7,6 +7,12 @@ const env = require('../config/env');
  * sensitif di JWT karena payload bisa dibaca (base64), meski tidak
  * bisa diubah tanpa signature valid.
  */
+const { DISPLAY_ROLE } = require('./roles');
+
+function expiresInFor(role) {
+  return role === DISPLAY_ROLE ? env.jwt.displayExpiresIn : env.jwt.expiresIn;
+}
+
 function signToken(user) {
   return jwt.sign(
     {
@@ -15,7 +21,7 @@ function signToken(user) {
       role: user.role,
     },
     env.jwt.secret,
-    { expiresIn: env.jwt.expiresIn }
+    { expiresIn: expiresInFor(user.role) }
   );
 }
 
@@ -23,4 +29,4 @@ function verifyToken(token) {
   return jwt.verify(token, env.jwt.secret);
 }
 
-module.exports = { signToken, verifyToken };
+module.exports = { signToken, verifyToken, expiresInFor, DISPLAY_ROLE };

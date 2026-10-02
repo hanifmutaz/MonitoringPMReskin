@@ -105,6 +105,10 @@ module.exports = {
   jwt: {
     secret: process.env.JWT_SECRET,
     expiresIn: process.env.JWT_EXPIRES_IN || '8h',
+    // Sesi lebih panjang khusus role 'Display' (akun monitor/TV), lihat
+    // utils/jwt.js. Akun ini view-only; nonaktifkan akunnya di User
+    // Management untuk mencabut akses seketika (is_active dicek tiap request).
+    displayExpiresIn: process.env.JWT_EXPIRES_IN_DISPLAY || '30d',
   },
 
   // Kredensial SMTP TIDAK di-require saat startup (§REQUIRED_VARS) - sama

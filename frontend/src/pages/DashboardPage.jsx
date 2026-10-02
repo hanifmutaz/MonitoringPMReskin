@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Package, Factory, AlertTriangle, ShieldAlert, Target, TrendingDown, Activity, Timer } from 'lucide-react';
+import { Package, Factory, AlertTriangle, ShieldAlert, Target, TrendingDown } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboardSummary } from '../hooks/useDashboardSummary';
@@ -49,26 +49,6 @@ function PercentBadge({ percentage }) {
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cfg.dot}`} />
       {formatKetepatan(percentage)}
     </span>
-  );
-}
-
-function NeedsDataCard({ icon, label, note }) {
-  return (
-    <div className="relative rounded-xl border border-dashed border-border bg-card p-4.5 pt-7">
-      <div className="absolute -top-3.5 left-4 flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-[var(--panel-3)] text-[var(--text-faint)] shadow-sm">
-        {icon}
-      </div>
-      {/* polish: A7 cross-check (09 Sep 2026) — 9px -> 10px, samain ke tier micro-badge yang dipakai konsisten di Sidebar/NotificationBell/masterdata hints/SettingsPage key */}
-      <span className="absolute right-4 top-3.5 rounded-full bg-[var(--panel-3)] px-2 py-1 font-[var(--font-mono)] text-[10px] font-bold uppercase tracking-[0.5px] text-[var(--text-faint)]">
-        Needs Data
-      </span>
-      <div className="mt-2">
-        <div className="mb-1 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">{label}</div>
-        {/* polish: A7 typography scale — turun ke body-tier (13px), sebelumnya text-[17px] font-display ikut kelas angka padahal ini teks kalimat, bukan value */}
-        <div className="text-[13px] font-medium text-muted-foreground">Belum tersedia</div>
-        <div className="mt-1.5 max-w-lg text-xs leading-relaxed text-muted-foreground">{note}</div>
-      </div>
-    </div>
   );
 }
 
@@ -206,11 +186,6 @@ function DashboardPage() {
           <KpiCard icon={<ShieldAlert size={18} />} label="Line Kritis" value={summary.lines_critical} caption={`${summary.lines_warning} perlu perhatian`} status="danger" />
         </div>
       )}
-
-      <div className="grid grid-cols-1 gap-4 gap-y-6 sm:grid-cols-2">
-        <NeedsDataCard icon={<Activity size={18} />} label="MTBF" note="Butuh sumber data breakdown/downtime mesin" />
-        <NeedsDataCard icon={<Timer size={18} />} label="MTTR" note="Butuh sumber data breakdown/downtime mesin" />
-      </div>
 
       <Card>
         <CardHeader><CardTitle>Ketepatan PM (Tahun Berjalan)</CardTitle></CardHeader>
