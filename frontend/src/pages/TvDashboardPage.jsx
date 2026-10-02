@@ -24,11 +24,12 @@ const TONE = { OK: 'text-ok', WARNING: 'text-warn', DANGER: 'text-danger' };
 const PILL = { OK: 'bg-ok text-black', WARNING: 'bg-warn text-black', DANGER: 'bg-danger text-white' };
 const LINE_LABEL = { OK: 'Normal', WARNING: 'Perlu PM', DANGER: 'Kritis' };
 const PART_LABEL = { OK: 'OK', WARNING: 'Warning', DANGER: 'Danger' };
-// Warna jenis PM sengaja BEDA dari warna status (merah/oranye/hijau) biar gak ketuker.
-const TAG_TONE = { M: 'text-[#8b5cf6]', W: 'text-[var(--accent)]', P: 'text-[#06b6d4]' };
+// Warna jenis PM sengaja BEDA dari warna status (merah/oranye/hijau) dan saling
+// berjauhan hue-nya (magenta vs cyan) biar kebaca jelas dari jauh di TV.
+const TAG_TONE = { M: 'text-[#e040fb]', W: 'text-[#00bcd4]', P: 'text-[#94a3b8]' };
 const JENIS_CHIP = {
-  Monthly: 'bg-[rgba(139,92,246,0.16)] text-[#8b5cf6]',
-  Weekly: 'bg-[var(--accent-dim)] text-[var(--accent)]',
+  Monthly: 'bg-[#c026d3] text-white',
+  Weekly: 'bg-[#0891b2] text-white',
 };
 
 // Jumlah baris tabel (PM Terdekat & Top Part): ?rows=N, default 15, disimpan di localStorage.
@@ -340,9 +341,7 @@ function TvDashboardPage() {
                         <td className="px-2 py-1 text-muted-foreground">{i + 1}</td>
                         <td className="px-2 py-1 font-[var(--font-mono)]">{r.line}</td>
                         <td className="px-2 py-1">
-                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${JENIS_CHIP[r.jenis]}`}>
-                            <span className="h-1.5 w-1.5 rounded-full bg-current" />{r.jenis}
-                          </span>
+                          <span className={`inline-block min-w-[4.5rem] rounded-full px-2.5 py-0.5 text-center text-xs font-semibold ${JENIS_CHIP[r.jenis]}`}>{r.jenis}</span>
                         </td>
                         <td className={`px-2 py-1 text-center font-semibold ${TONE[r.status]}`}>{sisaLabel(r.sisa)}</td>
                         <td className="px-2 py-1 text-center"><Pill status={r.status} label={LINE_LABEL[r.status]} /></td>
