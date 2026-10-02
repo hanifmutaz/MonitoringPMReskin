@@ -3,7 +3,7 @@
 // sudah ada (view-only), cuma ditambah auto-refresh. refetchIntervalInBackground
 // true supaya tetap update walau tab TV tidak sedang fokus.
 import { useQuery } from '@tanstack/react-query';
-import { fetchLineSummary, fetchPartSummary } from '../api/dashboardApi';
+import { fetchLineSummary, fetchPartSummary, fetchUpcoming, fetchSyncStatus } from '../api/dashboardApi';
 
 const REFRESH_MS = 60_000;
 
@@ -19,4 +19,12 @@ export function useTvLineSummary() {
 
 export function useTvPartSummary() {
   return useQuery({ queryKey: ['dashboard', 'part-summary'], queryFn: fetchPartSummary, ...tvOptions });
+}
+
+export function useTvUpcoming() {
+  return useQuery({ queryKey: ['dashboard', 'upcoming'], queryFn: fetchUpcoming, ...tvOptions });
+}
+
+export function useTvSyncStatus() {
+  return useQuery({ queryKey: ['dashboard', 'sync-status'], queryFn: fetchSyncStatus, ...tvOptions });
 }

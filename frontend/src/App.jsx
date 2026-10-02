@@ -21,7 +21,6 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const DashboardPmPartPage = lazy(() => import('./pages/DashboardPmPartPage'));
 const DashboardPmLineWeeklyPage = lazy(() => import('./pages/DashboardPmLineWeeklyPage'));
 const TvDashboardPage = lazy(() => import('./pages/TvDashboardPage'));
-const TvManagementPage = lazy(() => import('./pages/TvManagementPage'));
 const PmPartMonitoringPage = lazy(() => import('./pages/PmPartMonitoringPage'));
 const PmPartFormPage = lazy(() => import('./pages/PmPartFormPage'));
 const PmPartHistoryPage = lazy(() => import('./pages/PmPartHistoryPage'));
@@ -52,7 +51,6 @@ function App() {
           {/* Mode TV (monitor area teknisi): fullscreen, di luar MainLayout
               (tanpa sidebar/topbar). Tetap butuh login, view-only. */}
           <Route path="/tv" element={<TvDashboardPage />} />
-          <Route path="/tv/management" element={<TvManagementPage />} />
 
           <Route element={<MainLayout />}>
             <Route path="/" element={<DashboardPage />} />
