@@ -3,10 +3,13 @@ const express = require('express');
 const settingsController = require('../controllers/settingsController');
 const requireAuth = require('../middlewares/authMiddleware');
 const requireRole = require('../middlewares/roleMiddleware');
+const denyDisplayRole = require('../middlewares/denyDisplayRole');
 
 const router = express.Router();
 
 router.use(requireAuth);
+// Akun Display (monitor/TV) tidak boleh lihat maupun ubah Settings.
+router.use(denyDisplayRole);
 
 // GET - dibuka ke SEMUA role yang sudah login (dulu Admin only) - supaya
 // role yang digrant akses edit ke sebagian setting (setting_role_access,

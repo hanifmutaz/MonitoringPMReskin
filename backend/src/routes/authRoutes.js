@@ -3,6 +3,7 @@ const express = require('express');
 const multer = require('multer');
 const authController = require('../controllers/authController');
 const requireAuth = require('../middlewares/authMiddleware');
+const denyDisplayRole = require('../middlewares/denyDisplayRole');
 const loginRateLimiter = require('../middlewares/loginRateLimiter');
 const AppError = require('../utils/AppError');
 
@@ -44,9 +45,9 @@ router.post('/register', loginRateLimiter, authController.register);
 // Semua user login
 router.post('/logout', requireAuth, authController.logout);
 router.get('/me', requireAuth, authController.me);
-router.patch('/me', requireAuth, authController.updateProfile);
-router.patch('/me/password', requireAuth, authController.changePassword);
-router.post('/me/avatar', requireAuth, handleAvatarUpload, authController.uploadAvatar);
-router.delete('/me/avatar', requireAuth, authController.deleteAvatar);
+router.patch('/me', requireAuth, denyDisplayRole, authController.updateProfile);
+router.patch('/me/password', requireAuth, denyDisplayRole, authController.changePassword);
+router.post('/me/avatar', requireAuth, denyDisplayRole, handleAvatarUpload, authController.uploadAvatar);
+router.delete('/me/avatar', requireAuth, denyDisplayRole, authController.deleteAvatar);
 
 module.exports = router;

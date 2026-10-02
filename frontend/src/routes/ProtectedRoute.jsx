@@ -6,6 +6,8 @@ import ForbiddenState from '../components/ForbiddenState';
 /**
  * @param {string[]} [allowedRoles] - kalau diisi, cuma role ini yang boleh
  * lewat (mis. ['Admin'] buat Settings & User Management - UI Spec §3.2).
+ * @param {string[]} [deniedRoles] - kebalikan allowedRoles: role di daftar ini
+ * ditolak (mis. ['Display'] buat akun monitor/TV di /settings & /profile).
  * @param {string} [requiredPermission] - kalau diisi, cuma user yang punya
  * permission key ini (atau Admin) yang boleh lewat (mis. 'dashboard.multi_site').
  * Beda dari allowedRoles: ini permission granular yang bisa di-assign Admin
@@ -15,7 +17,7 @@ import ForbiddenState from '../components/ForbiddenState';
  * Backend TETAP jadi penegak utama (Dev Rules §12) - ini cuma UX, sembunyiin
  * menu/route yang emang gak bisa diakses dari sisi tampilan.
  */
-function ProtectedRoute({ allowedRoles, requiredPermission, requiredAnyPermission }) {
+function ProtectedRoute({ allowedRoles, deniedRoles, requiredPermission, requiredAnyPermission }) {
   const { isAuthenticated, loading, user, hasPermission } = useAuth();
   const location = useLocation();
 
@@ -31,6 +33,10 @@ function ProtectedRoute({ allowedRoles, requiredPermission, requiredAnyPermissio
   // ke Dashboard (dulu klik menu yang tidak boleh malah pindah ke Dashboard
   // tanpa penjelasan).
   if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <ForbiddenState />;
+  }
+
+  if (deniedRoles && deniedRoles.includes(user.role)) {
     return <ForbiddenState />;
   }
 

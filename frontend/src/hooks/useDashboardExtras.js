@@ -9,24 +9,27 @@ import {
   fetchMultiSite,
 } from '../api/dashboardApi';
 
+// Auto-refresh 60 detik, alasan sama dengan useDashboardSummary.
+const DASHBOARD_REFRESH = { refetchInterval: 60_000, refetchIntervalInBackground: true };
+
 export function useDashboardAttention() {
-  return useQuery({ queryKey: ['dashboard', 'attention'], queryFn: fetchAttention });
+  return useQuery({ queryKey: ['dashboard', 'attention'], queryFn: fetchAttention, ...DASHBOARD_REFRESH });
 }
 
 export function useDashboardUpcoming() {
-  return useQuery({ queryKey: ['dashboard', 'upcoming'], queryFn: fetchUpcoming });
+  return useQuery({ queryKey: ['dashboard', 'upcoming'], queryFn: fetchUpcoming, ...DASHBOARD_REFRESH });
 }
 
 export function useDashboardPartSummary() {
-  return useQuery({ queryKey: ['dashboard', 'part-summary'], queryFn: fetchPartSummary });
+  return useQuery({ queryKey: ['dashboard', 'part-summary'], queryFn: fetchPartSummary, ...DASHBOARD_REFRESH });
 }
 
 export function useDashboardLineSummary() {
-  return useQuery({ queryKey: ['dashboard', 'line-summary'], queryFn: fetchLineSummary });
+  return useQuery({ queryKey: ['dashboard', 'line-summary'], queryFn: fetchLineSummary, ...DASHBOARD_REFRESH });
 }
 
 export function useDashboardKetepatanAttention() {
-  return useQuery({ queryKey: ['dashboard', 'ketepatan-attention'], queryFn: fetchKetepatanAttention });
+  return useQuery({ queryKey: ['dashboard', 'ketepatan-attention'], queryFn: fetchKetepatanAttention, ...DASHBOARD_REFRESH });
 }
 
 // Refetch tiap 60 detik - dipake sebagai site switcher di 3 halaman

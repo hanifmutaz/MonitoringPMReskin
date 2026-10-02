@@ -53,13 +53,15 @@ export function useSyncConmasNow() {
 // yang sama dengan useSettings() - jadi Sidebar & SettingsPage berbagi cache,
 // tidak fetch dua kali. Admin tidak perlu fetch (selalu boleh).
 export function useCanAccessSettings() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isDisplay } = useAuth();
   const { data, isLoading } = useQuery({
     queryKey: ['settings'],
     queryFn: fetchSettings,
-    enabled: !isAdmin && !!user,
+    enabled: !isAdmin && !isDisplay && !!user,
   });
   if (isAdmin) return { canAccess: true, isLoading: false };
+  // Akun Display (monitor/TV) tidak pernah boleh akses Settings (backend juga 403).
+  if (isDisplay) return { canAccess: false, isLoading: false };
   const canAccess = (data || []).some((s) => (s.editable_role_ids || []).includes(user?.role_id));
   return { canAccess, isLoading };
 }

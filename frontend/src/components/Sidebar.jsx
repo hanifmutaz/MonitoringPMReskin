@@ -323,7 +323,10 @@ function NavGroup({ group, isOpen, onToggle, isGroupActive, summary, collapsed, 
 }
 
 function Sidebar() {
-  const { user, logout, isAdmin, hasPackage, hasPermission } = useAuth();
+  const { user, logout, isAdmin, isDisplay, hasPackage, hasPermission } = useAuth();
+  // Akun Display tidak boleh buka /profile: avatar+nama jadi teks biasa, bukan link.
+  const ProfileWrapper = isDisplay ? 'div' : NavLink;
+  const profileLinkProps = isDisplay ? {} : { to: '/profile' };
   const { data: summary } = useDashboardSummary();
   const { canAccess: canAccessSettings } = useCanAccessSettings();
   const location = useLocation();
@@ -472,18 +475,18 @@ function Sidebar() {
           {collapsed ? (
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
-                <NavLink
-                  to="/profile"
+                <ProfileWrapper
+                  {...profileLinkProps}
                   className="block shrink-0 overflow-hidden rounded-full no-underline transition-opacity hover:opacity-80"
                 >
                   <Avatar avatarUrl={user?.avatar_url} initials={initials} size={34} className="text-[13px]" />
-                </NavLink>
+                </ProfileWrapper>
               </TooltipTrigger>
               <TooltipContent side="right">Profil Saya</TooltipContent>
             </Tooltip>
           ) : (
-            <NavLink
-              to="/profile"
+            <ProfileWrapper
+              {...profileLinkProps}
               className="-mx-1 -my-1 flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 py-1 no-underline transition-colors hover:bg-accent"
             >
               <Avatar avatarUrl={user?.avatar_url} initials={initials} size={34} className="text-[13px]" />
@@ -498,7 +501,7 @@ function Sidebar() {
                 <div className="truncate text-[13px] font-medium">{user?.full_name}</div>
                 <div className="truncate text-[11.5px] text-[var(--text-faint)]">{user?.role}</div>
               </div>
-            </NavLink>
+            </ProfileWrapper>
           )}
           <Tooltip delayDuration={200}>
             <TooltipTrigger asChild>

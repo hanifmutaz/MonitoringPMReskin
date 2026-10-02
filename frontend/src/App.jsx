@@ -20,6 +20,7 @@ const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const DashboardPmPartPage = lazy(() => import('./pages/DashboardPmPartPage'));
 const DashboardPmLineWeeklyPage = lazy(() => import('./pages/DashboardPmLineWeeklyPage'));
+const TvDashboardPage = lazy(() => import('./pages/TvDashboardPage'));
 const PmPartMonitoringPage = lazy(() => import('./pages/PmPartMonitoringPage'));
 const PmPartFormPage = lazy(() => import('./pages/PmPartFormPage'));
 const PmPartHistoryPage = lazy(() => import('./pages/PmPartHistoryPage'));
@@ -47,6 +48,10 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
 
         <Route element={<ProtectedRoute />}>
+          {/* Mode TV (monitor area teknisi): fullscreen, di luar MainLayout
+              (tanpa sidebar/topbar). Tetap butuh login, view-only. */}
+          <Route path="/tv" element={<TvDashboardPage />} />
+
           <Route element={<MainLayout />}>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/dashboard/pm-part" element={<DashboardPmPartPage />} />
@@ -100,15 +105,20 @@ function App() {
             {/* Di luar ProtectedRoute allowedRoles - SEMUA role yang login
                 boleh akses profil sendiri, gak digating per-role kayak
                 /settings & /users di bawah. */}
-            <Route path="/profile" element={<ProfilePage />} />
+            {/* Akun role Display (monitor/TV) view-only: dilarang buka profil. */}
+            <Route element={<ProtectedRoute deniedRoles={['Display']} />}>
+              <Route path="/profile" element={<ProfilePage />} />
+            </Route>
 
             {/* Settings: bukan Admin-only lagi - role yang di-grant edit
                 minimal 1 setting juga boleh buka (dicek di SettingsPage
                 lewat useCanAccessSettings, backend GET /settings memang
                 terbuka untuk semua role login). Submenu per kategori:
                 /settings/:category. */}
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/settings/:menu" element={<SettingsPage />} />
+            <Route element={<ProtectedRoute deniedRoles={['Display']} />}>
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/settings/:menu" element={<SettingsPage />} />
+            </Route>
 
             <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
               <Route path="/users" element={<UserManagementPage />} />

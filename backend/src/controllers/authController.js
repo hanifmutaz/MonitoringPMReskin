@@ -5,16 +5,25 @@ const { validateLoginBody, validateRegisterBody, validateUpdateProfileBody, vali
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
 const env = require('../config/env');
+const jsonwebtoken = require('jsonwebtoken');
+const { DISPLAY_ROLE } = require('../utils/roles');
 
 const COOKIE_NAME = 'token';
 
-function cookieOptions() {
+function cookieOptions(role, token) {
+  // Role Display (monitor/TV): umur cookie ikut umur JWT-nya (exp - iat),
+  // jadi tidak perlu parser durasi sendiri. Role lain tetap 8 jam.
+  let maxAge = 8 * 60 * 60 * 1000;
+  if (role === DISPLAY_ROLE && token) {
+    const { exp, iat } = jsonwebtoken.decode(token) || {};
+    if (exp && iat) maxAge = (exp - iat) * 1000;
+  }
   return {
     httpOnly: true,
     secure: env.cookieSecure,
     sameSite: 'strict',
     path: '/',
-    maxAge: 8 * 60 * 60 * 1000, // 8 jam, selaras dengan JWT_EXPIRES_IN default
+    maxAge, // default 8 jam, selaras dengan JWT_EXPIRES_IN default
   };
 }
 
@@ -28,7 +37,7 @@ const login = asyncHandler(async (req, res) => {
   const context = { ip: req.ip, userAgent: req.get('user-agent') };
   const { token, user } = await authService.login(username, password, context);
 
-  res.cookie(COOKIE_NAME, token, cookieOptions());
+  res.cookie(COOKIE_NAME, token, cookieOptions(user.role, token));
 
   res.status(200).json({
     success: true,
