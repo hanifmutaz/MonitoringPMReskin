@@ -24,6 +24,8 @@ import { useUsers } from '../hooks/useUsers';
 import buildAuditLogColumns, { TABLE_NAME_LABEL } from './auditLogColumns';
 import Modal from '../components/Modal';
 import { FilterBar } from '../components/data-display/FilterBar';
+import { DateRangeFilter } from '../components/data-display/DateRangeFilter';
+import ExportExcelButton from '../components/ExportExcelButton';
 import { DataTable, DataTableNoResult } from '../components/data-display/DataTable';
 import { EmptyState } from '../components/ui/empty-state';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -63,6 +65,7 @@ function AuditLogPage() {
 
   const [tableName, setTableName] = useState('all');
   const [userId, setUserId] = useState('all');
+  const [dateRange, setDateRange] = useState({ from: '', to: '' });
   const [page, setPage] = useState(1);
   const [diffEntry, setDiffEntry] = useState(null);
 
@@ -72,16 +75,19 @@ function AuditLogPage() {
   const params = {
     table_name: tableName === 'all' ? undefined : tableName,
     user_id: userId === 'all' ? undefined : userId,
+    date_from: dateRange.from || undefined,
+    date_to: dateRange.to || undefined,
     page,
     limit: LIMIT,
   };
   const { data, isLoading, isFetching, isError } = useAuditLog(params);
 
-  const hasActiveFilter = tableName !== 'all' || userId !== 'all';
+  const hasActiveFilter = tableName !== 'all' || userId !== 'all' || Boolean(dateRange.from || dateRange.to);
 
   function handleResetFilter() {
     setTableName('all');
     setUserId('all');
+    setDateRange({ from: '', to: '' });
     setPage(1);
   }
 
@@ -89,7 +95,21 @@ function AuditLogPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <FilterBar>
+      <FilterBar
+        actions={
+          <ExportExcelButton
+            path="/audit-log/export"
+            params={{
+              table_name: params.table_name,
+              user_id: params.user_id,
+              date_from: params.date_from,
+              date_to: params.date_to,
+            }}
+            fallbackName="audit-log.xlsx"
+            disabled={data?.total === 0}
+          />
+        }
+      >
         <Select
           value={tableName}
           onValueChange={(v) => {
@@ -128,6 +148,15 @@ function AuditLogPage() {
             ))}
           </SelectContent>
         </Select>
+
+        <DateRangeFilter
+          from={dateRange.from}
+          to={dateRange.to}
+          onChange={(range) => {
+            setDateRange(range);
+            setPage(1);
+          }}
+        />
       </FilterBar>
 
       <DataTable

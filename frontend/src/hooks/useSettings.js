@@ -1,7 +1,14 @@
 // src/hooks/useSettings.js
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchSettings, updateSetting, updateSettingAccess, syncConmasNow } from '../api/settingsApi';
+import {
+  fetchSettings,
+  updateSetting,
+  updateSettingAccess,
+  syncConmasNow,
+  fetchAutoBackupStatus,
+  runAutoBackupNow,
+} from '../api/settingsApi';
 
 export function useSettings() {
   return useQuery({ queryKey: ['settings'], queryFn: fetchSettings });
@@ -64,4 +71,24 @@ export function useCanAccessSettings() {
   if (isDisplay) return { canAccess: false, isLoading: false };
   const canAccess = (data || []).some((s) => (s.editable_role_ids || []).includes(user?.role_id));
   return { canAccess, isLoading };
+}
+
+// Status backup otomatis (hasil run terakhir + daftar file di server). Admin only.
+// Polling 5 dtk HANYA selama server melaporkan backup sedang berjalan.
+export function useAutoBackupStatus(enabled = true) {
+  return useQuery({
+    queryKey: ['auto-backup-status'],
+    queryFn: fetchAutoBackupStatus,
+    enabled,
+    refetchInterval: (query) => (query.state.data?.running ? 5000 : false),
+  });
+}
+
+export function useRunAutoBackup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: runAutoBackupNow,
+    // Berhasil atau gagal, status terakhir & daftar file berubah.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['auto-backup-status'] }),
+  });
 }

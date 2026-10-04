@@ -3,16 +3,18 @@ const pmLineHistoryService = require('../services/pmLineHistoryService');
 const { validateCreatePmLineHistory } = require('../validators/pmLineHistoryValidator');
 const historyExportService = require('../services/historyExportService');
 const { sendXlsx } = require('../utils/xlsxExport');
+const { parseDateRange } = require('../utils/dateRange');
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
 
 const list = asyncHandler(async (req, res) => {
-  const { line_id, jenis, date_from, date_to, page, limit } = req.query;
+  const { line_id, jenis, page, limit } = req.query;
+  const { dateFrom, dateTo } = parseDateRange(req.query);
   const data = await pmLineHistoryService.listPmLineHistory({
     lineId: line_id ? Number(line_id) : undefined,
     jenis,
-    dateFrom: date_from,
-    dateTo: date_to,
+    dateFrom,
+    dateTo,
     page,
     limit,
   });
@@ -21,12 +23,13 @@ const list = asyncHandler(async (req, res) => {
 
 // GET /pm-line-history/export - filter sama dengan list, tanpa pagination.
 const exportXlsx = asyncHandler(async (req, res) => {
-  const { line_id, jenis, date_from, date_to } = req.query;
+  const { line_id, jenis } = req.query;
+  const { dateFrom, dateTo } = parseDateRange(req.query);
   const { buffer, filename } = await historyExportService.exportPmLineHistory({
     lineId: line_id ? Number(line_id) : undefined,
     jenis,
-    dateFrom: date_from,
-    dateTo: date_to,
+    dateFrom,
+    dateTo,
   });
   sendXlsx(res, buffer, filename);
 });

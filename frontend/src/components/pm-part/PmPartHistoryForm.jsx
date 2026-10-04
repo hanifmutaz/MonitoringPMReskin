@@ -18,10 +18,11 @@
 // dipetakan ke Button/token yang sama dipakai form lain (bg-[var(--accent-
 // dim)] border-primary, sama kayak Banner.jsx). Logic scan barcode/lookup
 // drawing no/candidate selection/create mutation TIDAK berubah sama sekali.
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScanLine } from 'lucide-react';
 import { useLines } from '../../hooks/useLines';
 import LineCombobox from '../LineCombobox';
+import Combobox from '../Combobox';
 import { useParts } from '../../hooks/useParts';
 import { useCreatePmPartHistory } from '../../hooks/usePmPartHistory';
 import { lookupPartsByDrawingNo } from '../../api/partsApi';
@@ -90,8 +91,25 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart, standalone = false
   const isLockedFromScan = Boolean(scannedPart) && !presetPart;
 
   const { data: lines = [] } = useLines({ isActive: true });
-  const { data: partsData } = useParts({ line_id: form.line_id || undefined, limit: 200 });
-  const parts = partsData?.items || [];
+  // limit 1000: tanpa Line terpilih daftar ini bisa berisi semua Part. Combobox
+  // hanya merender 100 teratas & sisanya dicari lewat ketikan, jadi aman.
+  const { data: partsData } = useParts({ line_id: form.line_id || undefined, limit: 1000 });
+
+  // Part terkunci (dari scan / klik baris Monitoring) selalu ada di opsi supaya
+  // labelnya tampil walau tidak ikut halaman data yang ter-load.
+  const partOptions = useMemo(() => {
+    const parts = partsData?.items || [];
+    const source = isLockedFromScan && lockedPart ? [lockedPart] : parts;
+    const opts = source.map((p) => ({
+      value: String(p.id),
+      label: `${p.drawing_no} (${p.jig_name}) / ${p.part_name}`,
+    }));
+    const lockedId = lockedPart ? String(lockedPart.id ?? lockedPart.part_id ?? '') : '';
+    if (lockedId && lockedPart.drawing_no && !opts.some((o) => o.value === lockedId)) {
+      opts.unshift({ value: lockedId, label: `${lockedPart.drawing_no} (${lockedPart.jig_name}) / ${lockedPart.part_name}` });
+    }
+    return opts;
+  }, [partsData, lockedPart, isLockedFromScan]);
 
   const createMutation = useCreatePmPartHistory();
 
@@ -234,18 +252,17 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart, standalone = false
 
         <div>
           <Label className="mb-2.5">Part (Drawing No / Nama)</Label>
-          <Select value={form.part_id} onValueChange={(v) => update('part_id', v)} disabled={isPrefilled || isLockedFromScan}>
-            <SelectTrigger aria-label="Pilih Part">
-              <SelectValue placeholder="Pilih Part" />
-            </SelectTrigger>
-            <SelectContent>
-              {(isLockedFromScan && lockedPart ? [lockedPart] : parts).map((p) => (
-                <SelectItem key={p.id} value={String(p.id)}>
-                  {p.drawing_no} ({p.jig_name}) / {p.part_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Combobox
+            value={form.part_id}
+            onValueChange={(v) => update('part_id', v)}
+            options={partOptions}
+            disabled={isPrefilled || isLockedFromScan}
+            placeholder="Pilih Part"
+            searchPlaceholder="Ketik Drawing No / Nama Part..."
+            searchAriaLabel="Cari Part"
+            emptyText="Part tidak ditemukan"
+            aria-label="Pilih Part"
+          />
           {errors.part_id && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.part_id}</p>}
           {isPrefilled && (
             <p className="mt-1 text-xs text-muted-foreground">

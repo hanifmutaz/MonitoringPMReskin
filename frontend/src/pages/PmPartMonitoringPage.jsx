@@ -55,6 +55,7 @@ import PmPartHistoryForm from '../components/pm-part/PmPartHistoryForm';
 import SearchBar from '../components/SearchBar';
 import { DataTable, DataTableNoResult } from '../components/data-display/DataTable';
 import { FilterBar } from '../components/data-display/FilterBar';
+import ExportExcelButton from '../components/ExportExcelButton';
 import { EmptyState } from '../components/ui/empty-state';
 import Modal from '../components/Modal';
 import { Button } from '../components/ui/button';
@@ -130,11 +131,24 @@ function PmPartMonitoringPage() {
 
       <FilterBar
         actions={
-          canSubmit ? (
-            <Button type="button" size="sm" onClick={() => setShowInputForm(true)}>
-              <Plus size={14} /> Input Penggantian Part
-            </Button>
-          ) : undefined
+          <>
+            {/* Export mengikuti filter yang aktif (search yang sudah di-debounce, sama dengan tabel). */}
+            <ExportExcelButton
+              path="/pm-part/export"
+              params={{
+                search: debouncedSearch || undefined,
+                status: status || undefined,
+                line_id: lineId === 'all' ? undefined : lineId,
+              }}
+              fallbackName="monitoring-pm-part.xlsx"
+              disabled={data?.total === 0}
+            />
+            {canSubmit && (
+              <Button type="button" size="sm" onClick={() => setShowInputForm(true)}>
+                <Plus size={14} /> Input Penggantian Part
+              </Button>
+            )}
+          </>
         }
       >
         <SearchBar value={search} onChange={handleFilterChange(setSearch)} placeholder="Cari drawing no / nama part..." />

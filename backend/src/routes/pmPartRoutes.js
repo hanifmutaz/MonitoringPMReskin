@@ -12,6 +12,8 @@ router.use(requireAuth, requirePermission('pm_part.view'));
 
 router.get('/', pmPartController.list);
 router.get('/ketepatan-per-line', pmPartController.ketepatanPerLine);
+// Harus SEBELUM '/:partId' (kalau tidak, 'export' dibaca sebagai partId).
+router.get('/export', pmPartController.exportXlsx);
 router.get('/:partId', pmPartController.detail);
 
 module.exports = router;

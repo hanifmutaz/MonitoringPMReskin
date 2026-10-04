@@ -6,6 +6,7 @@ const conmasDb = require('./src/config/conmasDb');
 const logger = require('./src/utils/logger');
 const conmasSyncJob = require('./src/jobs/conmasSyncJob');
 const notificationJob = require('./src/jobs/notificationJob');
+const backupJob = require('./src/jobs/backupJob');
 
 // Batas waktu menunggu request yang lagi jalan selesai sebelum dipaksa mati.
 // Harus < stop_grace_period orchestrator (docker default 10s -> lihat
@@ -31,6 +32,7 @@ async function shutdown(signal, exitCode = 0) {
     // 1. Berhenti nerima cron job baru.
     conmasSyncJob.stop();
     notificationJob.stop();
+    backupJob.stop();
 
     // 2. Berhenti nerima koneksi baru, tunggu request berjalan selesai.
     if (server) {
@@ -68,6 +70,10 @@ async function start() {
     // Notification job juga independen - kalau SMTP belum dikonfigurasi,
     // cuma log warning per email (lihat mailer.js), server API tetap normal.
     notificationJob.start().catch((err) => logger.error('Gagal start notification job', err));
+
+    // Backup otomatis: aktif/tidaknya & jadwalnya dibaca dari Settings (default
+    // nonaktif). Gagal start tidak mengganggu API.
+    backupJob.start().catch((err) => logger.error('Gagal start backup job', err));
   } catch (err) {
     logger.error('Failed to start server', err);
     process.exit(1);

@@ -3,7 +3,7 @@
 // Sidebar (submenu), supaya keduanya tidak bisa drift.
 //
 // Ada 2 level:
-//  - CATEGORY_META : 10 kategori dari backend (app_settings.category) beserta
+//  - CATEGORY_META : 11 kategori dari backend (app_settings.category) beserta
 //    judul yang sudah disederhanakan. Ini yang tampil sebagai judul kartu.
 //  - SETTINGS_MENU : PEMETAAN kategori ke submenu. Beberapa kategori digabung
 //    ke 1 submenu (1 halaman, beberapa kartu) supaya menu tidak kepanjangan.
@@ -21,6 +21,7 @@ export const CATEGORY_META = {
   user_role: { title: 'Akses & Sesi' },
   notifikasi: { title: 'Notifikasi Email' },
   inventory: { title: 'Stok Pengaman' },
+  backup_otomatis: { title: 'Backup Otomatis' },
 };
 
 export const SETTINGS_MENU = [
@@ -34,7 +35,7 @@ export const SETTINGS_MENU = [
   {
     key: 'umum',
     title: 'Umum',
-    categories: ['sync_data_produksi', 'dashboard_tampilan', 'user_role', 'notifikasi'],
+    categories: ['sync_data_produksi', 'dashboard_tampilan', 'user_role', 'notifikasi', 'backup_otomatis'],
   },
 ];
 

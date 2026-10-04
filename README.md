@@ -99,7 +99,14 @@ Catatan:
 - `.xlsx` dibatasi `BACKUP_EXCEL_MAX_ROWS` baris per tabel (default 100.000, yang terbaru dipertahankan). Tabel yang dipotong ditandai di sheet `_INFO`.
 - Timeout proxy: nginx (compose) sudah diset 10 menit untuk endpoint ini. Di IIS/ARR naikkan *Time-out* di Server Proxy Settings kalau DB besar (default 120 detik).
 - `.dump` dan `.sql` berisi seluruh data **termasuk akun user & hash password** — simpan di tempat aman. Foto profil tidak ikut (pakai langkah volume `uploads` di atas).
-- Ini backup manual. Backup terjadwal otomatis tetap sebaiknya lewat cron host.
+- Unduhan di atas adalah backup manual yang dikirim ke browser. Untuk backup terjadwal, lihat **Backup otomatis** di bawah.
+
+**Backup otomatis (terjadwal):** Admin mengatur di **Settings → Umum → Backup Otomatis** (default **nonaktif**): aktif/tidak, jam (WIB), jarak antar backup (hari), format (`dump` disarankan), dan jumlah file terbaru yang disimpan (yang lebih lama dihapus otomatis). Perubahan berlaku langsung tanpa restart. Tombol **Jalankan Sekarang** membuat satu backup di server untuk menguji pengaturan, dan file yang tersimpan bisa diunduh dari panel yang sama. Setiap backup (berhasil maupun gagal) tercatat di Audit Log.
+
+- File ditulis ke `BACKUP_DIR` (Docker: volume `backups` di `/app/backups`, default non-Docker `backend/backups`). Isinya berisi data akun user, jadi **jangan** taruh di folder yang bisa diakses web.
+- Docker lama yang di-upgrade: jalankan `docker compose up -d --build` supaya image baru (folder `/app/backups` milik user `node`) dan volume `backups` terbentuk. Tanpa itu backup terjadwal gagal menulis file.
+- Backup di server yang sama dengan database **bukan** pengganti salinan di luar server. Salin isi volume `backups` secara berkala ke tempat lain.
+- Jika server mati tepat di jam jadwal, backup yang terlewat dibuat saat server hidup lagi (selama jam jadwal hari itu sudah lewat).
 
 ### Rollback
 

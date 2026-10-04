@@ -12,4 +12,7 @@ router.use(requireAuth, requirePermission('auditlog.view'));
 
 router.get('/', auditLogController.list);
 
+// Export .xlsx (filter sama dengan list) - permission yang sama dengan view.
+router.get('/export', auditLogController.exportXlsx);
+
 module.exports = router;

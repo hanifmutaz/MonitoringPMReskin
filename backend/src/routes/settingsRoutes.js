@@ -35,4 +35,10 @@ router.post('/sync-conmas', requireRole('Admin'), settingsController.syncNow);
 // karena operasinya berat & punya efek samping (audit log, file sementara).
 router.post('/backup', requireRole('Admin'), settingsController.backup);
 
+// Backup otomatis yang tersimpan di server (BACKUP_DIR) - Admin only.
+// Jadwalnya sendiri diatur lewat PATCH /:key (key backup_auto_*).
+router.get('/backup/auto', requireRole('Admin'), settingsController.autoBackupStatus);
+router.post('/backup/auto/run', requireRole('Admin'), settingsController.autoBackupRun);
+router.get('/backup/auto/files/:name', requireRole('Admin'), settingsController.autoBackupDownload);
+
 module.exports = router;

@@ -25,7 +25,7 @@
 // `<div className="flex flex-wrap gap-2">`, beda dari <FilterBar> yang
 // dipakai grup Monitoring (`gap-3` + `items-center`). Disamain jadi 1
 // bahasa layout filter lintas grup halaman. Nol behavior change.
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useAllInventoryMovements } from '../hooks/useInventoryItemDetail';
@@ -40,7 +40,9 @@ import { DataTable, DataTableNoResult } from '../components/data-display/DataTab
 import { EmptyState } from '../components/ui/empty-state';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { FilterBar } from '../components/data-display/FilterBar';
+import { DateRangeFilter } from '../components/data-display/DateRangeFilter';
 import ExportExcelButton from '../components/ExportExcelButton';
+import Combobox from '../components/Combobox';
 import inventoryHistoryColumns, { MOVEMENT_TYPE_LABEL } from './inventoryHistoryColumns';
 
 const LIMIT = 20;
@@ -48,6 +50,7 @@ const LIMIT = 20;
 function InventoryHistoryPage() {
     const [itemId, setItemId] = useState('all');
     const [movementType, setMovementType] = useState('all');
+    const [dateRange, setDateRange] = useState({ from: '', to: '' });
     const [page, setPage] = useState(1);
     const [bulkError, setBulkError] = useState('');
     const confirm = useConfirm();
@@ -57,11 +60,20 @@ function InventoryHistoryPage() {
     // limit tinggi supaya dropdown filter isinya semua item, bukan cuma
     // halaman pertama - katalog Inventory diasumsikan tidak akan ribuan baris
     const { data: itemsData } = useInventoryItems({ limit: 1000 });
-    const items = itemsData?.items || [];
+    const itemOptions = useMemo(
+        () =>
+            (itemsData?.items || []).map((item) => ({
+                value: String(item.id),
+                label: `${item.part_name} (${item.spare_part_number})`,
+            })),
+        [itemsData]
+    );
 
     const params = {
         item_id: itemId === 'all' ? undefined : itemId,
         movement_type: movementType === 'all' ? undefined : movementType,
+        date_from: dateRange.from || undefined,
+        date_to: dateRange.to || undefined,
         page,
         limit: LIMIT,
     };
@@ -96,11 +108,12 @@ function InventoryHistoryPage() {
         }
     }
 
-    const hasActiveFilter = itemId !== 'all' || movementType !== 'all';
+    const hasActiveFilter = itemId !== 'all' || movementType !== 'all' || Boolean(dateRange.from || dateRange.to);
 
     function handleResetFilter() {
         setItemId('all');
         setMovementType('all');
+        setDateRange({ from: '', to: '' });
         setPage(1);
     }
 
@@ -110,31 +123,32 @@ function InventoryHistoryPage() {
                 actions={
                     <ExportExcelButton
                         path="/inventory/movements/export"
-                        params={{ item_id: params.item_id, movement_type: params.movement_type }}
+                        params={{
+                            item_id: params.item_id,
+                            movement_type: params.movement_type,
+                            date_from: params.date_from,
+                            date_to: params.date_to,
+                        }}
                         fallbackName="history-inventory.xlsx"
                         disabled={data?.total === 0}
                     />
                 }
             >
-                <Select
+                <Combobox
+                    className="w-[240px]"
                     value={itemId}
                     onValueChange={(v) => {
                         setItemId(v);
                         setPage(1);
                     }}
-                >
-                    <SelectTrigger className="w-[240px]" aria-label="Filter berdasarkan Item">
-                        <SelectValue placeholder="Semua Item" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Semua Item</SelectItem>
-                        {items.map((item) => (
-                            <SelectItem key={item.id} value={String(item.id)}>
-                                {item.part_name} ({item.spare_part_number})
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                    options={itemOptions}
+                    allLabel="Semua Item"
+                    placeholder="Semua Item"
+                    searchPlaceholder="Ketik nama / nomor part..."
+                    searchAriaLabel="Cari Item"
+                    emptyText="Item tidak ditemukan"
+                    aria-label="Filter berdasarkan Item"
+                />
 
                 <Select
                     value={movementType}
@@ -155,6 +169,15 @@ function InventoryHistoryPage() {
                         ))}
                     </SelectContent>
                 </Select>
+
+                <DateRangeFilter
+                    from={dateRange.from}
+                    to={dateRange.to}
+                    onChange={(range) => {
+                        setDateRange(range);
+                        setPage(1);
+                    }}
+                />
             </FilterBar>
 
             {bulkError && (

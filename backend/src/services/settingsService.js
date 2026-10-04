@@ -95,7 +95,7 @@ async function updateSetting(key, value, user) {
       }
     }
 
-    const { valid, errors } = validateSettingValue(before.value_type, value);
+    const { valid, errors } = validateSettingValue(before.value_type, value, key);
     if (!valid) {
       throw AppError.badRequest('Validasi gagal', errors);
     }

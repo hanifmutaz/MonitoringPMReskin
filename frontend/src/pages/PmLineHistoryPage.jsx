@@ -38,6 +38,8 @@ import { useMemo, useState } from 'react';
 import { Plus, X, Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { usePmLineHistoryList } from '../hooks/usePmLineHistory';
+import { useUrlFilters } from '../hooks/useUrlFilters';
+import { isDateString } from '../utils/urlFilters';
 import { useLines } from '../hooks/useLines';
 import LineCombobox from '../components/LineCombobox';
 import ExportExcelButton from '../components/ExportExcelButton';
@@ -55,13 +57,29 @@ import { EmptyState } from '../components/ui/empty-state';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { FilterBar } from '../components/data-display/FilterBar';
+import { DateRangeFilter } from '../components/data-display/DateRangeFilter';
 
 const LIMIT = 20;
 
+// Filter disimpan di URL (?line=3&jenis=MONTHLY&from=2026-09-01&to=2026-09-30):
+// bisa di-bookmark/dibagikan dan tidak reset saat pindah halaman. Halaman
+// (pagination) sengaja tetap state biasa - selalu kembali ke 1 saat filter berubah.
+const URL_FILTER_DEFAULTS = { line: 'all', jenis: 'all', from: '', to: '' };
+const URL_FILTER_VALIDATORS = {
+  line: (v) => v === 'all' || /^\d+$/.test(v),
+  jenis: (v) => v === 'all' || Object.hasOwn(JENIS_LABEL, v),
+  from: isDateString,
+  to: isDateString,
+};
+
 function PmLineHistoryPage() {
   const [showForm, setShowForm] = useState(false);
-  const [lineId, setLineId] = useState('all');
-  const [jenis, setJenis] = useState('all');
+  const [filters, setFilters, resetFilters] = useUrlFilters({
+    storageKey: 'pm-line-history',
+    defaults: URL_FILTER_DEFAULTS,
+    validators: URL_FILTER_VALIDATORS,
+  });
+  const { line: lineId, jenis, from: dateFrom, to: dateTo } = filters;
   const [page, setPage] = useState(1);
   const [bulkError, setBulkError] = useState('');
   const confirm = useConfirm();
@@ -99,6 +117,8 @@ function PmLineHistoryPage() {
   const params = {
     line_id: lineId === 'all' ? undefined : lineId,
     jenis: jenis === 'all' ? undefined : jenis,
+    date_from: dateFrom || undefined,
+    date_to: dateTo || undefined,
     page,
     limit: LIMIT,
   };
@@ -138,11 +158,15 @@ function PmLineHistoryPage() {
     }
   }
 
-  const hasActiveFilter = lineId !== 'all' || jenis !== 'all';
+  const hasActiveFilter = lineId !== 'all' || jenis !== 'all' || Boolean(dateFrom || dateTo);
 
   function handleResetFilter() {
-    setLineId('all');
-    setJenis('all');
+    resetFilters();
+    setPage(1);
+  }
+
+  function applyFilter(patch) {
+    setFilters(patch);
     setPage(1);
   }
 
@@ -162,7 +186,7 @@ function PmLineHistoryPage() {
         actions={
           <ExportExcelButton
             path="/pm-line-history/export"
-            params={{ line_id: params.line_id, jenis: params.jenis }}
+            params={{ line_id: params.line_id, jenis: params.jenis, date_from: params.date_from, date_to: params.date_to }}
             fallbackName="history-pm-line.xlsx"
             disabled={data?.total === 0}
           />
@@ -170,10 +194,7 @@ function PmLineHistoryPage() {
       >
         <LineCombobox
           value={lineId}
-          onValueChange={(v) => {
-            setLineId(v);
-            setPage(1);
-          }}
+          onValueChange={(v) => applyFilter({ line: v })}
           lines={lines}
           allLabel="Semua Line"
           placeholder="Semua Line"
@@ -183,10 +204,7 @@ function PmLineHistoryPage() {
 
         <Select
           value={jenis}
-          onValueChange={(v) => {
-            setJenis(v);
-            setPage(1);
-          }}
+          onValueChange={(v) => applyFilter({ jenis: v })}
         >
           <SelectTrigger className="w-[180px]" aria-label="Filter berdasarkan Jenis PM">
             <SelectValue placeholder="Semua Jenis" />
@@ -200,6 +218,8 @@ function PmLineHistoryPage() {
             ))}
           </SelectContent>
         </Select>
+
+        <DateRangeFilter from={dateFrom} to={dateTo} onChange={(range) => applyFilter({ from: range.from, to: range.to })} />
       </FilterBar>
 
       {bulkError && (

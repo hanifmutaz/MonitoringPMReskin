@@ -39,6 +39,7 @@ import SelectAllAcrossPagesBar from '../components/SelectAllAcrossPagesBar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { EmptyState } from '../components/ui/empty-state';
 import { FilterBar } from '../components/data-display/FilterBar';
+import { DateRangeFilter } from '../components/data-display/DateRangeFilter';
 import { useJenisPenggantian } from '../hooks/useJenisPenggantian';
 import { formatDate } from '../utils/formatDate';
 
@@ -48,6 +49,7 @@ function PmPartHistoryPage() {
   const { filterOptions: jenisFilterOptions, labelOf: jenisLabel } = useJenisPenggantian();
   const [lineId, setLineId] = useState('all');
   const [jenis, setJenis] = useState('all');
+  const [dateRange, setDateRange] = useState({ from: '', to: '' });
   const [page, setPage] = useState(1);
   const [bulkError, setBulkError] = useState('');
   const confirm = useConfirm();
@@ -58,6 +60,8 @@ function PmPartHistoryPage() {
   const params = {
     line_id: lineId === 'all' ? undefined : lineId,
     jenis: jenis === 'all' ? undefined : jenis,
+    date_from: dateRange.from || undefined,
+    date_to: dateRange.to || undefined,
     page,
     limit: LIMIT,
   };
@@ -102,7 +106,7 @@ function PmPartHistoryPage() {
         actions={
           <ExportExcelButton
             path="/pm-part-history/export"
-            params={{ line_id: params.line_id, jenis: params.jenis }}
+            params={{ line_id: params.line_id, jenis: params.jenis, date_from: params.date_from, date_to: params.date_to }}
             fallbackName="history-pm-part.xlsx"
             disabled={data?.total === 0}
           />
@@ -140,6 +144,15 @@ function PmPartHistoryPage() {
             ))}
           </SelectContent>
         </Select>
+
+        <DateRangeFilter
+          from={dateRange.from}
+          to={dateRange.to}
+          onChange={(range) => {
+            setDateRange(range);
+            setPage(1);
+          }}
+        />
       </FilterBar>
 
       <div className="rounded-xl border border-border bg-card p-4.5">

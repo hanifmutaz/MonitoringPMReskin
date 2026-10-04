@@ -21,6 +21,9 @@
 //  - Yang dicadangkan: SELURUH isi database (termasuk akun & hash password),
 //    jadi file backup harus diperlakukan sebagai data sensitif.
 //  - Foto profil (volume uploads) BUKAN bagian dari dump DB - lihat README.
+//  - Backup OTOMATIS (jobs/backupJob.js) dan tombol "Jalankan Sekarang" menulis
+//    ke folder BACKUP_DIR di server lewat createStoredBackup() di bawah, dengan
+//    kunci `running` yang sama (tidak pernah ada 2 backup bersamaan).
 const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
@@ -287,4 +290,172 @@ async function createAndSendBackup(res, user, format = DEFAULT_FORMAT) {
   }
 }
 
-module.exports = { createAndSendBackup, buildPgDumpInvocation, FORMATS, DEFAULT_FORMAT };
+// --- Backup tersimpan di server (otomatis / "Jalankan Sekarang") ------------------
+
+// trigger: 'auto' = dijalankan jadwal, 'manual' = tombol "Jalankan Sekarang".
+// Stempel waktu di nama file (WIB) bisa diurutkan sebagai teks.
+const STORED_FILE_RE = /^pm-monitoring-(auto|manual)-(\d{8}-\d{4})\.(dump|sql|xlsx)$/;
+const STATUS_FILE = '.last-run.json';
+const TRIGGER_LABEL = { auto: 'otomatis', manual: 'manual di server' };
+
+function storedFilePath(name) {
+  return path.join(env.backup.dir, name);
+}
+
+async function readdirSafe(dir) {
+  try {
+    return await fs.promises.readdir(dir);
+  } catch (err) {
+    if (err.code === 'ENOENT') return [];
+    throw err;
+  }
+}
+
+/**
+ * Waktu pembuatan dari STEMPEL di nama file (WIB, UTC+7 tetap - tanpa DST),
+ * bukan mtime: mtime ikut berubah kalau volume disalin/di-restore, sedangkan
+ * jadwal backup otomatis (jobs/backupJob.js) bergantung pada "kapan backup
+ * terakhir dibuat".
+ */
+function createdAtFromStamp(stamp) {
+  const [, y, mo, d, h, mi] = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})$/.exec(stamp);
+  return new Date(`${y}-${mo}-${d}T${h}:${mi}:00+07:00`).toISOString();
+}
+
+/** Daftar file backup tersimpan, terbaru dulu. Hanya file bernama persis pola di atas. */
+async function listStoredBackups() {
+  const names = (await readdirSafe(env.backup.dir)).filter((n) => STORED_FILE_RE.test(n));
+  const files = [];
+  for (const name of names) {
+    try {
+      const st = await fs.promises.stat(storedFilePath(name));
+      const [, trigger, stamp, ext] = STORED_FILE_RE.exec(name);
+      files.push({ name, trigger, format: ext, size: st.size, created_at: createdAtFromStamp(stamp) });
+    } catch {
+      /* file hilang di antara readdir dan stat (mis. baru dipangkas) - lewati */
+    }
+  }
+  // Stempel waktu (grup 2 pola nama) bisa diurutkan sebagai teks; terbaru dulu.
+  const stampOf = (f) => STORED_FILE_RE.exec(f.name)[2];
+  files.sort((a, b) => (stampOf(a) < stampOf(b) ? 1 : stampOf(a) > stampOf(b) ? -1 : 0));
+  return files;
+}
+
+/** Hapus file `trigger` yang lebih lama dari `keep` file terbaru. Return jumlah terhapus. */
+async function pruneStoredBackups(trigger, keep) {
+  const keepN = Math.max(1, Math.floor(Number(keep) || 1));
+  const files = (await listStoredBackups()).filter((f) => f.trigger === trigger);
+  let removed = 0;
+  for (const f of files.slice(keepN)) {
+    try {
+      await fs.promises.rm(storedFilePath(f.name), { force: true });
+      removed += 1;
+    } catch (err) {
+      logger.warn('[BACKUP] gagal menghapus backup lama', { name: f.name, err: err.message });
+    }
+  }
+  return removed;
+}
+
+async function writeLastRun(entry) {
+  try {
+    await fs.promises.mkdir(env.backup.dir, { recursive: true, mode: 0o700 });
+    await fs.promises.writeFile(storedFilePath(STATUS_FILE), JSON.stringify(entry), { mode: 0o600 });
+  } catch (err) {
+    logger.warn('[BACKUP] gagal menulis status backup terakhir', { err: err.message });
+  }
+}
+
+async function readLastRun() {
+  try {
+    return JSON.parse(await fs.promises.readFile(storedFilePath(STATUS_FILE), 'utf8'));
+  } catch {
+    return null; // belum pernah jalan / file rusak
+  }
+}
+
+/** Untuk panel Settings: hasil run terakhir + daftar file. */
+async function getStoredBackupStatus() {
+  const [last_run, files] = await Promise.all([readLastRun(), listStoredBackups()]);
+  return { last_run, files, running };
+}
+
+/** Path file untuk diunduh. Nama divalidasi ketat (anti path traversal) -> 404 kalau tidak cocok/ tidak ada. */
+async function resolveStoredBackup(name) {
+  if (typeof name !== 'string' || !STORED_FILE_RE.test(name)) throw AppError.notFound('File backup tidak ditemukan');
+  const filePath = storedFilePath(name);
+  try {
+    const st = await fs.promises.stat(filePath);
+    return { filePath, size: st.size, name, format: STORED_FILE_RE.exec(name)[3] };
+  } catch {
+    throw AppError.notFound('File backup tidak ditemukan');
+  }
+}
+
+/**
+ * Buat backup & simpan di BACKUP_DIR (bukan dikirim ke client).
+ * @param {{format?: 'dump'|'sql'|'xlsx', trigger: 'auto'|'manual', keep: number, userId?: number|null}} opts
+ * @returns {Promise<{name:string, size:number, format:string, pruned:number}>}
+ */
+async function createStoredBackup({ format = DEFAULT_FORMAT, trigger, keep, userId = null }) {
+  const fmt = FORMATS[format];
+  if (!fmt) throw new AppError('Format backup tidak dikenal', 400, { format: `Pilih salah satu: ${Object.keys(FORMATS).join(', ')}` });
+  if (!TRIGGER_LABEL[trigger]) throw new Error(`trigger backup tidak dikenal: ${trigger}`);
+  if (running) throw new AppError('Backup lain sedang berjalan, coba lagi sebentar', 409);
+  running = true;
+
+  const name = `pm-monitoring-${trigger}-${dayjs().tz('Asia/Jakarta').format('YYYYMMDD-HHmm')}.${fmt.ext}`;
+  const finalPath = storedFilePath(name);
+  const partialPath = `${finalPath}.partial`; // belum dianggap backup sampai selesai & di-rename
+
+  try {
+    await fs.promises.mkdir(env.backup.dir, { recursive: true, mode: 0o700 });
+    await writeBackupFile(format, partialPath);
+    await fs.promises.chmod(partialPath, 0o600); // berisi hash password user
+    await fs.promises.rename(partialPath, finalPath);
+    const { size } = await fs.promises.stat(finalPath);
+    const pruned = await pruneStoredBackups(trigger, keep);
+
+    const detail = `Backup ${TRIGGER_LABEL[trigger]} tersimpan - ${fmt.label} (${name}, ${(size / 1024 / 1024).toFixed(2)} MB)${
+      pruned > 0 ? `, ${pruned} file lama dihapus` : ''
+    }`;
+    await recordAudit({ tableName: 'backup', recordId: null, action: 'CREATE', userId, actionDetail: detail }).catch((err) =>
+      logger.warn('[BACKUP] audit backup gagal ditulis', { err: err.message })
+    );
+    await writeLastRun({ at: new Date().toISOString(), ok: true, trigger, format, name, size, message: null });
+    logger.info('[BACKUP] backup tersimpan di server', { name, trigger, format, size, pruned });
+    return { name, size, format, pruned };
+  } catch (err) {
+    await fs.promises.rm(partialPath, { force: true }).catch(() => {});
+    // err.message dari AppError sudah aman (tanpa stderr mentah/kredensial, lihat runPgDump).
+    const message = err instanceof AppError ? err.message : 'Backup gagal, cek log server';
+    await writeLastRun({ at: new Date().toISOString(), ok: false, trigger, format, name: null, size: null, message });
+    await recordAudit({
+      tableName: 'backup',
+      recordId: null,
+      action: 'CREATE',
+      userId,
+      actionDetail: `Backup ${TRIGGER_LABEL[trigger]} GAGAL - ${fmt.label}: ${message}`,
+    }).catch(() => {});
+    logger.error('[BACKUP] backup tersimpan di server gagal', { trigger, format, err: err.message });
+    throw err;
+  } finally {
+    running = false;
+  }
+}
+
+function isRunning() {
+  return running;
+}
+
+module.exports = {
+  createAndSendBackup,
+  createStoredBackup,
+  listStoredBackups,
+  getStoredBackupStatus,
+  resolveStoredBackup,
+  isRunning,
+  buildPgDumpInvocation,
+  FORMATS,
+  DEFAULT_FORMAT,
+};

@@ -22,6 +22,7 @@ import { useMemo, useState } from 'react';
 import { Plus, X, Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { usePmLineStatus } from '../hooks/usePmLineStatus';
+import { useUrlFilters } from '../hooks/useUrlFilters';
 import buildPmLineColumns from '../components/pm-line/pmLineColumns';
 import Banner from '../components/Banner';
 import PmLineHistoryForm from '../components/pm-line/PmLineHistoryForm';
@@ -39,6 +40,12 @@ const STATUS_OPTIONS = [
   { value: 'WARNING', label: 'Warning' },
   { value: 'DANGER', label: 'Danger' },
 ];
+
+// Filter disimpan di URL (?q=line1&sm=DANGER&sw=WARNING): bisa di-bookmark/dibagikan
+// dan tidak reset saat pindah halaman. Konstanta di luar komponen (hook butuh referensi stabil).
+const URL_FILTER_DEFAULTS = { q: '', sm: 'all', sw: 'all' };
+const isStatusFilter = (v) => v === 'all' || STATUS_OPTIONS.some((o) => o.value === v);
+const URL_FILTER_VALIDATORS = { sm: isStatusFilter, sw: isStatusFilter };
 
 // "line1", "Line 1", "LINE-1" semuanya cocok dengan "LINE-1" (sama dengan LineCombobox).
 const normalize = (v) => String(v ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -83,16 +90,13 @@ function PmLineStatusPage() {
   const [showInputForm, setShowInputForm] = useState(false);
 
   // Filter (client-side). 'all' = tidak difilter.
-  const [search, setSearch] = useState('');
-  const [statusMonthly, setStatusMonthly] = useState('all');
-  const [statusWeekly, setStatusWeekly] = useState('all');
+  const [filters, setFilters, handleResetFilter] = useUrlFilters({
+    storageKey: 'pm-line-status',
+    defaults: URL_FILTER_DEFAULTS,
+    validators: URL_FILTER_VALIDATORS,
+  });
+  const { q: search, sm: statusMonthly, sw: statusWeekly } = filters;
   const hasActiveFilter = Boolean(search) || statusMonthly !== 'all' || statusWeekly !== 'all';
-
-  function handleResetFilter() {
-    setSearch('');
-    setStatusMonthly('all');
-    setStatusWeekly('all');
-  }
 
   // Urutan: jadwal PM terdekat di paling atas. Yang dipakai = sisa hari
   // terkecil antara Monthly dan Weekly (negatif = sudah lewat jadwal).
@@ -219,9 +223,9 @@ function PmLineStatusPage() {
           ) : undefined
         }
       >
-        <SearchBar value={search} onChange={setSearch} placeholder="Cari nama Line..." />
-        <StatusSelect value={statusMonthly} onChange={setStatusMonthly} label="Status Monthly" prefix="Monthly" />
-        <StatusSelect value={statusWeekly} onChange={setStatusWeekly} label="Status Weekly" prefix="Weekly" />
+        <SearchBar value={search} onChange={(v) => setFilters({ q: v })} placeholder="Cari nama Line..." />
+        <StatusSelect value={statusMonthly} onChange={(v) => setFilters({ sm: v })} label="Status Monthly" prefix="Monthly" />
+        <StatusSelect value={statusWeekly} onChange={(v) => setFilters({ sw: v })} label="Status Weekly" prefix="Weekly" />
         {hasActiveFilter && (
           <Button type="button" variant="ghost" size="sm" onClick={handleResetFilter}>
             <X size={14} /> Reset

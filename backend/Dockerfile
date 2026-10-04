@@ -46,7 +46,10 @@ COPY --from=deps-prod /app/node_modules ./node_modules
 COPY package.json app.js server.js ./
 COPY src ./src
 # Folder upload avatar: mount volume ke /app/uploads biar persisten.
-RUN mkdir -p /app/uploads && chown -R node:node /app/uploads
+# /app/backups = tujuan Backup Otomatis (BACKUP_DIR). WAJIB dimiliki user `node`
+# (kalau tidak, backup terjadwal gagal menulis) dan di-mount sebagai volume
+# supaya file tidak hilang saat container dibuat ulang.
+RUN mkdir -p /app/uploads /app/backups && chown -R node:node /app/uploads /app/backups
 USER node
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

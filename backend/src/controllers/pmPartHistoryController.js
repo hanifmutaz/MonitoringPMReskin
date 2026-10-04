@@ -3,17 +3,19 @@ const pmPartHistoryService = require('../services/pmPartHistoryService');
 const { validateCreateHistory } = require('../validators/pmPartHistoryValidator');
 const historyExportService = require('../services/historyExportService');
 const { sendXlsx } = require('../utils/xlsxExport');
+const { parseDateRange } = require('../utils/dateRange');
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
 
 const list = asyncHandler(async (req, res) => {
-  const { line_id, part_id, jenis, date_from, date_to, page, limit } = req.query;
+  const { line_id, part_id, jenis, page, limit } = req.query;
+  const { dateFrom, dateTo } = parseDateRange(req.query);
   const data = await pmPartHistoryService.listHistory({
     lineId: line_id ? Number(line_id) : undefined,
     partId: part_id ? Number(part_id) : undefined,
     jenis,
-    dateFrom: date_from,
-    dateTo: date_to,
+    dateFrom,
+    dateTo,
     page,
     limit,
   });
@@ -22,13 +24,14 @@ const list = asyncHandler(async (req, res) => {
 
 // GET /pm-part-history/export - filter sama dengan list, tanpa pagination.
 const exportXlsx = asyncHandler(async (req, res) => {
-  const { line_id, part_id, jenis, date_from, date_to } = req.query;
+  const { line_id, part_id, jenis } = req.query;
+  const { dateFrom, dateTo } = parseDateRange(req.query);
   const { buffer, filename } = await historyExportService.exportPmPartHistory({
     lineId: line_id ? Number(line_id) : undefined,
     partId: part_id ? Number(part_id) : undefined,
     jenis,
-    dateFrom: date_from,
-    dateTo: date_to,
+    dateFrom,
+    dateTo,
   });
   sendXlsx(res, buffer, filename);
 });

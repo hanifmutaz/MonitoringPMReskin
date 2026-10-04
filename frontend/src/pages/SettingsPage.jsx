@@ -12,6 +12,7 @@ import ToggleSwitch from '../components/ToggleSwitch';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { downloadFile } from '../api/downloadApi';
+import AutoBackupPanel from '../components/settings/AutoBackupPanel';
 
 // Label manusiawi per setting key — settingnya sendiri fixed catalog dari
 // migration (bukan dibuat dinamis lewat UI), jadi cukup static map di sini
@@ -53,7 +54,20 @@ const SETTING_LABELS = {
   notif_inventory_repeat: 'Ulangi Pengingat Inventory',
   // Stok Pengaman
   inventory_safety_stock_percentage: 'Persen Stok Pengaman',
+  // Backup Otomatis
+  backup_auto_enabled: 'Aktifkan Backup Otomatis',
+  backup_auto_time: 'Jam Backup (WIB)',
+  backup_auto_interval_days: 'Jarak Antar Backup (hari)',
+  backup_auto_format: 'Format File Backup',
+  backup_auto_keep: 'Jumlah File yang Disimpan',
 };
+
+// Pilihan untuk setting teks yang nilainya terbatas (bukan ketik bebas).
+const BACKUP_FORMAT_CHOICES = [
+  { value: 'dump', label: 'dump (lengkap, disarankan)' },
+  { value: 'sql', label: 'sql (teks)' },
+  { value: 'xlsx', label: 'xlsx (Excel)' },
+];
 
 function displayValue(setting) {
   if (setting.value_type === 'boolean') return setting.value === 'true' || setting.value === true ? 'Ya' : 'Tidak';
@@ -222,10 +236,26 @@ function SettingRow({ setting, canEdit, isAdmin }) {
                   autoFocus
                 />
               )}
-              {setting.value_type === 'text' && (
+              {setting.value_type === 'text' && setting.key === 'backup_auto_format' && (
+                <select
+                  aria-label={SETTING_LABELS[setting.key]}
+                  className="h-10 rounded-md border border-border bg-secondary px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  value={localValue}
+                  disabled={updateMutation.isPending}
+                  onChange={(e) => setLocalValue(e.target.value)}
+                  autoFocus
+                >
+                  {BACKUP_FORMAT_CHOICES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {setting.value_type === 'text' && setting.key !== 'backup_auto_format' && (
                 <Input
-                  type="text"
-                  className="w-[160px]"
+                  type={setting.key === 'backup_auto_time' ? 'time' : 'text'}
+                  className={setting.key === 'backup_auto_time' ? 'w-[120px]' : 'w-[160px]'}
                   value={localValue}
                   disabled={updateMutation.isPending}
                   onChange={(e) => setLocalValue(e.target.value)}
@@ -323,6 +353,8 @@ function CategoryCard({ categoryKey, settings, isAdmin, userRoleId }) {
           canEdit={isAdmin || (s.editable_role_ids || []).includes(userRoleId)}
         />
       ))}
+      {/* Status run terakhir + file di server: endpoint-nya Admin only. */}
+      {categoryKey === 'backup_otomatis' && isAdmin && <AutoBackupPanel />}
     </div>
   );
 }
@@ -468,6 +500,8 @@ function SettingsPage() {
         </div>
       )}
       {activeMenu.categories.map((cat) => {
+        // Backup (jadwal, file di server) sepenuhnya urusan Admin.
+        if (cat === 'backup_otomatis' && !isAdmin) return null;
         const categorySettings = data.filter((s) => s.category === cat);
         if (categorySettings.length === 0) return null;
         return (

@@ -106,8 +106,8 @@ async function listMovements(itemId, { page, limit }) {
   return inventoryQueries.findMovementsByItem(itemId, { page, limit });
 }
 
-async function listAllMovements({ item_id, movement_type, page, limit }) {
-  return inventoryQueries.findAllMovements({ item_id, movement_type, page, limit });
+async function listAllMovements({ item_id, movement_type, dateFrom, dateTo, page, limit }) {
+  return inventoryQueries.findAllMovements({ item_id, movement_type, dateFrom, dateTo, page, limit });
 }
 
 /**

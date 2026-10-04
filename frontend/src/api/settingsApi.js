@@ -26,3 +26,16 @@ export async function syncConmasNow() {
   const { data } = await apiClient.post('/settings/sync-conmas');
   return data.data;
 }
+
+// Admin only - backup OTOMATIS yang tersimpan di server (BACKUP_DIR). Jadwalnya
+// diatur lewat updateSetting (key backup_auto_*); file didownload lewat
+// downloadFile('/settings/backup/auto/files/<nama>').
+export async function fetchAutoBackupStatus() {
+  const { data } = await apiClient.get('/settings/backup/auto');
+  return data.data; // { last_run, files, running }
+}
+
+export async function runAutoBackupNow() {
+  const { data } = await apiClient.post('/settings/backup/auto/run');
+  return data.data;
+}

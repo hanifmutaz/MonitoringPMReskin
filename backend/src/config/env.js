@@ -148,6 +148,10 @@ module.exports = {
   // lengkap, mis. "C:\\Program Files\\PostgreSQL\\16\\bin\\pg_dump.exe".
   backup: {
     pgDumpPath: process.env.PG_DUMP_PATH || 'pg_dump',
+    // Folder tujuan backup OTOMATIS (Settings > Umum > Backup Otomatis).
+    // Di Docker diarahkan ke volume (lihat docker-compose.yml) supaya file
+    // tidak hilang saat container dibuat ulang. Dibuat otomatis kalau belum ada.
+    dir: require('path').resolve(process.env.BACKUP_DIR || 'backups'),
     timeoutMs: parseInt(process.env.BACKUP_TIMEOUT_MS, 10) || 10 * 60 * 1000,
     // Backup Excel: maksimal baris per tabel (sisanya dipotong, yang TERBARU
     // dipertahankan; ditandai di sheet _INFO). Excel sendiri membatasi ~1 juta

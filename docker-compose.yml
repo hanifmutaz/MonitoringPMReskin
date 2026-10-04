@@ -52,8 +52,12 @@ services:
       PORT: 4000
       DATABASE_URL: postgresql://pm_app:${POSTGRES_PASSWORD}@db:5432/pm_monitoring
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
+      # Tujuan Backup Otomatis (Settings > Umum > Backup Otomatis). Jangan diubah
+      # kecuali volume `backups` di bawah ikut dipindah.
+      BACKUP_DIR: /app/backups
     volumes:
       - uploads:/app/uploads
+      - backups:/app/backups
     expose:
       - "4000"
 
@@ -71,3 +75,4 @@ services:
 volumes:
   pgdata:
   uploads:
+  backups:

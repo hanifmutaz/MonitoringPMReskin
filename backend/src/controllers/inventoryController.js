@@ -7,6 +7,7 @@ const {
 } = require('../validators/inventoryValidator');
 const historyExportService = require('../services/historyExportService');
 const { sendXlsx } = require('../utils/xlsxExport');
+const { parseDateRange } = require('../utils/dateRange');
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
 
@@ -29,9 +30,12 @@ const movements = asyncHandler(async (req, res) => {
 
 const allMovements = asyncHandler(async (req, res) => {
   const { item_id, movement_type, page, limit } = req.query;
+  const { dateFrom, dateTo } = parseDateRange(req.query);
   const data = await inventoryService.listAllMovements({
     item_id: item_id ? Number(item_id) : undefined,
     movement_type,
+    dateFrom,
+    dateTo,
     page,
     limit,
   });
@@ -41,9 +45,12 @@ const allMovements = asyncHandler(async (req, res) => {
 // GET /inventory/movements/export - filter sama dengan /movements/all, tanpa pagination.
 const exportMovementsXlsx = asyncHandler(async (req, res) => {
   const { item_id, movement_type } = req.query;
+  const { dateFrom, dateTo } = parseDateRange(req.query);
   const { buffer, filename } = await historyExportService.exportInventoryMovements({
     item_id: item_id ? Number(item_id) : undefined,
     movement_type,
+    dateFrom,
+    dateTo,
   });
   sendXlsx(res, buffer, filename);
 });

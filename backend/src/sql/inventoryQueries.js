@@ -1,5 +1,6 @@
 // src/sql/inventoryQueries.js
 const db = require('../config/db');
+const { addTimestampRange } = require('../utils/dateRange');
 
 const ITEM_SELECT = `
   SELECT
@@ -143,7 +144,7 @@ async function findMovementsByItem(itemId, { page = 1, limit = 20 } = {}, runner
   return { items: dataResult.rows, total: countResult.rows[0].total, page: Number(page), limit: Number(limit) };
 }
 
-async function findAllMovements({ item_id, movement_type, page = 1, limit = 20 } = {}, runner = db) {
+async function findAllMovements({ item_id, movement_type, dateFrom, dateTo, page = 1, limit = 20 } = {}, runner = db) {
   const conditions = ['m.deleted_at IS NULL'];
   const params = [];
 
@@ -155,6 +156,7 @@ async function findAllMovements({ item_id, movement_type, page = 1, limit = 20 }
     params.push(movement_type);
     conditions.push(`m.movement_type = $${params.length}`);
   }
+  addTimestampRange(conditions, params, 'm.created_at', dateFrom, dateTo);
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const offset = (Number(page) - 1) * Number(limit);
@@ -192,7 +194,7 @@ async function findPartsByInventoryItem(itemId, runner = db) {
 }
 
 /** Semua movement yang cocok filter (tanpa pagination) buat export; maxRows = cap+1. */
-async function findAllMovementsForExport({ item_id, movement_type, maxRows } = {}, runner = db) {
+async function findAllMovementsForExport({ item_id, movement_type, dateFrom, dateTo, maxRows } = {}, runner = db) {
   const conditions = ['m.deleted_at IS NULL'];
   const params = [];
   if (item_id) {
@@ -203,6 +205,7 @@ async function findAllMovementsForExport({ item_id, movement_type, maxRows } = {
     params.push(movement_type);
     conditions.push(`m.movement_type = $${params.length}`);
   }
+  addTimestampRange(conditions, params, 'm.created_at', dateFrom, dateTo);
   const limitSql = maxRows ? ` LIMIT ${Number(maxRows)}` : '';
   const result = await runner.query(
     `SELECT m.id, i.spare_part_number, i.part_name, m.movement_type, m.qty, m.note,
