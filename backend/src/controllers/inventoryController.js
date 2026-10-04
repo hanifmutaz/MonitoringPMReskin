@@ -5,6 +5,8 @@ const {
   validateUpdateItem,
   validateAdjustStock,
 } = require('../validators/inventoryValidator');
+const historyExportService = require('../services/historyExportService');
+const { sendXlsx } = require('../utils/xlsxExport');
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
 
@@ -34,6 +36,16 @@ const allMovements = asyncHandler(async (req, res) => {
     limit,
   });
   res.status(200).json({ success: true, message: 'Success', data });
+});
+
+// GET /inventory/movements/export - filter sama dengan /movements/all, tanpa pagination.
+const exportMovementsXlsx = asyncHandler(async (req, res) => {
+  const { item_id, movement_type } = req.query;
+  const { buffer, filename } = await historyExportService.exportInventoryMovements({
+    item_id: item_id ? Number(item_id) : undefined,
+    movement_type,
+  });
+  sendXlsx(res, buffer, filename);
 });
 
 const create = asyncHandler(async (req, res) => {
@@ -80,4 +92,4 @@ const ropStatus = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Success', data });
 });
 
-module.exports = { list, detail, movements, allMovements, create, update, adjustStock, remove, linkPart, ropStatus };
+module.exports = { list, detail, movements, allMovements, exportMovementsXlsx, create, update, adjustStock, remove, linkPart, ropStatus };

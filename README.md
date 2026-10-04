@@ -85,6 +85,13 @@ docker run --rm -v <project>_uploads:/data -v "$PWD":/out alpine tar czf /out/up
 
 Jadwalkan backup DB harian (cron host) dan **uji restore** minimal sekali di mesin lain.
 
+**Backup lewat aplikasi:** Admin bisa klik **Settings → Umum → Backup Data → Backup Sekarang** untuk mengunduh file `.dump` (format sama dengan perintah `pg_dump -Fc` di atas, restore pakai `pg_restore`). Tiap backup tercatat di Audit Log. Catatan:
+
+- Docker: `pg_dump` 16 sudah ada di image backend. Non-Docker (mis. Windows/IIS): pasang PostgreSQL client dengan versi **≥ server DB** dan isi `PG_DUMP_PATH` di `backend/.env`.
+- Timeout proxy: nginx (compose) sudah diset 10 menit untuk endpoint ini. Di IIS/ARR naikkan *Time-out* di Server Proxy Settings kalau DB besar (default 120 detik).
+- File berisi seluruh data **termasuk akun user & hash password** — simpan di tempat aman. Foto profil tidak ikut (pakai langkah volume `uploads` di atas).
+- Ini backup manual. Backup terjadwal otomatis tetap sebaiknya lewat cron host.
+
 ### Rollback
 
 1. `docker compose stop backend frontend`

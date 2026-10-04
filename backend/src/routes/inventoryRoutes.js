@@ -23,6 +23,8 @@ router.get('/rop-status', canReadInventory, inventoryController.ropStatus);
 // HARUS di atas '/:id' - kalau ditaruh di bawah, '/movements/all' bakal
 // ketangkep sebagai '/:id' dengan id='movements' duluan.
 router.get('/movements/all', canReadInventory, inventoryController.allMovements);
+// Harus SEBELUM '/:id' (kalau tidak, 'movements' dibaca sebagai id).
+router.get('/movements/export', canReadInventory, inventoryController.exportMovementsXlsx);
 router.get('/:id', canReadInventory, inventoryController.detail);
 router.get('/:id/movements', canReadInventory, inventoryController.movements);
 

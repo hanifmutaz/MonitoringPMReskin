@@ -10,6 +10,9 @@ router.use(requireAuth);
 // View-only - butuh permission 'pm_part.view'
 router.get('/', requirePermission('pm_part.view'), pmPartHistoryController.list);
 
+// Export .xlsx (filter sama dengan list) - cukup permission view yang sama.
+router.get('/export', requirePermission('pm_part.view'), pmPartHistoryController.exportXlsx);
+
 // Submit penggantian part (termasuk lewat scan barcode Drawing No) - butuh
 // permission 'pm_part.submit'. Admin selalu bypass (superuser). Role
 // non-Admin HARUS di-assign eksplisit oleh Admin lewat Role Management.

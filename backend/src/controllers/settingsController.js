@@ -1,6 +1,7 @@
 // src/controllers/settingsController.js
 const settingsService = require('../services/settingsService');
 const conmasSyncJob = require('../jobs/conmasSyncJob');
+const backupService = require('../services/backupService');
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
 
@@ -39,4 +40,10 @@ const syncNow = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Sync selesai', data: result });
 });
 
-module.exports = { list, update, updateAccess, syncNow };
+// POST /settings/backup - Admin only (route level). Membuat dump database
+// (pg_dump -Fc) dan mengirimnya sebagai download. Lihat backupService.js.
+const backup = asyncHandler(async (req, res) => {
+  await backupService.createAndSendBackup(res, req.user);
+});
+
+module.exports = { list, update, updateAccess, syncNow, backup };

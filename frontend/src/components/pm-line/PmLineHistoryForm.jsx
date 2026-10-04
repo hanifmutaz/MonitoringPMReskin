@@ -20,6 +20,7 @@
 // rounded-lg. Lihat docs/frontend/UI-CONSISTENCY-AUDIT.md A2.
 import { useState } from 'react';
 import { useLines } from '../../hooks/useLines';
+import LineCombobox from '../LineCombobox';
 import { useCreatePmLineHistory } from '../../hooks/usePmLineHistory';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -110,18 +111,7 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm, sta
       <div className="mt-3.5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         <div>
           <Label className="mb-2.5">Line</Label>
-          <Select value={form.line_id} onValueChange={(v) => update('line_id', v)} disabled={isPrefilled}>
-            <SelectTrigger aria-label="Pilih Line">
-              <SelectValue placeholder="Pilih Line" />
-            </SelectTrigger>
-            <SelectContent>
-              {lines.map((l) => (
-                <SelectItem key={l.id} value={String(l.id)}>
-                  {l.line_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <LineCombobox value={form.line_id} onValueChange={(v) => update('line_id', v)} disabled={isPrefilled} lines={lines} placeholder="Pilih Line" aria-label="Pilih Line" />
           {errors.line_id && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.line_id}</p>}
         </div>
 

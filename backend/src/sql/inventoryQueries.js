@@ -191,6 +191,32 @@ async function findPartsByInventoryItem(itemId, runner = db) {
   return result.rows;
 }
 
+/** Semua movement yang cocok filter (tanpa pagination) buat export; maxRows = cap+1. */
+async function findAllMovementsForExport({ item_id, movement_type, maxRows } = {}, runner = db) {
+  const conditions = ['m.deleted_at IS NULL'];
+  const params = [];
+  if (item_id) {
+    params.push(item_id);
+    conditions.push(`m.inventory_item_id = $${params.length}`);
+  }
+  if (movement_type) {
+    params.push(movement_type);
+    conditions.push(`m.movement_type = $${params.length}`);
+  }
+  const limitSql = maxRows ? ` LIMIT ${Number(maxRows)}` : '';
+  const result = await runner.query(
+    `SELECT m.id, i.spare_part_number, i.part_name, m.movement_type, m.qty, m.note,
+            u.full_name AS user_full_name, m.created_at
+     FROM inventory_stock_movements m
+     JOIN inventory_items i ON i.id = m.inventory_item_id
+     JOIN users u ON u.id = m.user_id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY m.created_at DESC, m.id DESC${limitSql}`,
+    params
+  );
+  return result.rows;
+}
+
 module.exports = {
   findAllItems,
   findItemById,
@@ -205,5 +231,6 @@ module.exports = {
   insertMovement,
   findMovementsByItem,
   findAllMovements,
+  findAllMovementsForExport,
   findPartsByInventoryItem,
 };

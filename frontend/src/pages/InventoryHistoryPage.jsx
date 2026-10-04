@@ -40,6 +40,7 @@ import { DataTable, DataTableNoResult } from '../components/data-display/DataTab
 import { EmptyState } from '../components/ui/empty-state';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { FilterBar } from '../components/data-display/FilterBar';
+import ExportExcelButton from '../components/ExportExcelButton';
 import inventoryHistoryColumns, { MOVEMENT_TYPE_LABEL } from './inventoryHistoryColumns';
 
 const LIMIT = 20;
@@ -105,7 +106,16 @@ function InventoryHistoryPage() {
 
     return (
         <div className="flex flex-col gap-4">
-            <FilterBar>
+            <FilterBar
+                actions={
+                    <ExportExcelButton
+                        path="/inventory/movements/export"
+                        params={{ item_id: params.item_id, movement_type: params.movement_type }}
+                        fallbackName="history-inventory.xlsx"
+                        disabled={data?.total === 0}
+                    />
+                }
+            >
                 <Select
                     value={itemId}
                     onValueChange={(v) => {

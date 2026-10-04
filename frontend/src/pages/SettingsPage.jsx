@@ -1,7 +1,7 @@
 // src/pages/SettingsPage.jsx
 import { useState } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
-import { RefreshCw, Pencil, Check, X, Lock, ShieldCheck, Loader2 } from 'lucide-react';
+import { RefreshCw, Pencil, Check, X, Lock, ShieldCheck, Loader2, DatabaseBackup } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings, useUpdateSetting, useUpdateSettingAccess, useSyncConmasNow, useCanAccessSettings } from '../hooks/useSettings';
@@ -11,6 +11,7 @@ import { useRoles } from '../hooks/useRoles';
 import ToggleSwitch from '../components/ToggleSwitch';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
+import { downloadFile } from '../api/downloadApi';
 
 // Label manusiawi per setting key — settingnya sendiri fixed catalog dari
 // migration (bukan dibuat dinamis lewat UI), jadi cukup static map di sini
@@ -326,6 +327,53 @@ function CategoryCard({ categoryKey, settings, isAdmin, userRoleId }) {
   );
 }
 
+function BackupCard() {
+  const [pending, setPending] = useState(false);
+  const [result, setResult] = useState(null);
+
+  async function handleBackup() {
+    setPending(true);
+    setResult(null);
+    try {
+      const filename = await downloadFile('/settings/backup', undefined, 'pm-monitoring-backup.dump', 'POST');
+      setResult({ ok: true, text: `Backup berhasil diunduh: ${filename}` });
+    } catch (err) {
+      setResult({ ok: false, text: err.message });
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4.5">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Backup Data</h2>
+        <Button type="button" size="sm" variant="outline" onClick={handleBackup} disabled={pending}>
+          {pending ? (
+            <>
+              <Loader2 size={13} className="animate-spin" /> Membuat backup...
+            </>
+          ) : (
+            <>
+              <DatabaseBackup size={13} /> Backup Sekarang
+            </>
+          )}
+        </Button>
+      </div>
+      <p className="m-0 mt-2 text-xs text-muted-foreground">
+        Mengunduh salinan seluruh database (file .dump). Simpan di tempat aman &mdash; isinya mencakup data akun user
+        dan password yang sudah di-hash. Restore dilakukan admin server dengan <code>pg_restore</code> (lihat README).
+        Foto profil tidak ikut di dalam file ini.
+      </p>
+      {result && (
+        <p role={result.ok ? 'status' : 'alert'} className={`m-0 mt-2 text-xs ${result.ok ? 'text-[var(--ok)]' : 'text-destructive'}`}>
+          {result.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function SettingsPage() {
   const { menu } = useParams();
   const { user, isAdmin } = useAuth();
@@ -381,6 +429,8 @@ function SettingsPage() {
           <CategoryCard key={cat} categoryKey={cat} settings={categorySettings} isAdmin={isAdmin} userRoleId={user?.role_id} />
         );
       })}
+      {/* Backup = Admin only (route POST /settings/backup juga Admin only). */}
+      {activeMenu.key === 'umum' && isAdmin && <BackupCard />}
     </div>
   );
 }

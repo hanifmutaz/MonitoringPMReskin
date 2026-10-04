@@ -220,7 +220,7 @@ function TvDashboardPage() {
       key: `l-${r.key}`, title: r.line, sub: `PM ${r.jenis}`, info: sisaLabel(r.sisa), status: r.status,
     })),
     ...(pd?.top_attention ?? []).filter((p) => p.status === 'DANGER').map((p) => ({
-      key: `p-${p.part_id}`, title: p.line_name, sub: p.jig_name || p.part_name, info: `Sisa ${num(p.remaining_shot)} shot`, status: 'DANGER',
+      key: `p-${p.part_id}`, title: p.line_name, sub: [p.drawing_no, p.part_name].filter(Boolean).join(' • '), info: `Sisa ${num(p.remaining_shot)} shot`, status: 'DANGER',
     })),
   ];
 
@@ -357,13 +357,14 @@ function TvDashboardPage() {
                 <div className="flex h-full items-center justify-center text-muted-foreground">Belum ada data part</div>
               ) : (
                 <table className="w-full border-collapse text-sm [&_td]:whitespace-nowrap">
-                  <thead><tr><Th>No</Th><Th>Line</Th><Th>Jig / Station</Th><Th right>Sisa Shot</Th><Th center>Status</Th></tr></thead>
+                  <thead><tr><Th>No</Th><Th>Line</Th><Th>IPDP</Th><Th>Part Name</Th><Th right>Sisa Shot</Th><Th center>Status</Th></tr></thead>
                   <tbody>
                     {topParts.map((p, i) => (
                       <tr key={p.part_id} className="border-b border-[var(--border-soft)]">
                         <td className="px-2 py-1 text-muted-foreground">{i + 1}</td>
                         <td className="px-2 py-1 font-[var(--font-mono)]">{p.line_name}</td>
-                        <td className="px-2 py-1">{p.jig_name || p.part_name}</td>
+                        <td className="px-2 py-1 font-[var(--font-mono)]">{p.drawing_no || '-'}</td>
+                        <td className="px-2 py-1">{p.part_name || '-'}</td>
                         <td className={`px-2 py-1 text-right font-[var(--font-mono)] font-semibold ${TONE[p.status]}`}>{num(p.remaining_shot)}</td>
                         <td className="px-2 py-1 text-center"><Pill status={p.status} label={STATUS_LABEL[p.status]} /></td>
                       </tr>

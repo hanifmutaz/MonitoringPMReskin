@@ -13,6 +13,7 @@ const ACTION_BADGE_CLASS = {
 
 const TABLE_NAME_LABEL = {
   app_settings: 'Settings',
+  backup: 'Backup Database',
   inventory_items: 'Inventory Item',
   inventory_stock_movements: 'Mutasi Stok',
   lines: 'Line',

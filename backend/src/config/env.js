@@ -141,6 +141,16 @@ module.exports = {
 
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
 
+  // Backup database lewat tombol di Settings (Admin). Memanggil `pg_dump`
+  // (format custom, sama dengan perintah di README -> restore pakai
+  // `pg_restore`). Di Docker, pg_dump sudah ikut di image backend. Di
+  // deployment non-Docker (mis. Windows/IIS) isi PG_DUMP_PATH dengan path
+  // lengkap, mis. "C:\\Program Files\\PostgreSQL\\16\\bin\\pg_dump.exe".
+  backup: {
+    pgDumpPath: process.env.PG_DUMP_PATH || 'pg_dump',
+    timeoutMs: parseInt(process.env.BACKUP_TIMEOUT_MS, 10) || 10 * 60 * 1000,
+  },
+
   logLevel: process.env.LOG_LEVEL || 'info',
 
   // Identitas lokasi instance ini sendiri - 'internal' | 'sgp' | 'systech'.

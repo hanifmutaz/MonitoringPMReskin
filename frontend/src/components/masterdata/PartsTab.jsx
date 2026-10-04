@@ -28,6 +28,7 @@ import { Plus, Package, ListChecks, Inbox } from 'lucide-react';
 import { useParts } from '../../hooks/useParts';
 import { usePartMutations } from '../../hooks/usePartMutations';
 import { useLines } from '../../hooks/useLines';
+import LineCombobox from '../LineCombobox';
 import { useInventoryItems } from '../../hooks/useInventoryItems';
 import { useInventoryMutations } from '../../hooks/useInventoryMutations';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
@@ -142,18 +143,7 @@ function PartFormModal({ initial, lines, onClose }) {
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <div>
             <Label className="mb-1.5">Line</Label>
-            <Select value={form.line_id} onValueChange={(v) => setForm({ ...form, line_id: v })}>
-              <SelectTrigger aria-label="Pilih Line">
-                <SelectValue placeholder="Pilih Line" />
-              </SelectTrigger>
-              <SelectContent>
-                {lines.map((l) => (
-                  <SelectItem key={l.id} value={String(l.id)}>
-                    {l.line_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <LineCombobox value={form.line_id} onValueChange={(v) => setForm({ ...form, line_id: v })} lines={lines} placeholder="Pilih Line" aria-label="Pilih Line" />
           </div>
           <div>
             <Label className="mb-1.5">Jig Name</Label>
@@ -454,25 +444,18 @@ function PartsTab() {
             }}
             placeholder="Cari drawing no / nama part..."
           />
-          <Select
+          <LineCombobox
             value={lineId}
             onValueChange={(v) => {
               setLineId(v);
               setPage(1);
             }}
-          >
-            <SelectTrigger className="h-9 w-[180px]" aria-label="Urutkan Part">
-              <SelectValue placeholder="Semua Line" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Line</SelectItem>
-              {lines.map((l) => (
-                <SelectItem key={l.id} value={String(l.id)}>
-                  {l.line_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            lines={lines}
+            allLabel="Semua Line"
+            placeholder="Semua Line"
+            className="w-[180px]"
+            aria-label="Filter berdasarkan Line"
+          />
           <PageSizeSelector
             value={limit}
             onChange={(v) => {

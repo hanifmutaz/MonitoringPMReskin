@@ -39,6 +39,8 @@ import { Plus, X, Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { usePmLineHistoryList } from '../hooks/usePmLineHistory';
 import { useLines } from '../hooks/useLines';
+import LineCombobox from '../components/LineCombobox';
+import ExportExcelButton from '../components/ExportExcelButton';
 import { useRowSelection } from '../hooks/useRowSelection';
 import { useBulkDeleteMutation } from '../hooks/useRecycleBin';
 import { useAuth } from '../contexts/AuthContext';
@@ -156,26 +158,28 @@ function PmLineHistoryPage() {
         />
       )}
 
-      <FilterBar>
-        <Select
+      <FilterBar
+        actions={
+          <ExportExcelButton
+            path="/pm-line-history/export"
+            params={{ line_id: params.line_id, jenis: params.jenis }}
+            fallbackName="history-pm-line.xlsx"
+            disabled={data?.total === 0}
+          />
+        }
+      >
+        <LineCombobox
           value={lineId}
           onValueChange={(v) => {
             setLineId(v);
             setPage(1);
           }}
-        >
-          <SelectTrigger className="w-[220px]" aria-label="Filter berdasarkan Line">
-            <SelectValue placeholder="Semua Line" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Line</SelectItem>
-            {lines.map((l) => (
-              <SelectItem key={l.id} value={String(l.id)}>
-                {l.line_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          lines={lines}
+          allLabel="Semua Line"
+          placeholder="Semua Line"
+          className="w-[220px]"
+          aria-label="Filter berdasarkan Line"
+        />
 
         <Select
           value={jenis}

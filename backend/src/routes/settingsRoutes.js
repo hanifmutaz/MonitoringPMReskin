@@ -31,4 +31,8 @@ router.patch('/:key/access', requireRole('Admin'), settingsController.updateAcce
 // di settingsController.js).
 router.post('/sync-conmas', requireRole('Admin'), settingsController.syncNow);
 
+// POST /backup - unduh dump database (pg_dump), Admin only. POST (bukan GET)
+// karena operasinya berat & punya efek samping (audit log, file sementara).
+router.post('/backup', requireRole('Admin'), settingsController.backup);
+
 module.exports = router;

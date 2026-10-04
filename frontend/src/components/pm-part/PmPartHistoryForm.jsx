@@ -21,6 +21,7 @@
 import { useState } from 'react';
 import { ScanLine } from 'lucide-react';
 import { useLines } from '../../hooks/useLines';
+import LineCombobox from '../LineCombobox';
 import { useParts } from '../../hooks/useParts';
 import { useCreatePmPartHistory } from '../../hooks/usePmPartHistory';
 import { lookupPartsByDrawingNo } from '../../api/partsApi';
@@ -228,18 +229,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart, standalone = false
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         <div>
           <Label className="mb-2.5">Line</Label>
-          <Select value={form.line_id} onValueChange={(v) => update('line_id', v)} disabled={isPrefilled || isLockedFromScan}>
-            <SelectTrigger aria-label="Pilih Line">
-              <SelectValue placeholder="Pilih Line" />
-            </SelectTrigger>
-            <SelectContent>
-              {lines.map((l) => (
-                <SelectItem key={l.id} value={String(l.id)}>
-                  {l.line_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <LineCombobox value={form.line_id} onValueChange={(v) => update('line_id', v)} disabled={isPrefilled || isLockedFromScan} lines={lines} placeholder="Pilih Line" aria-label="Pilih Line" />
         </div>
 
         <div>

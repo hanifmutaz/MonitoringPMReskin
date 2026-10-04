@@ -9,7 +9,7 @@ const LIST_SELECT = `
   JOIN users u ON u.id = h.user_id
 `;
 
-async function findAll({ lineId, jenis, dateFrom, dateTo, page = 1, limit = 20 } = {}, runner = db) {
+function buildWhere({ lineId, jenis, dateFrom, dateTo } = {}) {
   const conditions = ['h.deleted_at IS NULL'];
   const params = [];
 
@@ -31,6 +31,11 @@ async function findAll({ lineId, jenis, dateFrom, dateTo, page = 1, limit = 20 }
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  return { where, params };
+}
+
+async function findAll({ lineId, jenis, dateFrom, dateTo, page = 1, limit = 20 } = {}, runner = db) {
+  const { where, params } = buildWhere({ lineId, jenis, dateFrom, dateTo });
   const offset = (page - 1) * limit;
 
   const itemsResult = await runner.query(
@@ -44,6 +49,17 @@ async function findAll({ lineId, jenis, dateFrom, dateTo, page = 1, limit = 20 }
   );
 
   return { items: itemsResult.rows, total: countResult.rows[0].total, page, limit };
+}
+
+/** Semua baris yang cocok filter (tanpa pagination) buat export; maxRows = cap+1. */
+async function findAllForExport({ lineId, jenis, dateFrom, dateTo, maxRows } = {}, runner = db) {
+  const { where, params } = buildWhere({ lineId, jenis, dateFrom, dateTo });
+  const limitSql = maxRows ? ` LIMIT ${Number(maxRows)}` : '';
+  const result = await runner.query(
+    `${LIST_SELECT} ${where} ORDER BY h.tgl_input DESC, h.id DESC${limitSql}`,
+    params
+  );
+  return result.rows;
 }
 
 async function create(data, runner = db) {
@@ -90,4 +106,4 @@ async function getKetepatanPerLine({ dateFrom }, runner = db) {
   return result.rows;
 }
 
-module.exports = { findAll, create, getKetepatanOverall, getKetepatanPerLine };
+module.exports = { findAllForExport, findAll, create, getKetepatanOverall, getKetepatanPerLine };

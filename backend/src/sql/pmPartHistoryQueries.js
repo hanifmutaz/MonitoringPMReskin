@@ -12,7 +12,7 @@ const LIST_SELECT = `
   JOIN users u ON u.id = h.user_id
 `;
 
-async function findAll({ lineId, partId, jenis, dateFrom, dateTo, page = 1, limit = 20 } = {}, runner = db) {
+function buildWhere({ lineId, partId, jenis, dateFrom, dateTo } = {}) {
   const conditions = ['h.deleted_at IS NULL'];
   const params = [];
 
@@ -38,6 +38,11 @@ async function findAll({ lineId, partId, jenis, dateFrom, dateTo, page = 1, limi
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  return { where, params };
+}
+
+async function findAll({ lineId, partId, jenis, dateFrom, dateTo, page = 1, limit = 20 } = {}, runner = db) {
+  const { where, params } = buildWhere({ lineId, partId, jenis, dateFrom, dateTo });
   const offset = (page - 1) * limit;
 
   const itemsResult = await runner.query(
@@ -52,6 +57,31 @@ async function findAll({ lineId, partId, jenis, dateFrom, dateTo, page = 1, limi
   );
 
   return { items: itemsResult.rows, total: countResult.rows[0].total, page, limit };
+}
+
+/**
+ * Semua baris yang cocok filter (tanpa pagination) buat export. `maxRows`
+ * dipakai untuk ambil cap+1 supaya pemanggil bisa tahu kalau datanya kelebihan.
+ * Label jenis diambil dari master jenis_penggantian (fallback ke kode).
+ */
+async function findAllForExport({ lineId, partId, jenis, dateFrom, dateTo, maxRows } = {}, runner = db) {
+  const { where, params } = buildWhere({ lineId, partId, jenis, dateFrom, dateTo });
+  const limitSql = maxRows ? ` LIMIT ${Number(maxRows)}` : '';
+  const result = await runner.query(
+    `SELECT h.id, l.line_name, p.jig_name, p.drawing_no, p.part_name,
+            h.tgl_ganti, h.shift, h.counter_saat_diganti,
+            h.jenis_penggantian, COALESCE(j.label, h.jenis_penggantian) AS jenis_label,
+            h.pic_name, h.on_time, h.remark, u.full_name AS user_full_name, h.created_at
+     FROM pm_part_history h
+     JOIN parts p ON p.id = h.part_id
+     JOIN lines l ON l.id = p.line_id
+     JOIN users u ON u.id = h.user_id
+     LEFT JOIN jenis_penggantian j ON j.code = h.jenis_penggantian
+     ${where}
+     ORDER BY h.tgl_ganti DESC, h.id DESC${limitSql}`,
+    params
+  );
+  return result.rows;
 }
 
 async function partExists(partId, runner = db) {
@@ -135,6 +165,7 @@ async function getKetepatanPerLine({ dateFrom }, runner = db) {
 }
 
 module.exports = {
+  findAllForExport,
   findPartForHistory,
   findAll,
   partExists,

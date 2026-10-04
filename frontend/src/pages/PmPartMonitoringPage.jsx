@@ -46,6 +46,7 @@ import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useAuth } from '../contexts/AuthContext';
 import { usePmPartList } from '../hooks/usePmPartList';
 import { useLines } from '../hooks/useLines';
+import LineCombobox from '../components/LineCombobox';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import KetepatanPerLinePanel from '../components/pm-part/KetepatanPerLinePanel';
 import buildPmPartColumns from '../components/pm-part/pmPartColumns';
@@ -57,7 +58,6 @@ import { FilterBar } from '../components/data-display/FilterBar';
 import { EmptyState } from '../components/ui/empty-state';
 import Modal from '../components/Modal';
 import { Button } from '../components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 const LIMIT = 20;
 
@@ -139,19 +139,7 @@ function PmPartMonitoringPage() {
       >
         <SearchBar value={search} onChange={handleFilterChange(setSearch)} placeholder="Cari drawing no / nama part..." />
 
-        <Select value={lineId} onValueChange={handleFilterChange(setLineId)}>
-          <SelectTrigger className="w-[180px]" aria-label="Filter berdasarkan Line">
-            <SelectValue placeholder="Semua Line" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Line</SelectItem>
-            {lines.map((l) => (
-              <SelectItem key={l.id} value={String(l.id)}>
-                {l.line_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <LineCombobox value={lineId} onValueChange={handleFilterChange(setLineId)} lines={lines} allLabel="Semua Line" placeholder="Semua Line" className="w-[180px]" aria-label="Filter berdasarkan Line" />
 
         <StatusFilterPills value={status} onChange={handleFilterChange(setStatus)} />
       </FilterBar>
