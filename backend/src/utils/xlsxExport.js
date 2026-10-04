@@ -58,6 +58,24 @@ function buildXlsxBuffer({ sheetName, columns, rows }) {
   return xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
 
+/**
+ * Workbook banyak sheet. Tiap sheet: { name, header: string[], rows: any[][], widths?: number[] }.
+ * Nama sheet dipotong 31 karakter (batas Excel).
+ */
+function buildMultiSheetXlsxBuffer(sheets) {
+  const wb = xlsx.utils.book_new();
+  const used = new Set();
+  for (const sh of sheets) {
+    const ws = xlsx.utils.aoa_to_sheet([sh.header, ...sh.rows]);
+    ws['!cols'] = sh.header.map((h, i) => ({ wch: (sh.widths && sh.widths[i]) || Math.min(Math.max(String(h).length + 2, 10), 40) }));
+    let name = String(sh.name).slice(0, 31);
+    for (let n = 2; used.has(name); n += 1) name = `${String(sh.name).slice(0, 28)}_${n}`;
+    used.add(name);
+    xlsx.utils.book_append_sheet(wb, ws, name);
+  }
+  return xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
+
 /** Nama file: <prefix>-YYYYMMDD-HHmm.xlsx (WIB). */
 function exportFilename(prefix) {
   return `${prefix}-${dayjs().tz(TZ).format('YYYYMMDD-HHmm')}.xlsx`;
@@ -84,6 +102,7 @@ function assertWithinExportLimit(rows) {
 module.exports = {
   EXPORT_MAX_ROWS,
   buildXlsxBuffer,
+  buildMultiSheetXlsxBuffer,
   exportFilename,
   sendXlsx,
   formatTimestampWib,

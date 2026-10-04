@@ -40,10 +40,14 @@ const syncNow = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Sync selesai', data: result });
 });
 
-// POST /settings/backup - Admin only (route level). Membuat dump database
-// (pg_dump -Fc) dan mengirimnya sebagai download. Lihat backupService.js.
+// POST /settings/backup?format=dump|sql|xlsx - Admin only (route level).
+// Default dump (pg_dump -Fc). Lihat backupService.js untuk beda tiap format.
 const backup = asyncHandler(async (req, res) => {
-  await backupService.createAndSendBackup(res, req.user);
+  const format = req.query.format || backupService.DEFAULT_FORMAT;
+  if (!Object.prototype.hasOwnProperty.call(backupService.FORMATS, format)) {
+    throw AppError.badRequest('Validasi gagal', { format: `Pilih salah satu: ${Object.keys(backupService.FORMATS).join(', ')}` });
+  }
+  await backupService.createAndSendBackup(res, req.user, format);
 });
 
 module.exports = { list, update, updateAccess, syncNow, backup };

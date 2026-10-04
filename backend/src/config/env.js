@@ -149,6 +149,10 @@ module.exports = {
   backup: {
     pgDumpPath: process.env.PG_DUMP_PATH || 'pg_dump',
     timeoutMs: parseInt(process.env.BACKUP_TIMEOUT_MS, 10) || 10 * 60 * 1000,
+    // Backup Excel: maksimal baris per tabel (sisanya dipotong, yang TERBARU
+    // dipertahankan; ditandai di sheet _INFO). Excel sendiri membatasi ~1 juta
+    // baris/sheet, dan workbook besar boros memori server.
+    excelMaxRowsPerTable: parseInt(process.env.BACKUP_EXCEL_MAX_ROWS, 10) || 100000,
   },
 
   logLevel: process.env.LOG_LEVEL || 'info',

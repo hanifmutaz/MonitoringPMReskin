@@ -85,11 +85,20 @@ docker run --rm -v <project>_uploads:/data -v "$PWD":/out alpine tar czf /out/up
 
 Jadwalkan backup DB harian (cron host) dan **uji restore** minimal sekali di mesin lain.
 
-**Backup lewat aplikasi:** Admin bisa klik **Settings → Umum → Backup Data → Backup Sekarang** untuk mengunduh file `.dump` (format sama dengan perintah `pg_dump -Fc` di atas, restore pakai `pg_restore`). Tiap backup tercatat di Audit Log. Catatan:
+**Backup lewat aplikasi:** Admin bisa buka **Settings → Umum → Backup Data** dan pilih salah satu format. Tiap unduhan tercatat di Audit Log (beserta formatnya).
 
-- Docker: `pg_dump` 16 sudah ada di image backend. Non-Docker (mis. Windows/IIS): pasang PostgreSQL client dengan versi **≥ server DB** dan isi `PG_DUMP_PATH` di `backend/.env`.
+| Format | Untuk apa | Restore |
+|---|---|---|
+| **.dump** (disarankan) | Backup lengkap, sama dengan `pg_dump -Fc` di atas | `pg_restore -U pm_app -d pm_monitoring --clean --if-exists file.dump` |
+| **.sql** | Script teks biasa, bisa dibuka di text editor | `psql -U pm_app -d pm_monitoring -f file.sql` ke database **kosong** |
+| **.xlsx** | Semua tabel sebagai sheet Excel, untuk dilihat/diarsip | **Tidak bisa di-restore otomatis** (constraint, trigger & tipe data tidak ikut). Kolom `password_hash` tidak disertakan. |
+
+Catatan:
+
+- `.dump` dan `.sql` memakai `pg_dump`. Docker: sudah ada di image backend. Non-Docker (mis. Windows/IIS): pasang PostgreSQL client dengan versi **≥ server DB** dan isi `PG_DUMP_PATH` di `backend/.env`. Format `.xlsx` **tidak** butuh `pg_dump`.
+- `.xlsx` dibatasi `BACKUP_EXCEL_MAX_ROWS` baris per tabel (default 100.000, yang terbaru dipertahankan). Tabel yang dipotong ditandai di sheet `_INFO`.
 - Timeout proxy: nginx (compose) sudah diset 10 menit untuk endpoint ini. Di IIS/ARR naikkan *Time-out* di Server Proxy Settings kalau DB besar (default 120 detik).
-- File berisi seluruh data **termasuk akun user & hash password** — simpan di tempat aman. Foto profil tidak ikut (pakai langkah volume `uploads` di atas).
+- `.dump` dan `.sql` berisi seluruh data **termasuk akun user & hash password** — simpan di tempat aman. Foto profil tidak ikut (pakai langkah volume `uploads` di atas).
 - Ini backup manual. Backup terjadwal otomatis tetap sebaiknya lewat cron host.
 
 ### Rollback

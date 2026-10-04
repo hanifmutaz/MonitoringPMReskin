@@ -327,46 +327,91 @@ function CategoryCard({ categoryKey, settings, isAdmin, userRoleId }) {
   );
 }
 
+const BACKUP_OPTIONS = [
+  {
+    format: 'dump',
+    title: 'Backup Lengkap (.dump)',
+    badge: 'Disarankan',
+    desc: 'Salinan seluruh database. Satu-satunya yang dijamin bisa di-restore utuh dengan pg_restore.',
+    fallback: 'pm-monitoring-backup.dump',
+  },
+  {
+    format: 'sql',
+    title: 'Script SQL (.sql)',
+    desc: 'Teks biasa yang bisa dibuka di text editor. Restore dengan psql.',
+    fallback: 'pm-monitoring-backup.sql',
+  },
+  {
+    format: 'xlsx',
+    title: 'Excel (.xlsx)',
+    desc: 'Semua tabel sebagai sheet, untuk dilihat atau diarsip. BUKAN untuk restore, dan password_hash tidak disertakan.',
+    fallback: 'pm-monitoring-backup.xlsx',
+  },
+];
+
 function BackupCard() {
-  const [pending, setPending] = useState(false);
+  const [pendingFormat, setPendingFormat] = useState(null);
   const [result, setResult] = useState(null);
 
-  async function handleBackup() {
-    setPending(true);
+  async function handleBackup(opt) {
+    setPendingFormat(opt.format);
     setResult(null);
     try {
-      const filename = await downloadFile('/settings/backup', undefined, 'pm-monitoring-backup.dump', 'POST');
+      const filename = await downloadFile('/settings/backup', { format: opt.format }, opt.fallback, 'POST');
       setResult({ ok: true, text: `Backup berhasil diunduh: ${filename}` });
     } catch (err) {
       setResult({ ok: false, text: err.message });
     } finally {
-      setPending(false);
+      setPendingFormat(null);
     }
   }
 
   return (
     <div className="rounded-xl border border-border bg-card p-4.5">
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Backup Data</h2>
-        <Button type="button" size="sm" variant="outline" onClick={handleBackup} disabled={pending}>
-          {pending ? (
-            <>
-              <Loader2 size={13} className="animate-spin" /> Membuat backup...
-            </>
-          ) : (
-            <>
-              <DatabaseBackup size={13} /> Backup Sekarang
-            </>
-          )}
-        </Button>
-      </div>
-      <p className="m-0 mt-2 text-xs text-muted-foreground">
-        Mengunduh salinan seluruh database (file .dump). Simpan di tempat aman &mdash; isinya mencakup data akun user
-        dan password yang sudah di-hash. Restore dilakukan admin server dengan <code>pg_restore</code> (lihat README).
-        Foto profil tidak ikut di dalam file ini.
+      <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Backup Data</h2>
+      <p className="m-0 mt-1 text-xs text-muted-foreground">
+        Pilih format yang dibutuhkan. Semua file berisi data akun user, jadi simpan di tempat aman. Foto profil tidak
+        ikut. Panduan restore ada di README.
       </p>
+
+      <div className="mt-3 flex flex-col divide-y divide-[var(--border-soft)]">
+        {BACKUP_OPTIONS.map((opt) => (
+          <div key={opt.format} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                {opt.title}
+                {opt.badge && (
+                  <span className="rounded-full bg-[var(--accent-dim)] px-2 py-0.5 text-[11px] font-medium text-primary">
+                    {opt.badge}
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground">{opt.desc}</div>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="shrink-0"
+              onClick={() => handleBackup(opt)}
+              disabled={pendingFormat !== null}
+            >
+              {pendingFormat === opt.format ? (
+                <>
+                  <Loader2 size={13} className="animate-spin" /> Membuat...
+                </>
+              ) : (
+                <>
+                  <DatabaseBackup size={13} /> Unduh
+                </>
+              )}
+            </Button>
+          </div>
+        ))}
+      </div>
+
       {result && (
-        <p role={result.ok ? 'status' : 'alert'} className={`m-0 mt-2 text-xs ${result.ok ? 'text-[var(--ok)]' : 'text-destructive'}`}>
+        <p role={result.ok ? 'status' : 'alert'} className={`m-0 mt-3 text-xs ${result.ok ? 'text-[var(--ok)]' : 'text-destructive'}`}>
           {result.text}
         </p>
       )}
