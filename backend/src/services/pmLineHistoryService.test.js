@@ -1,12 +1,16 @@
 // src/services/pmLineHistoryService.test.js
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { determineHelperUpdate, determineOnTime } = require('./pmLineHistoryService');
+const { determineHelperUpdate, determineOnTime, resolveTglInput } = require('./pmLineHistoryService');
 
 describe('determineHelperUpdate - Reset Rule MASTER DOCUMENT Bagian 2.D', () => {
   test('WEEKLY: update tgl_pm_weekly_terakhir + reset akumulasi_poin_weekly, tidak menyentuh Monthly', () => {
     const result = determineHelperUpdate('WEEKLY', '2026-07-11', null, true);
-    assert.deepEqual(result, { tgl_pm_weekly_terakhir: '2026-07-11', akumulasi_poin_weekly: 0 });
+    assert.deepEqual(result, {
+      tgl_pm_weekly_terakhir: '2026-07-11',
+      akumulasi_poin_weekly: 0,
+      akumulasi_poin_weekly_raw: 0,
+    });
   });
 
   test('MONTHLY + global default true + line override null -> ikut global (reset semua kolom Monthly+Weekly)', () => {
@@ -14,8 +18,10 @@ describe('determineHelperUpdate - Reset Rule MASTER DOCUMENT Bagian 2.D', () => 
     assert.deepEqual(result, {
       tgl_pm_monthly_terakhir: '2026-07-11',
       akumulasi_poin_monthly: 0,
+      akumulasi_poin_monthly_raw: 0,
       tgl_pm_weekly_terakhir: '2026-07-11',
       akumulasi_poin_weekly: 0,
+      akumulasi_poin_weekly_raw: 0,
     });
   });
 
@@ -24,6 +30,7 @@ describe('determineHelperUpdate - Reset Rule MASTER DOCUMENT Bagian 2.D', () => 
     assert.deepEqual(result, {
       tgl_pm_monthly_terakhir: '2026-07-11',
       akumulasi_poin_monthly: 0,
+      akumulasi_poin_monthly_raw: 0,
     });
   });
 
@@ -32,6 +39,7 @@ describe('determineHelperUpdate - Reset Rule MASTER DOCUMENT Bagian 2.D', () => 
     assert.deepEqual(result, {
       tgl_pm_monthly_terakhir: '2026-07-11',
       akumulasi_poin_monthly: 0,
+      akumulasi_poin_monthly_raw: 0,
     });
   });
 
@@ -40,8 +48,10 @@ describe('determineHelperUpdate - Reset Rule MASTER DOCUMENT Bagian 2.D', () => 
     assert.deepEqual(result, {
       tgl_pm_monthly_terakhir: '2026-07-11',
       akumulasi_poin_monthly: 0,
+      akumulasi_poin_monthly_raw: 0,
       tgl_pm_weekly_terakhir: '2026-07-11',
       akumulasi_poin_weekly: 0,
+      akumulasi_poin_weekly_raw: 0,
     });
   });
 
@@ -89,5 +99,51 @@ describe('determineOnTime - Fitur Ketepatan PM Monthly/Weekly', () => {
   test('MONTHLY: akumulasi poin sudah mentok cap -> telat (sudah due, belum di-PM)', () => {
     const helperBefore = { tgl_pm_monthly_terakhir: '2026-06-01', akumulasi_poin_monthly: 30 };
     assert.equal(determineOnTime('MONTHLY', '2026-07-11', helperBefore, THRESHOLDS), false);
+  });
+});
+
+describe('determineOnTime - poin mentah (tanpa cap), fix "PM hari ini dihitung telat"', () => {
+  test('WEEKLY: poin mentah == cap (jatuh tempo HARI INI) -> tetap tepat waktu', () => {
+    const h = { tgl_pm_weekly_terakhir: '2026-07-04', akumulasi_poin_weekly: 7, akumulasi_poin_weekly_raw: 7 };
+    assert.equal(determineOnTime('WEEKLY', '2026-07-11', h, THRESHOLDS), true);
+  });
+
+  test('WEEKLY: poin mentah > cap (sudah lewat jatuh tempo) -> telat', () => {
+    const h = { tgl_pm_weekly_terakhir: '2026-07-04', akumulasi_poin_weekly: 7, akumulasi_poin_weekly_raw: 9 };
+    assert.equal(determineOnTime('WEEKLY', '2026-07-13', h, THRESHOLDS), false);
+  });
+
+  test('MONTHLY: poin mentah == cap -> tepat waktu; > cap -> telat', () => {
+    const base = { tgl_pm_monthly_terakhir: '2026-06-01', akumulasi_poin_monthly: 30 };
+    assert.equal(determineOnTime('MONTHLY', '2026-07-11', { ...base, akumulasi_poin_monthly_raw: '30.0' }, THRESHOLDS), true);
+    assert.equal(determineOnTime('MONTHLY', '2026-07-11', { ...base, akumulasi_poin_monthly_raw: '31.5' }, THRESHOLDS), false);
+  });
+
+  test('raw NULL (baris lama) -> fallback aturan lama (poin ter-cap < cap)', () => {
+    const h = { tgl_pm_weekly_terakhir: '2026-07-04', akumulasi_poin_weekly: 7, akumulasi_poin_weekly_raw: null };
+    assert.equal(determineOnTime('WEEKLY', '2026-07-11', h, THRESHOLDS), false);
+  });
+});
+
+describe('resolveTglInput - tanggal ditentukan sistem', () => {
+  const TODAY = '2026-10-05';
+  test('sudah pernah PM -> selalu hari ini, tanggal dari client diabaikan (anti backdate)', () => {
+    const h = { tgl_pm_monthly_terakhir: '2026-09-01', tgl_pm_weekly_terakhir: '2026-09-28' };
+    assert.equal(resolveTglInput('MONTHLY', '2026-08-01', h, TODAY), TODAY);
+    assert.equal(resolveTglInput('WEEKLY', '2026-08-01', h, TODAY), TODAY);
+  });
+
+  test('PM pertama (tgl terakhir kosong) -> tanggal dari client dipakai', () => {
+    assert.equal(resolveTglInput('MONTHLY', '2026-09-10', { tgl_pm_monthly_terakhir: null }, TODAY), '2026-09-10');
+  });
+
+  test('PM pertama tanpa tanggal dari client -> hari ini', () => {
+    assert.equal(resolveTglInput('WEEKLY', undefined, { tgl_pm_weekly_terakhir: null }, TODAY), TODAY);
+  });
+
+  test('pengecekan per jenis: Monthly sudah ada, Weekly masih kosong -> Weekly boleh manual', () => {
+    const h = { tgl_pm_monthly_terakhir: '2026-09-01', tgl_pm_weekly_terakhir: null };
+    assert.equal(resolveTglInput('WEEKLY', '2026-09-20', h, TODAY), '2026-09-20');
+    assert.equal(resolveTglInput('MONTHLY', '2026-09-20', h, TODAY), TODAY);
   });
 });

@@ -9,10 +9,14 @@ function validateCreatePmLineHistory(body) {
   if (!body || !Number.isInteger(body.line_id)) {
     errors.line_id = 'Line ID wajib diisi (integer)';
   }
-  if (!body || typeof body.tgl_input !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.tgl_input)) {
-    errors.tgl_input = 'Tanggal Input wajib diisi format YYYY-MM-DD';
-  } else if (body.tgl_input > dateUtils.todayString()) {
-    errors.tgl_input = 'Tanggal Input tidak boleh di masa depan';
+  // tgl_input OPSIONAL: tanggal ditentukan sistem (lihat resolveTglInput di
+  // pmLineHistoryService). Hanya dipakai untuk PM pertama sebuah Line.
+  if (body && body.tgl_input !== undefined && body.tgl_input !== null && body.tgl_input !== '') {
+    if (typeof body.tgl_input !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.tgl_input)) {
+      errors.tgl_input = 'Tanggal Input harus format YYYY-MM-DD';
+    } else if (body.tgl_input > dateUtils.todayString()) {
+      errors.tgl_input = 'Tanggal Input tidak boleh di masa depan';
+    }
   }
   if (!body || !JENIS_ENUM.includes(body.jenis_pm)) {
     errors.jenis_pm = `Jenis PM harus salah satu dari: ${JENIS_ENUM.join(', ')}`;

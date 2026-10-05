@@ -99,7 +99,12 @@ async function recomputeAllLines() {
     }
 
     const cappedPoints = Math.min(totalPoints, settings.pm_monthly_point_cap || 30);
-    await pmLineQueries.updateHelper(line.id, { akumulasi_poin_monthly: cappedPoints });
+    // Poin mentah (tanpa cap) disimpan terpisah khusus buat menilai ketepatan
+    // (lihat migration 1700000031000).
+    await pmLineQueries.updateHelper(line.id, {
+      akumulasi_poin_monthly: cappedPoints,
+      akumulasi_poin_monthly_raw: totalPoints,
+    });
     updatedCount += 1;
   }
 

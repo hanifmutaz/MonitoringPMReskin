@@ -43,7 +43,7 @@ const AppError = require('../utils/AppError');
  */
 function determineHelperUpdate(jenisPm, tglInput, lineOverride, globalDefault) {
   if (jenisPm === 'WEEKLY') {
-    return { tgl_pm_weekly_terakhir: tglInput, akumulasi_poin_weekly: 0 };
+    return { tgl_pm_weekly_terakhir: tglInput, akumulasi_poin_weekly: 0, akumulasi_poin_weekly_raw: 0 };
   }
 
   // MONTHLY
@@ -53,10 +53,12 @@ function determineHelperUpdate(jenisPm, tglInput, lineOverride, globalDefault) {
   const fields = {
     tgl_pm_monthly_terakhir: tglInput,
     akumulasi_poin_monthly: 0,
+    akumulasi_poin_monthly_raw: 0,
   };
   if (effectiveAutoReset) {
     fields.tgl_pm_weekly_terakhir = tglInput;
     fields.akumulasi_poin_weekly = 0;
+    fields.akumulasi_poin_weekly_raw = 0;
   }
   return fields;
 }
@@ -92,14 +94,43 @@ async function listPmLineHistory({ lineId, jenis, dateFrom, dateTo, page, limit 
  * @returns {boolean}
  */
 function determineOnTime(jenisPm, tglInput, helperBefore, thresholds) {
-  if (jenisPm === 'WEEKLY') {
-    if (!helperBefore?.tgl_pm_weekly_terakhir) return true;
-    return Number(helperBefore.akumulasi_poin_weekly) < thresholds.weeklyTotalDays;
+  const isWeekly = jenisPm === 'WEEKLY';
+  const lastDate = isWeekly ? helperBefore?.tgl_pm_weekly_terakhir : helperBefore?.tgl_pm_monthly_terakhir;
+  if (!lastDate) return true; // PM pertama: belum ada due date yang bisa dilewati
+
+  const cap = isWeekly ? thresholds.weeklyTotalDays : thresholds.monthlyCap;
+  const rawPoints = isWeekly ? helperBefore.akumulasi_poin_weekly_raw : helperBefore.akumulasi_poin_monthly_raw;
+
+  // Poin mentah (tanpa cap) tersedia: telat HANYA kalau sudah melewati cap.
+  // poin == cap berarti jatuh tempo HARI INI -> PM hari ini masih tepat waktu.
+  if (rawPoints !== null && rawPoints !== undefined) {
+    return Number(rawPoints) <= cap;
   }
 
-  // MONTHLY
-  if (!helperBefore?.tgl_pm_monthly_terakhir) return true;
-  return Number(helperBefore.akumulasi_poin_monthly) < thresholds.monthlyCap;
+  // Fallback (baris lama yang belum pernah di-recompute job accrual sejak
+  // migration 1700000031000): aturan lama, poin ter-cap harus < cap.
+  const cappedPoints = isWeekly ? helperBefore.akumulasi_poin_weekly : helperBefore.akumulasi_poin_monthly;
+  return Number(cappedPoints) < cap;
+}
+
+/**
+ * Tentukan tanggal PM yang dicatat. KPI ketepatan harus real, jadi tanggal
+ * ditentukan SISTEM (hari ini WIB), bukan input operator - supaya tidak bisa
+ * di-backdate. Satu-satunya pengecualian: PM PERTAMA untuk jenis itu (Tgl PM
+ * Terakhir masih kosong, mis. Line baru dimasukkan) - operator boleh isi
+ * tanggal PM aslinya karena belum ada baseline.
+ * Koreksi tanggal setelahnya hanya lewat edit Admin (alasan wajib + audit log).
+ *
+ * @param {'MONTHLY'|'WEEKLY'} jenisPm
+ * @param {string|undefined|null} requestedTgl - 'YYYY-MM-DD' dari client (boleh kosong)
+ * @param {object|null} helperBefore
+ * @param {string} todayStr - 'YYYY-MM-DD' (WIB, dari server)
+ * @returns {string}
+ */
+function resolveTglInput(jenisPm, requestedTgl, helperBefore, todayStr) {
+  const lastDate = jenisPm === 'WEEKLY' ? helperBefore?.tgl_pm_weekly_terakhir : helperBefore?.tgl_pm_monthly_terakhir;
+  if (!lastDate) return requestedTgl || todayStr;
+  return todayStr;
 }
 
 async function getOnTimeThresholds() {
@@ -125,17 +156,22 @@ async function submitPmLineHistory(data, userId) {
       pmLineQueries.findHelperByLine(data.line_id, client),
     ]);
 
+    const tglInput = resolveTglInput(data.jenis_pm, data.tgl_input, helperBefore, dateUtils.todayString());
+
     const helperUpdateFields = determineHelperUpdate(
       data.jenis_pm,
-      data.tgl_input,
+      tglInput,
       line.auto_reset_weekly_on_monthly,
       globalDefault
     );
 
     await pmLineQueries.updateHelper(data.line_id, helperUpdateFields, client);
 
-    const onTime = determineOnTime(data.jenis_pm, data.tgl_input, helperBefore, onTimeThresholds);
-    const createdHistory = await pmLineHistoryQueries.create({ ...data, user_id: userId, on_time: onTime }, client);
+    const onTime = determineOnTime(data.jenis_pm, tglInput, helperBefore, onTimeThresholds);
+    const createdHistory = await pmLineHistoryQueries.create(
+      { ...data, tgl_input: tglInput, user_id: userId, on_time: onTime },
+      client
+    );
 
     // Audit untuk history PM Line (wajib - Development Rules §22). Efek reset
     // ke pm_monthly_helper TIDAK diaudit terpisah — tabel itu bukan bagian
@@ -219,6 +255,7 @@ module.exports = {
   submitPmLineHistory,
   determineHelperUpdate,
   determineOnTime,
+  resolveTglInput,
   getKetepatanSummary,
   getKetepatanPerLine,
 };

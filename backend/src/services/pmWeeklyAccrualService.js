@@ -86,7 +86,12 @@ async function recomputeAllLines() {
     }
 
     const cappedPoints = Math.min(totalPoints, settings.pm_weekly_total_days || 7);
-    await pmLineQueries.updateHelper(line.id, { akumulasi_poin_weekly: cappedPoints });
+    // Poin mentah (tanpa cap) disimpan terpisah khusus buat menilai ketepatan
+    // (lihat migration 1700000031000).
+    await pmLineQueries.updateHelper(line.id, {
+      akumulasi_poin_weekly: cappedPoints,
+      akumulasi_poin_weekly_raw: totalPoints,
+    });
     updatedCount += 1;
   }
 

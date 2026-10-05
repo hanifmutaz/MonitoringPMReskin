@@ -2,7 +2,7 @@
 // Fase 1 (A1/D3): kolom Tanggal pakai formatDate() -> "04 Jul 2026" (bukan
 // tgl_input mentah). Sisanya tidak berubah.
 import OnTimeBadge from '../OnTimeBadge';
-import { formatDate } from '../../utils/formatDate';
+import { formatDate, formatDateTime } from '../../utils/formatDate';
 
 const JENIS_LABEL = { MONTHLY: 'Monthly', WEEKLY: 'Weekly' };
 
@@ -11,6 +11,13 @@ const pmLineHistoryColumns = [
     key: 'tgl_input',
     header: 'Tanggal',
     render: (item) => <span className="font-[var(--font-mono)] text-[13px]">{formatDate(item.tgl_input)}</span>,
+  },
+  {
+    // Jam dicatat sistem saat submit (created_at), bukan input operator.
+    key: 'waktu_input',
+    header: 'Waktu Input',
+    className: 'text-xs text-[var(--text-dim)]',
+    render: (item) => formatDateTime(item.created_at),
   },
   {
     key: 'line',

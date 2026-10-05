@@ -22,6 +22,7 @@ import { useState } from 'react';
 import { useLines } from '../../hooks/useLines';
 import LineCombobox from '../LineCombobox';
 import { useCreatePmLineHistory } from '../../hooks/usePmLineHistory';
+import { usePmLineStatus } from '../../hooks/usePmLineStatus';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -70,6 +71,15 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm, sta
   const { data: lines = [] } = useLines({ isActive: true });
   const createMutation = useCreatePmLineHistory();
 
+  // KPI Ketepatan harus real: tanggal PM DIISI SISTEM (hari ini, WIB, di
+  // backend) dan tidak bisa diubah operator. Pengecualian: PM PERTAMA untuk
+  // jenis ini (Tgl PM Terakhir Line itu masih kosong) - baru di kasus itu
+  // field tanggal muncul supaya operator bisa isi tanggal PM aslinya.
+  const { data: statusRows } = usePmLineStatus();
+  const selectedStatus = statusRows?.find((r) => String(r.line_id) === String(form.line_id));
+  const lastDateField = form.jenis_pm === 'WEEKLY' ? 'tgl_pm_weekly_terakhir' : 'tgl_pm_monthly_terakhir';
+  const isFirstPm = Boolean(form.line_id) && Boolean(selectedStatus) && !selectedStatus[lastDateField];
+
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
@@ -87,7 +97,8 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm, sta
       await createMutation.mutateAsync({
         line_id: Number(form.line_id),
         jenis_pm: form.jenis_pm,
-        tgl_input: form.tgl_input,
+        // Hanya dikirim untuk PM pertama; selain itu backend pakai tanggal server.
+        ...(isFirstPm ? { tgl_input: form.tgl_input } : {}),
         pic_name: form.pic_name,
         keterangan: form.keterangan || undefined,
       });
@@ -128,17 +139,29 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm, sta
           </Select>
         </div>
 
-        <div>
-          <Label className="mb-2.5">Tanggal Input</Label>
-          <Input
-            type="date"
-            value={form.tgl_input}
-            max={todayStr()}
-            onChange={(e) => update('tgl_input', e.target.value)}
-            required
-          />
-          {errors.tgl_input && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.tgl_input}</p>}
-        </div>
+        {isFirstPm ? (
+          <div>
+            <Label className="mb-2.5">Tanggal PM Pertama</Label>
+            <Input
+              type="date"
+              value={form.tgl_input}
+              max={todayStr()}
+              onChange={(e) => update('tgl_input', e.target.value)}
+              required
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Line ini belum pernah di-PM {form.jenis_pm === 'WEEKLY' ? 'Weekly' : 'Monthly'}, jadi tanggal boleh diisi
+              manual (hanya sekali ini).
+            </p>
+            {errors.tgl_input && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.tgl_input}</p>}
+          </div>
+        ) : (
+          <div>
+            <Label className="mb-2.5">Tanggal &amp; Waktu</Label>
+            <Input value="Otomatis dari sistem (saat disimpan)" disabled readOnly aria-label="Tanggal dan waktu diisi sistem" />
+            {errors.tgl_input && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.tgl_input}</p>}
+          </div>
+        )}
 
         <div>
           <Label className="mb-2.5">PIC</Label>
