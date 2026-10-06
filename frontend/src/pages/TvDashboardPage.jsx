@@ -36,6 +36,9 @@ const JENIS_CHIP = {
 const ROW_OPTIONS = [10, 15, 20, 30];
 const DEFAULT_ROWS = 15;
 const ROWS_KEY = 'tv.rows';
+// Jadwal 7 hari: tiap hari menampilkan SEMUA Line dalam 2 kolom (maks 8 baris = 16 entri).
+// Lebih dari itu baru dipotong dan sisanya ditulis "+N lagi" (jarang terjadi).
+const DAY_MAX_ENTRIES = 16;
 const clampRows = (n) => (Number.isFinite(n) ? Math.min(50, Math.max(5, Math.round(n))) : DEFAULT_ROWS);
 function readStoredRows() {
   try { return clampRows(Number(localStorage.getItem(ROWS_KEY)) || DEFAULT_ROWS); } catch { return DEFAULT_ROWS; }
@@ -423,27 +426,33 @@ function TvDashboardPage() {
             <Panel icon={<CalendarDays size={22} />} title="Jadwal PM 7 Hari Ke Depan" aside="(Berdasarkan Tanggal Due)">
               <div className="grid grid-cols-8 gap-2">
                 {dayCols.map((c) => (
-                  <div key={c.key} className="flex h-[8.25rem] min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-[var(--panel-2)]">
+                  <div key={c.key} className="flex min-h-[8.25rem] min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-[var(--panel-2)]">
                     <div className={`py-1 text-center ${c.sunday ? 'bg-danger-dim text-danger' : 'bg-[var(--accent-dim)] text-[var(--accent)]'}`}>
                       <div className="text-sm font-semibold leading-tight">{c.d.format('dddd')}</div>
-                      <div className="text-xs leading-tight opacity-80">{c.d.format('D MMM YYYY')}</div>
+                      <div className="text-xs leading-tight opacity-80">
+                        {c.d.format('D MMM YYYY')}
+                        {c.lineCount > 0 && <span className="font-semibold"> · {c.lineCount} line</span>}
+                      </div>
                     </div>
                     {c.entries.length === 0 ? (
                       <div className="flex flex-1 flex-col items-center justify-center text-xs text-[var(--text-faint)]">
                         <div className="text-base">-</div>Tidak ada jadwal
                       </div>
                     ) : (
-                      <div className="flex min-h-0 flex-1 flex-col justify-between px-2 py-1.5">
-                        <div className="flex flex-col gap-0.5 text-sm font-semibold">
-                          {c.entries.slice(0, 3).map((e) => (
-                            <div key={e.key} className="flex items-center justify-between gap-1">
+                      <div className="flex min-h-0 flex-1 flex-col gap-0.5 px-2 py-1">
+                        {/* 2 kolom, urut turun per kolom (A-Z): semua Line terlihat tanpa harus "+N lagi". */}
+                        <div
+                          className="grid grid-flow-col grid-cols-2 gap-x-2 text-xs font-semibold leading-[0.875rem]"
+                          style={{ gridTemplateRows: `repeat(${Math.ceil(Math.min(c.entries.length, DAY_MAX_ENTRIES) / 2)}, auto)` }}
+                        >
+                          {c.entries.slice(0, DAY_MAX_ENTRIES).map((e) => (
+                            <div key={e.key} className="flex min-w-0 items-center justify-between gap-1">
                               <span className="truncate font-[var(--font-mono)]">{e.line}</span>
-                              <span className={TAG_TONE[e.tag]}>({e.tag})</span>
+                              <span className={`shrink-0 ${TAG_TONE[e.tag]}`}>({e.tag})</span>
                             </div>
                           ))}
-                          {c.entries.length > 3 && <div className="text-xs font-normal text-[var(--text-faint)]">+{c.entries.length - 3} lagi</div>}
                         </div>
-                        <div className="text-center text-xs font-semibold text-[var(--accent)]">{c.lineCount} line</div>
+                        {c.entries.length > DAY_MAX_ENTRIES && <div className="text-xs font-normal text-[var(--text-faint)]">+{c.entries.length - DAY_MAX_ENTRIES} lagi</div>}
                       </div>
                     )}
                   </div>
