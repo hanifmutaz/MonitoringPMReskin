@@ -96,8 +96,8 @@ function DashboardPmLineWeeklyPage() {
                 <KetepatanPeriodPanel
                     ketepatan={data.ketepatan}
                     items={[
-                        { key: 'monthly', label: 'Ketepatan PM Monthly', caption: 'Input sebelum poin lewat cap' },
-                        { key: 'weekly', label: 'Ketepatan PM Weekly', caption: 'Input dalam siklus hari weekly' },
+                        { key: 'monthly', label: 'Monthly', caption: 'Input sebelum poin lewat cap' },
+                        { key: 'weekly', label: 'Weekly', caption: 'Input dalam siklus hari weekly' },
                     ]}
                 />
             )}

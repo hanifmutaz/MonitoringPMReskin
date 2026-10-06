@@ -1,11 +1,11 @@
 // src/components/KetepatanPeriodPanel.jsx
-// Panel "Ketepatan PM" dipakai Dashboard PM Part & Dashboard PM Monthly and Weekly.
-// Menampilkan 2 baris KPI: BULAN INI (bulan kalender berjalan) dan TAHUN BERJALAN,
-// supaya tren bulanan langsung kelihatan tanpa harus klik apa pun.
+// Panel "Ketepatan PM" Dashboard PM Monthly and Weekly: SATU baris kartu, dikelompokkan
+// per jenis PM, tiap jenis menampilkan BULAN INI lalu TAHUN BERJALAN berdampingan,
+// jadi tren bulanan vs tahunan satu jenis langsung terbaca:
+//   [Monthly - Bulan Ini] [Monthly - Tahun Ini] [Weekly - Bulan Ini] [Weekly - Tahun Ini]
 //
-// `ketepatan` datang dari backend (part_summary.ketepatan / line_summary.ketepatan).
-// Field ini BARU: site remote yang belum di-upgrade tidak mengirimnya, jadi kalau
-// undefined komponen ini render null (bukan crash).
+// `ketepatan` datang dari backend (line_summary.ketepatan). Field ini BARU: site remote
+// yang belum di-upgrade tidak mengirimnya, jadi kalau undefined komponen render null.
 import dayjs from 'dayjs';
 import 'dayjs/locale/id';
 import { Target } from 'lucide-react';
@@ -31,47 +31,39 @@ function monthLabel(monthKey) {
   return d.isValid() ? d.locale('id').format('MMMM YYYY') : monthKey;
 }
 
+const PERIODS = [
+  { field: 'bulan_ini', label: 'Bulan Ini', period: 'bulan ini' },
+  { field: 'tahun_ini', label: 'Tahun Ini', period: 'tahun ini' },
+];
+
 /**
  * @param {{ketepatan?: {month: string} & Record<string, {bulan_ini: object, tahun_ini: object}>,
  *          items: {key: string, label: string, caption: string}[]}} props
  */
 function KetepatanPeriodPanel({ ketepatan, items }) {
   if (!ketepatan) return null;
-  const cols = items.length >= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2';
-
-  const rows = [
-    { id: 'bulan', title: `Bulan Ini (${monthLabel(ketepatan.month)})`, field: 'bulan_ini', period: 'bulan ini' },
-    { id: 'tahun', title: 'Tahun Berjalan', field: 'tahun_ini', period: 'tahun ini' },
-  ];
-
+  // 4 kartu (2 jenis x 2 periode): 1 baris di layar lebar, 2 baris di layar sedang, 1 kolom di HP.
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Ketepatan PM</CardTitle>
+        <CardTitle>Ketepatan PM (Bulan Ini: {monthLabel(ketepatan.month)})</CardTitle>
       </CardHeader>
-      <div className="flex flex-col gap-5">
-        {rows.map((r) => (
-          <section key={r.id} aria-label={`Ketepatan PM ${r.title}`}>
-            <h3 className="m-0 mb-2.5 font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
-              {r.title}
-            </h3>
-            <div className={`grid grid-cols-1 gap-4 ${cols}`}>
-              {items.map((it) => {
-                const d = ketepatan[it.key]?.[r.field];
-                return (
-                  <KpiCard
-                    key={it.key}
-                    icon={<Target size={18} />}
-                    label={it.label}
-                    value={formatPct(d?.percentage)}
-                    caption={ketepatanCaption(d, it.caption, r.period)}
-                    status={ketepatanTone(d?.percentage)}
-                  />
-                );
-              })}
-            </div>
-          </section>
-        ))}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {items.flatMap((it) =>
+          PERIODS.map((p) => {
+            const d = ketepatan[it.key]?.[p.field];
+            return (
+              <KpiCard
+                key={`${it.key}-${p.field}`}
+                icon={<Target size={18} />}
+                label={`${it.label} · ${p.label}`}
+                value={formatPct(d?.percentage)}
+                caption={ketepatanCaption(d, it.caption, p.period)}
+                status={ketepatanTone(d?.percentage)}
+              />
+            );
+          })
+        )}
       </div>
     </Card>
   );

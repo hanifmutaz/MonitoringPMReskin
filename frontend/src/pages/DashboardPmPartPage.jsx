@@ -75,7 +75,7 @@ function DashboardPmPartPage() {
                     ))}
                 </div>
             ) : (
-                <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${ketepatanPart ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <KpiCard
                         icon={<Package size={18} />}
                         label="Total Parts"
@@ -100,16 +100,6 @@ function DashboardPmPartPage() {
                         value={data.status_danger.toLocaleString('id-ID')}
                         status="danger"
                     />
-                    {/* Field baru: site remote yang belum di-upgrade tidak mengirimnya -> kartu tidak dirender. */}
-                    {ketepatanPart && (
-                        <KpiCard
-                            icon={<Target size={18} />}
-                            label="Ketepatan PM Part"
-                            value={formatPct(ketepatanPart.percentage)}
-                            caption={ketepatanCaption(ketepatanPart, 'Diganti sebelum/tepat target shot', 'tahun ini')}
-                            status={ketepatanTone(ketepatanPart.percentage)}
-                        />
-                    )}
                 </div>
             )}
 
@@ -118,12 +108,24 @@ function DashboardPmPartPage() {
                     <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">Ringkasan Status Part</h2>
                 </div>
                 {!isLoading && (
-                    <LineStatusDonut
-                        healthy={data.status_ok}
-                        warning={data.status_warning}
-                        critical={data.status_danger}
-                        totalLabel="Total Part"
-                    />
+                    <div className="grid grid-cols-1 items-center gap-6 lg:grid-cols-2">
+                        <LineStatusDonut
+                            healthy={data.status_ok}
+                            warning={data.status_warning}
+                            critical={data.status_danger}
+                            totalLabel="Total Part"
+                        />
+                        {/* Field baru: site remote yang belum di-upgrade tidak mengirimnya -> kartu tidak dirender. */}
+                        {ketepatanPart && (
+                            <KpiCard
+                                icon={<Target size={18} />}
+                                label="Ketepatan PM Part (Tahun Berjalan)"
+                                value={formatPct(ketepatanPart.percentage)}
+                                caption={ketepatanCaption(ketepatanPart, 'Diganti sebelum/tepat target shot', 'tahun ini')}
+                                status={ketepatanTone(ketepatanPart.percentage)}
+                            />
+                        )}
+                    </div>
                 )}
             </div>
 
