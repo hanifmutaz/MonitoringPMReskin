@@ -144,7 +144,7 @@ function Kpi({ icon, label, sub, value, cls }) {
   );
 }
 
-// Tile lebar (2 kolom): ketepatan BULAN INI per jenis PM. Warna angka mengikuti
+// Tile lebar (2 kolom): ketepatan BULAN INI PM Monthly & Weekly. Warna angka mengikuti
 // ambang yang sama dengan dashboard biasa (>=90 hijau, >=50 oranye, sisanya merah).
 // Bulan tanpa event tampil "-" (abu-abu), bukan 0%, supaya tidak dikira performa jelek.
 const pctTone = (p) => (p === null || p === undefined ? 'text-muted-foreground' : p >= 90 ? 'text-ok' : p >= 50 ? 'text-warn' : 'text-danger');
@@ -161,7 +161,7 @@ function KetepatanBulanKpi({ monthKey, items }) {
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold leading-tight">Ketepatan PM</div>
         <div className="text-xs leading-tight opacity-80">(Bulan Ini{label ? ` - ${label}` : ''})</div>
-        <div className="mt-0.5 grid grid-cols-3 gap-2">
+        <div className="mt-0.5 grid grid-cols-2 gap-2">
           {items.map((it) => (
             <div key={it.label} className="min-w-0">
               <div className="truncate text-xs leading-tight opacity-80">{it.label}</div>
@@ -246,14 +246,13 @@ function TvDashboardPage() {
 
   const lineUpcoming = new Set(upcoming.filter((u) => u.type !== 'PM_PART').map((u) => u.line_name)).size;
   const compliance = overallCompliance(summary);
-  // Ketepatan BULAN INI. Field baru di part/line-summary: kalau backend belum di-upgrade
+  // Ketepatan BULAN INI (Monthly & Weekly saja; Part sengaja tidak). Field baru di line-summary: kalau backend belum di-upgrade
   // nilainya undefined -> tile tetap tampil dengan "-" (tidak crash).
   const kBulan = [
-    { label: 'Part', pct: pd?.ketepatan?.part?.bulan_ini?.percentage },
     { label: 'Monthly', pct: ld?.ketepatan?.monthly?.bulan_ini?.percentage },
     { label: 'Weekly', pct: ld?.ketepatan?.weekly?.bulan_ini?.percentage },
   ];
-  const kBulanMonth = ld?.ketepatan?.month ?? pd?.ketepatan?.month;
+  const kBulanMonth = ld?.ketepatan?.month;
 
   const priority = [
     ...nextActions.filter((r) => r.sisa <= 0).map((r) => ({

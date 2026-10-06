@@ -33,16 +33,17 @@ function monthLabel(monthKey) {
 
 /**
  * @param {{ketepatan?: {month: string} & Record<string, {bulan_ini: object, tahun_ini: object}>,
- *          items: {key: string, label: string, caption: string}[]}} props
+ *          items: {key: string, label: string, caption: string}[],
+ *          showMonth?: boolean}} props  (showMonth=false -> hanya baris Tahun Berjalan)
  */
-function KetepatanPeriodPanel({ ketepatan, items }) {
+function KetepatanPeriodPanel({ ketepatan, items, showMonth = true }) {
   if (!ketepatan) return null;
   const cols = items.length >= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2';
 
   const rows = [
     { id: 'bulan', title: `Bulan Ini (${monthLabel(ketepatan.month)})`, field: 'bulan_ini', period: 'bulan ini' },
     { id: 'tahun', title: 'Tahun Berjalan', field: 'tahun_ini', period: 'tahun ini' },
-  ];
+  ].filter((r) => showMonth || r.id !== 'bulan');
 
   return (
     <Card>

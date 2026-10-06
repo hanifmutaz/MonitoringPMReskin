@@ -89,7 +89,7 @@ function KpiCardSkeleton() {
   );
 }
 
-// Tren ketepatan per bulan (6 bulan terakhir, lama -> baru). Bulan tanpa event
+// Tren ketepatan per bulan PM Monthly & Weekly (6 bulan terakhir, lama -> baru). Bulan tanpa event
 // tampil "-" (abu-abu), bukan 0%, supaya gak dikira performa jelek.
 // Kolom bulan terakhir = bulan berjalan (belum final sampai akhir bulan).
 function KetepatanTrendPanel({ data }) {
@@ -103,7 +103,7 @@ function KetepatanTrendPanel({ data }) {
       <div className="overflow-x-auto" tabIndex="0" role="region" aria-label="Tabel tren ketepatan PM per bulan (scroll horizontal)">
         <table className="w-full border-collapse">
           <thead><tr>
-            {['Bulan', 'PM Part', 'Monthly', 'Weekly'].map((h) => (
+            {['Bulan', 'Monthly', 'Weekly'].map((h) => (
               <th key={h} scope="col" className="border-b border-border px-2.5 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">{h}</th>
             ))}
           </tr></thead>
@@ -114,7 +114,7 @@ function KetepatanTrendPanel({ data }) {
                   {formatMonthKey(row.month, 'MMM YYYY')}
                   {i === lastIndex && <span className="ml-1.5 text-[11px] text-[var(--text-faint)]">(berjalan)</span>}
                 </td>
-                {['part', 'monthly', 'weekly'].map((k) => (
+                {['monthly', 'weekly'].map((k) => (
                   <td key={k} className="border-b border-[var(--border-soft)] px-2.5 py-2.5">
                     <div className="flex items-center gap-2">
                       <PercentBadge percentage={row[k].percentage} />
@@ -245,8 +245,7 @@ function DashboardPage() {
             <CardTitle>Ketepatan PM (Bulan Ini - {formatMonthKey(summary.ketepatan_bulan_ini.month)})</CardTitle>
           </CardHeader>
           {!loadingSummary && (
-            <div className="grid grid-cols-1 gap-4 gap-y-6 sm:grid-cols-3">
-              <KpiCard icon={<Target size={18} />} label="Ketepatan PM Part" value={formatKetepatan(summary.ketepatan_bulan_ini.part.percentage)} caption={ketepatanCaption(summary.ketepatan_bulan_ini.part.percentage, summary.ketepatan_bulan_ini.part.total, 'Diganti sebelum/tepat target shot', 'bulan ini')} status={ketepatanStatus(summary.ketepatan_bulan_ini.part.percentage)} />
+            <div className="grid grid-cols-1 gap-4 gap-y-6 sm:grid-cols-2">
               <KpiCard icon={<Target size={18} />} label="Ketepatan PM Monthly" value={formatKetepatan(summary.ketepatan_bulan_ini.monthly.percentage)} caption={ketepatanCaption(summary.ketepatan_bulan_ini.monthly.percentage, summary.ketepatan_bulan_ini.monthly.total, 'Input sebelum poin lewat cap', 'bulan ini')} status={ketepatanStatus(summary.ketepatan_bulan_ini.monthly.percentage)} />
               <KpiCard icon={<Target size={18} />} label="Ketepatan PM Weekly" value={formatKetepatan(summary.ketepatan_bulan_ini.weekly.percentage)} caption={ketepatanCaption(summary.ketepatan_bulan_ini.weekly.percentage, summary.ketepatan_bulan_ini.weekly.total, 'Input dalam siklus hari weekly', 'bulan ini')} status={ketepatanStatus(summary.ketepatan_bulan_ini.weekly.percentage)} />
             </div>

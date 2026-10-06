@@ -103,6 +103,7 @@ function DashboardPmPartPage() {
             {!isLoading && (
                 <KetepatanPeriodPanel
                     ketepatan={data.ketepatan}
+                    showMonth={false}
                     items={[{ key: 'part', label: 'Ketepatan PM Part', caption: 'Diganti sebelum/tepat target shot' }]}
                 />
             )}
