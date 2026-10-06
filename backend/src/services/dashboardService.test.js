@@ -56,6 +56,8 @@ function stubDefaults() {
     monthly: { percentage: 0, total: 0 },
     weekly: { percentage: 0, total: 0 },
   }));
+  mock.method(pmPartHistoryService, 'getKetepatanMonthlyTrend', async () => new Map());
+  mock.method(pmLineHistoryService, 'getKetepatanMonthlyTrend', async () => new Map());
   mock.method(settingsService, 'getSetting', async () => 10);
 }
 
@@ -328,6 +330,54 @@ describe('dashboardService', () => {
       assert.equal(result.length, 5);
       assert.equal(result[0].line_name, 'L7'); // percentage terkecil = 93
       assert.ok(result[0].worst_percentage <= result[1].worst_percentage);
+    });
+  });
+
+  describe('ketepatan per bulan', () => {
+    test('getSummary: ketepatan_bulan_ini + ketepatan_trend (6 bulan) ikut keluar', async () => {
+      mock.method(pmLineHistoryService, 'getKetepatanSummary', async ({ period } = {}) =>
+        period === 'month'
+          ? { monthly: { percentage: 80, total: 5 }, weekly: { percentage: 100, total: 12 } }
+          : { monthly: { percentage: 0, total: 0 }, weekly: { percentage: 0, total: 0 } }
+      );
+      mock.method(pmPartHistoryService, 'getKetepatanSummary', async ({ period } = {}) =>
+        period === 'month' ? { percentage: 90, total: 10 } : { percentage: 0, total: 0 }
+      );
+      mock.method(pmLineHistoryService, 'getKetepatanMonthlyTrend', async () => new Map());
+      mock.method(pmPartHistoryService, 'getKetepatanMonthlyTrend', async () => new Map());
+      mock.method(pmPartService, 'getAllComputedMetrics', async () => []);
+      mock.method(pmLineService, 'getPmLineStatus', async () => []);
+
+      const summary = await dashboardService.getSummary();
+
+      assert.deepEqual(summary.ketepatan_bulan_ini.part, { percentage: 90, total: 10 });
+      assert.deepEqual(summary.ketepatan_bulan_ini.monthly, { percentage: 80, total: 5 });
+      assert.deepEqual(summary.ketepatan_bulan_ini.weekly, { percentage: 100, total: 12 });
+      assert.match(summary.ketepatan_bulan_ini.month, /^\d{4}-\d{2}$/);
+      assert.equal(summary.ketepatan_trend.length, 6);
+    });
+
+    test('getKetepatanTrend: selalu N bulan urut lama->baru, bulan tanpa event = percentage null', async () => {
+      const dateUtils = require('../utils/dateUtils');
+      const thisMonth = dateUtils.monthKey(0);
+      mock.method(pmPartHistoryService, 'getKetepatanMonthlyTrend', async () =>
+        new Map([[thisMonth, { total: 4, on_time_count: 3, percentage: 75 }]])
+      );
+      mock.method(pmLineHistoryService, 'getKetepatanMonthlyTrend', async () =>
+        new Map([
+          [thisMonth, { monthly: { total: 2, on_time_count: 2, percentage: 100 }, weekly: { total: 0, on_time_count: 0, percentage: null } }],
+        ])
+      );
+
+      const trend = await dashboardService.getKetepatanTrend(6);
+
+      assert.equal(trend.length, 6);
+      assert.equal(trend[0].month, dateUtils.monthKey(-5));
+      assert.equal(trend[5].month, thisMonth);
+      assert.deepEqual(trend[0].part, { percentage: null, total: 0 });
+      assert.deepEqual(trend[5].part, { percentage: 75, total: 4 });
+      assert.deepEqual(trend[5].monthly, { percentage: 100, total: 2 });
+      assert.deepEqual(trend[5].weekly, { percentage: null, total: 0 });
     });
   });
 });

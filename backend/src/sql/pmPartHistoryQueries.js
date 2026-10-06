@@ -134,16 +134,39 @@ async function create(data, runner = db) {
 
 // --- Ketepatan PM Part (lihat pmPartHistoryService.js buat definisi on_time) ---
 
-async function getKetepatanOverall({ dateFrom }, runner = db) {
+// dateTo OPSIONAL (inklusif). Tanpa dateTo = dari dateFrom sampai sekarang.
+async function getKetepatanOverall({ dateFrom, dateTo }, runner = db) {
+  const params = [dateFrom];
+  let dateToSql = '';
+  if (dateTo) {
+    params.push(dateTo);
+    dateToSql = ` AND tgl_ganti <= $${params.length}`;
+  }
   const result = await runner.query(
     `SELECT
        COUNT(*) FILTER (WHERE on_time IS NOT NULL) AS total,
        COUNT(*) FILTER (WHERE on_time = TRUE) AS on_time_count
      FROM pm_part_history
-     WHERE tgl_ganti >= $1 AND deleted_at IS NULL`,
-    [dateFrom]
+     WHERE tgl_ganti >= $1${dateToSql} AND deleted_at IS NULL`,
+    params
   );
   return result.rows[0];
+}
+
+// Ketepatan PM Part per bulan kalender (key 'YYYY-MM' dari tgl_ganti).
+async function getKetepatanByMonth({ dateFrom, dateTo }, runner = db) {
+  const result = await runner.query(
+    `SELECT
+       to_char(tgl_ganti, 'YYYY-MM') AS month,
+       COUNT(*) FILTER (WHERE on_time IS NOT NULL) AS total,
+       COUNT(*) FILTER (WHERE on_time = TRUE) AS on_time_count
+     FROM pm_part_history
+     WHERE tgl_ganti >= $1 AND tgl_ganti <= $2 AND deleted_at IS NULL
+     GROUP BY 1
+     ORDER BY 1 ASC`,
+    [dateFrom, dateTo]
+  );
+  return result.rows;
 }
 
 async function getKetepatanPerLine({ dateFrom }, runner = db) {
@@ -172,5 +195,6 @@ module.exports = {
   findPartTargetShot,
   create,
   getKetepatanOverall,
+  getKetepatanByMonth,
   getKetepatanPerLine,
 };

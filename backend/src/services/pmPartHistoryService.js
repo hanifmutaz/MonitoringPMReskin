@@ -117,9 +117,13 @@ function toPercentage(total, onTimeCount) {
 
 // --- Ketepatan PM Part, tahun berjalan (lihat migration 1700000012000) ---
 
-async function getKetepatanSummary() {
-  const dateFrom = dateUtils.startOfYearString();
-  const row = await pmPartHistoryQueries.getKetepatanOverall({ dateFrom });
+// period: 'year' (default, tahun berjalan) | 'month' (bulan kalender berjalan, WIB).
+async function getKetepatanSummary({ period = 'year' } = {}) {
+  const range =
+    period === 'month'
+      ? { dateFrom: dateUtils.startOfMonthString(), dateTo: dateUtils.endOfMonthString() }
+      : { dateFrom: dateUtils.startOfYearString() };
+  const row = await pmPartHistoryQueries.getKetepatanOverall(range);
   const total = Number(row.total);
   const onTimeCount = Number(row.on_time_count);
   return { total, on_time_count: onTimeCount, percentage: toPercentage(total, onTimeCount) };
@@ -141,7 +145,24 @@ async function getKetepatanPerLine() {
   });
 }
 
+// Tren N bulan terakhir (termasuk bulan ini) -> Map 'YYYY-MM' -> {total, on_time_count, percentage}.
+// Bulan tanpa event tidak ada di Map (pemanggil yang mengisi kosongnya).
+async function getKetepatanMonthlyTrend(months = 6) {
+  const rows = await pmPartHistoryQueries.getKetepatanByMonth({
+    dateFrom: dateUtils.startOfMonthString(-(months - 1)),
+    dateTo: dateUtils.endOfMonthString(),
+  });
+  const result = new Map();
+  for (const r of rows) {
+    const total = Number(r.total);
+    const onTimeCount = Number(r.on_time_count);
+    result.set(r.month, { total, on_time_count: onTimeCount, percentage: toPercentage(total, onTimeCount) });
+  }
+  return result;
+}
+
 module.exports = {
+  getKetepatanMonthlyTrend,
   listHistory,
   createHistory,
   determineOnTime,

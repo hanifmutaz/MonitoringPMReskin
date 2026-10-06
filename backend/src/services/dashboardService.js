@@ -36,8 +36,50 @@ function worstStatus(a, b) {
   return STATUS_RANK[a] >= STATUS_RANK[b] ? a : b;
 }
 
+const KETEPATAN_TREND_MONTHS = 6;
+
+const EMPTY_KETEPATAN = { total: 0, on_time_count: 0, percentage: null };
+
+function pickKetepatan(r) {
+  return { percentage: r.percentage ?? null, total: r.total ?? 0 };
+}
+
+// Tren ketepatan N bulan terakhir (urut lama -> baru, SELALU N entri: bulan
+// tanpa event diisi percentage null biar grafik/tabel gak bolong urutannya).
+// Part dihitung dari tgl_ganti, Monthly/Weekly dari tgl_input.
+async function getKetepatanTrend(months = KETEPATAN_TREND_MONTHS) {
+  const [partTrend, lineTrend] = await Promise.all([
+    pmPartHistoryService.getKetepatanMonthlyTrend(months),
+    pmLineHistoryService.getKetepatanMonthlyTrend(months),
+  ]);
+
+  const result = [];
+  for (let offset = -(months - 1); offset <= 0; offset += 1) {
+    const month = dateUtils.monthKey(offset);
+    const part = partTrend.get(month) || EMPTY_KETEPATAN;
+    const line = lineTrend.get(month) || { monthly: EMPTY_KETEPATAN, weekly: EMPTY_KETEPATAN };
+    result.push({
+      month,
+      part: pickKetepatan(part),
+      monthly: pickKetepatan(line.monthly),
+      weekly: pickKetepatan(line.weekly),
+    });
+  }
+  return result;
+}
+
 async function getSummary() {
-  const [partMetrics, lineStatuses, totalParts, activeLines, ketepatanPart, ketepatanLine] = await Promise.all([
+  const [
+    partMetrics,
+    lineStatuses,
+    totalParts,
+    activeLines,
+    ketepatanPart,
+    ketepatanLine,
+    ketepatanPartMonth,
+    ketepatanLineMonth,
+    ketepatanTrend,
+  ] = await Promise.all([
     getCachedPartMetrics(),
     getCachedLineStatuses(),
     dashboardQueries.countAllParts(),
@@ -47,6 +89,10 @@ async function getSummary() {
     // di halaman Monitoring (pmLineService.getPmLineStatus / pmPartService.getKetepatanPerLine).
     pmPartHistoryService.getKetepatanSummary(),
     pmLineHistoryService.getKetepatanSummary(),
+    // Ketepatan BULAN INI (bulan kalender WIB) + tren 6 bulan terakhir.
+    pmPartHistoryService.getKetepatanSummary({ period: 'month' }),
+    pmLineHistoryService.getKetepatanSummary({ period: 'month' }),
+    getKetepatanTrend(),
   ]);
 
   const statusCounts = { OK: 0, WARNING: 0, DANGER: 0 };
@@ -73,6 +119,15 @@ async function getSummary() {
     ketepatan_pm_monthly_total: ketepatanLine.monthly.total,
     ketepatan_pm_weekly_percentage: ketepatanLine.weekly.percentage,
     ketepatan_pm_weekly_total: ketepatanLine.weekly.total,
+    // Per bulan (bulan kalender berjalan). Field baru - frontend wajib tahan
+    // kalau undefined (site remote yang belum di-upgrade).
+    ketepatan_bulan_ini: {
+      month: dateUtils.monthKey(0),
+      part: pickKetepatan(ketepatanPartMonth),
+      monthly: pickKetepatan(ketepatanLineMonth.monthly),
+      weekly: pickKetepatan(ketepatanLineMonth.weekly),
+    },
+    ketepatan_trend: ketepatanTrend,
   };
 }
 
@@ -275,4 +330,5 @@ module.exports = {
   getPartSummary,
   getLineSummary,
   getKetepatanAttention,
+  getKetepatanTrend,
 };

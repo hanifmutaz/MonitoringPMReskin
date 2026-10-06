@@ -58,7 +58,25 @@ function startOfYearString() {
   return today().startOf('year').format(DATE_FORMAT);
 }
 
+/** Awal bulan (WIB). offset 0 = bulan ini, -1 = bulan lalu, dst. */
+function startOfMonthString(offset = 0) {
+  return today().add(offset, 'month').startOf('month').format(DATE_FORMAT);
+}
+
+/** Akhir bulan (WIB, hari terakhir bulan itu). */
+function endOfMonthString(offset = 0) {
+  return today().add(offset, 'month').endOf('month').format(DATE_FORMAT);
+}
+
+/** Key bulan 'YYYY-MM' (WIB). */
+function monthKey(offset = 0) {
+  return today().add(offset, 'month').format('YYYY-MM');
+}
+
 module.exports = {
+  startOfMonthString,
+  endOfMonthString,
+  monthKey,
   today,
   parseDbDate,
   daysSince,

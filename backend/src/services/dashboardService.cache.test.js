@@ -26,6 +26,8 @@ function stubAggregationDeps() {
     monthly: { percentage: 0, total: 0 },
     weekly: { percentage: 0, total: 0 },
   }));
+  mock.method(pmPartHistoryService, 'getKetepatanMonthlyTrend', async () => new Map());
+  mock.method(pmLineHistoryService, 'getKetepatanMonthlyTrend', async () => new Map());
 }
 
 // `cache` di dashboardService.js adalah module-level singleton (persist

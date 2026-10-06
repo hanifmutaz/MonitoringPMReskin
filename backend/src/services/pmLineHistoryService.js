@@ -214,9 +214,13 @@ function emptyJenisResult() {
 // yang berbeda sifat (poin ter-cap vs kalender murni), digabung jadi 1 angka
 // malah kabur maknanya.
 
-async function getKetepatanSummary() {
-  const dateFrom = dateUtils.startOfYearString();
-  const rows = await pmLineHistoryQueries.getKetepatanOverall({ dateFrom });
+// period: 'year' (default, tahun berjalan) | 'month' (bulan kalender berjalan, WIB).
+async function getKetepatanSummary({ period = 'year' } = {}) {
+  const range =
+    period === 'month'
+      ? { dateFrom: dateUtils.startOfMonthString(), dateTo: dateUtils.endOfMonthString() }
+      : { dateFrom: dateUtils.startOfYearString() };
+  const rows = await pmLineHistoryQueries.getKetepatanOverall(range);
 
   const result = { monthly: emptyJenisResult(), weekly: emptyJenisResult() };
   for (const r of rows) {
@@ -224,6 +228,24 @@ async function getKetepatanSummary() {
     const onTimeCount = Number(r.on_time_count);
     const key = r.jenis_pm === 'MONTHLY' ? 'monthly' : 'weekly';
     result[key] = { total, on_time_count: onTimeCount, percentage: toPercentage(total, onTimeCount) };
+  }
+  return result;
+}
+
+// Tren N bulan terakhir (termasuk bulan ini) -> Map 'YYYY-MM' -> {monthly, weekly}.
+// Bulan/jenis tanpa event tidak ada di Map (pemanggil yang mengisi kosongnya).
+async function getKetepatanMonthlyTrend(months = 6) {
+  const rows = await pmLineHistoryQueries.getKetepatanByMonth({
+    dateFrom: dateUtils.startOfMonthString(-(months - 1)),
+    dateTo: dateUtils.endOfMonthString(),
+  });
+  const result = new Map();
+  for (const r of rows) {
+    if (!result.has(r.month)) result.set(r.month, { monthly: emptyJenisResult(), weekly: emptyJenisResult() });
+    const total = Number(r.total);
+    const onTimeCount = Number(r.on_time_count);
+    const key = r.jenis_pm === 'MONTHLY' ? 'monthly' : 'weekly';
+    result.get(r.month)[key] = { total, on_time_count: onTimeCount, percentage: toPercentage(total, onTimeCount) };
   }
   return result;
 }
@@ -257,5 +279,6 @@ module.exports = {
   determineOnTime,
   resolveTglInput,
   getKetepatanSummary,
+  getKetepatanMonthlyTrend,
   getKetepatanPerLine,
 };

@@ -74,16 +74,41 @@ async function create(data, runner = db) {
 
 // --- Ketepatan PM Monthly/Weekly (lihat pmLineHistoryService.js buat definisi on_time) ---
 
-async function getKetepatanOverall({ dateFrom }, runner = db) {
+// dateTo OPSIONAL (inklusif). Tanpa dateTo = dari dateFrom sampai sekarang
+// (perilaku lama, dipakai angka "tahun berjalan").
+async function getKetepatanOverall({ dateFrom, dateTo }, runner = db) {
+  const params = [dateFrom];
+  let dateToSql = '';
+  if (dateTo) {
+    params.push(dateTo);
+    dateToSql = ` AND tgl_input <= $${params.length}`;
+  }
   const result = await runner.query(
     `SELECT
        jenis_pm,
        COUNT(*) FILTER (WHERE on_time IS NOT NULL) AS total,
        COUNT(*) FILTER (WHERE on_time = TRUE) AS on_time_count
      FROM pm_monthly_history
-     WHERE tgl_input >= $1 AND deleted_at IS NULL
+     WHERE tgl_input >= $1${dateToSql} AND deleted_at IS NULL
      GROUP BY jenis_pm`,
-    [dateFrom]
+    params
+  );
+  return result.rows;
+}
+
+// Ketepatan per bulan kalender (key 'YYYY-MM' dari tgl_input) per jenis PM.
+async function getKetepatanByMonth({ dateFrom, dateTo }, runner = db) {
+  const result = await runner.query(
+    `SELECT
+       to_char(tgl_input, 'YYYY-MM') AS month,
+       jenis_pm,
+       COUNT(*) FILTER (WHERE on_time IS NOT NULL) AS total,
+       COUNT(*) FILTER (WHERE on_time = TRUE) AS on_time_count
+     FROM pm_monthly_history
+     WHERE tgl_input >= $1 AND tgl_input <= $2 AND deleted_at IS NULL
+     GROUP BY 1, jenis_pm
+     ORDER BY 1 ASC`,
+    [dateFrom, dateTo]
   );
   return result.rows;
 }
@@ -106,4 +131,11 @@ async function getKetepatanPerLine({ dateFrom }, runner = db) {
   return result.rows;
 }
 
-module.exports = { findAllForExport, findAll, create, getKetepatanOverall, getKetepatanPerLine };
+module.exports = {
+  findAllForExport,
+  findAll,
+  create,
+  getKetepatanOverall,
+  getKetepatanByMonth,
+  getKetepatanPerLine,
+};
