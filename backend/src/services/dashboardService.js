@@ -68,6 +68,32 @@ async function getKetepatanTrend(months = KETEPATAN_TREND_MONTHS) {
   return result;
 }
 
+// Ketepatan per jenis untuk 1 bulan kalender berjalan + tahun berjalan.
+// Dipakai halaman "Dashboard PM Part", "Dashboard PM Monthly and Weekly" dan Mode TV
+// (juga ikut terkirim ke Internal lewat multiSiteService, karena memanggil fungsi yang sama).
+async function getPartKetepatan() {
+  const [tahun, bulan] = await Promise.all([
+    pmPartHistoryService.getKetepatanSummary(),
+    pmPartHistoryService.getKetepatanSummary({ period: 'month' }),
+  ]);
+  return {
+    month: dateUtils.monthKey(0),
+    part: { bulan_ini: pickKetepatan(bulan), tahun_ini: pickKetepatan(tahun) },
+  };
+}
+
+async function getLineKetepatan() {
+  const [tahun, bulan] = await Promise.all([
+    pmLineHistoryService.getKetepatanSummary(),
+    pmLineHistoryService.getKetepatanSummary({ period: 'month' }),
+  ]);
+  return {
+    month: dateUtils.monthKey(0),
+    monthly: { bulan_ini: pickKetepatan(bulan.monthly), tahun_ini: pickKetepatan(tahun.monthly) },
+    weekly: { bulan_ini: pickKetepatan(bulan.weekly), tahun_ini: pickKetepatan(tahun.weekly) },
+  };
+}
+
 async function getSummary() {
   const [
     partMetrics,
@@ -265,7 +291,7 @@ async function getKetepatanAttention() {
 // Monthly and Weekly" yang masing-masing cuma nampilin domainnya sendiri) ---
 
 async function getPartSummary() {
-  const partMetrics = await getCachedPartMetrics();
+  const [partMetrics, ketepatan] = await Promise.all([getCachedPartMetrics(), getPartKetepatan()]);
 
   const statusCounts = { OK: 0, WARNING: 0, DANGER: 0 };
   for (const p of partMetrics) statusCounts[p.status] += 1;
@@ -297,11 +323,13 @@ async function getPartSummary() {
     per_line: Object.values(perLine).sort((a, b) => b.DANGER - a.DANGER || b.WARNING - a.WARNING),
     top_attention: topAttention,
     top_lowest_shot: topLowestShot,
+    // Field baru - frontend wajib tahan kalau undefined (site remote belum di-upgrade).
+    ketepatan,
   };
 }
 
 async function getLineSummary() {
-  const lineStatuses = await getCachedLineStatuses();
+  const [lineStatuses, ketepatan] = await Promise.all([getCachedLineStatuses(), getLineKetepatan()]);
 
   const monthlyBuckets = { OK: 0, WARNING: 0, DANGER: 0 };
   const weeklyBuckets = { OK: 0, WARNING: 0, DANGER: 0 };
@@ -319,6 +347,8 @@ async function getLineSummary() {
     monthly: monthlyBuckets,
     weekly: weeklyBuckets,
     attention,
+    // Field baru - frontend wajib tahan kalau undefined (site remote belum di-upgrade).
+    ketepatan,
   };
 }
 

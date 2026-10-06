@@ -3,7 +3,7 @@
 // prioritas hari ini, PM terdekat, top part perlu perhatian, jadwal PM 8 hari.
 // Auto-refresh 60 detik, tanpa endpoint baru. Dibuka lewat tombol "Mode TV" di
 // Topbar (route /tv). Ukuran & jumlah baris dibatasi supaya tidak kepotong.
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import 'dayjs/locale/id';
@@ -144,6 +144,38 @@ function Kpi({ icon, label, sub, value, cls }) {
   );
 }
 
+// Tile lebar (2 kolom): ketepatan BULAN INI per jenis PM. Warna angka mengikuti
+// ambang yang sama dengan dashboard biasa (>=90 hijau, >=50 oranye, sisanya merah).
+// Bulan tanpa event tampil "-" (abu-abu), bukan 0%, supaya tidak dikira performa jelek.
+const pctTone = (p) => (p === null || p === undefined ? 'text-muted-foreground' : p >= 90 ? 'text-ok' : p >= 50 ? 'text-warn' : 'text-danger');
+
+function KetepatanBulanKpi({ monthKey, items }) {
+  const d = monthKey ? dayjs(`${monthKey}-01`) : null;
+  const label = d?.isValid() ? d.format('MMM YYYY') : null;
+  return (
+    <div
+      className="flex min-w-0 items-center gap-3 rounded-2xl border border-current/30 bg-[var(--accent-dim)] px-4 py-3 text-[var(--accent)]"
+      style={{ gridColumn: 'span 2' }}
+    >
+      <Target size={30} className="shrink-0" />
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-semibold leading-tight">Ketepatan PM</div>
+        <div className="text-xs leading-tight opacity-80">(Bulan Ini{label ? ` - ${label}` : ''})</div>
+        <div className="mt-0.5 grid grid-cols-3 gap-2">
+          {items.map((it) => (
+            <div key={it.label} className="min-w-0">
+              <div className="truncate text-xs leading-tight opacity-80">{it.label}</div>
+              <div className={`font-[var(--font-display)] text-3xl font-semibold leading-tight tabular-nums ${pctTone(it.pct)}`}>
+                {it.pct === null || it.pct === undefined ? '-' : `${it.pct}%`}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Panel({ icon, title, aside, children, className = '' }) {
   return (
     <section className={`flex min-h-0 flex-col rounded-2xl border border-border bg-card p-4 ${className}`}>
@@ -214,6 +246,14 @@ function TvDashboardPage() {
 
   const lineUpcoming = new Set(upcoming.filter((u) => u.type !== 'PM_PART').map((u) => u.line_name)).size;
   const compliance = overallCompliance(summary);
+  // Ketepatan BULAN INI. Field baru di part/line-summary: kalau backend belum di-upgrade
+  // nilainya undefined -> tile tetap tampil dengan "-" (tidak crash).
+  const kBulan = [
+    { label: 'Part', pct: pd?.ketepatan?.part?.bulan_ini?.percentage },
+    { label: 'Monthly', pct: ld?.ketepatan?.monthly?.bulan_ini?.percentage },
+    { label: 'Weekly', pct: ld?.ketepatan?.weekly?.bulan_ini?.percentage },
+  ];
+  const kBulanMonth = ld?.ketepatan?.month ?? pd?.ketepatan?.month;
 
   const priority = [
     ...nextActions.filter((r) => r.sisa <= 0).map((r) => ({
@@ -305,8 +345,13 @@ function TvDashboardPage() {
         </div>
       ) : (
         <>
-          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${kpis.length}, minmax(0, 1fr))` }}>
-            {kpis.map(({ key, ...k }) => <Kpi key={key} {...k} />)}
+          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${kpis.length + 2}, minmax(0, 1fr))` }}>
+            {kpis.map(({ key, ...k }) => (key === 'comp' ? (
+              <Fragment key={key}>
+                <KetepatanBulanKpi monthKey={kBulanMonth} items={kBulan} />
+                <Kpi {...k} />
+              </Fragment>
+            ) : <Kpi key={key} {...k} />))}
           </div>
 
           <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1.65fr)] gap-3">

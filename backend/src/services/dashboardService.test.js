@@ -231,6 +231,19 @@ describe('dashboardService', () => {
   });
 
   describe('getPartSummary', () => {
+    test('ketepatan: bulan_ini & tahun_ini PM Part dipisah (period month vs year)', async () => {
+      mock.method(pmPartService, 'getAllComputedMetrics', async () => []);
+      mock.method(pmPartHistoryService, 'getKetepatanSummary', async ({ period } = {}) =>
+        period === 'month' ? { percentage: 80, total: 5 } : { percentage: 95, total: 40 }
+      );
+
+      const result = await dashboardService.getPartSummary();
+
+      assert.match(result.ketepatan.month, /^\d{4}-\d{2}$/);
+      assert.deepEqual(result.ketepatan.part.bulan_ini, { percentage: 80, total: 5 });
+      assert.deepEqual(result.ketepatan.part.tahun_ini, { percentage: 95, total: 40 });
+    });
+
     test('per_line diurutkan DANGER terbanyak dulu, lalu WARNING terbanyak (bukan alfabetis)', async () => {
       mock.method(pmPartService, 'getAllComputedMetrics', async () => [
         part({ line_name: 'Z-Line', status: 'OK' }),
@@ -267,6 +280,21 @@ describe('dashboardService', () => {
   });
 
   describe('getLineSummary', () => {
+    test('ketepatan: monthly & weekly masing-masing punya bulan_ini dan tahun_ini', async () => {
+      mock.method(pmLineService, 'getPmLineStatus', async () => []);
+      mock.method(pmLineHistoryService, 'getKetepatanSummary', async ({ period } = {}) =>
+        period === 'month'
+          ? { monthly: { percentage: 100, total: 3 }, weekly: { percentage: null, total: 0 } }
+          : { monthly: { percentage: 97, total: 41 }, weekly: { percentage: 90, total: 44 } }
+      );
+
+      const result = await dashboardService.getLineSummary();
+
+      assert.deepEqual(result.ketepatan.monthly.bulan_ini, { percentage: 100, total: 3 });
+      assert.deepEqual(result.ketepatan.weekly.bulan_ini, { percentage: null, total: 0 });
+      assert.deepEqual(result.ketepatan.weekly.tahun_ini, { percentage: 90, total: 44 });
+    });
+
     test('monthly & weekly bucket dihitung TERPISAH (1 line bisa masuk 2 bucket berbeda)', async () => {
       mock.method(pmLineService, 'getPmLineStatus', async () => [
         line({ status_monthly: 'DANGER', status_weekly: 'OK' }),

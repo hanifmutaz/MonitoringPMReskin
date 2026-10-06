@@ -15,6 +15,7 @@ import KpiCard from '../components/KpiCard';
 import LineStatusDonut from '../components/LineStatusDonut';
 import CriticalAlertsPanel from '../components/CriticalAlertsPanel';
 import SiteSwitcher from '../components/SiteSwitcher';
+import KetepatanPeriodPanel from '../components/KetepatanPeriodPanel';
 
 function DashboardPmPartPage() {
     usePageHeader({ title: 'Dashboard PM Part' });
@@ -97,6 +98,13 @@ function DashboardPmPartPage() {
                         status="danger"
                     />
                 </div>
+            )}
+
+            {!isLoading && (
+                <KetepatanPeriodPanel
+                    ketepatan={data.ketepatan}
+                    items={[{ key: 'part', label: 'Ketepatan PM Part', caption: 'Diganti sebelum/tepat target shot' }]}
+                />
             )}
 
             <div className="rounded-xl border border-border bg-card p-4.5">

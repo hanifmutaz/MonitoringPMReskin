@@ -15,6 +15,7 @@ import KpiCard from '../components/KpiCard';
 import LineStatusDonut from '../components/LineStatusDonut';
 import StatusBadge from '../components/StatusBadge';
 import SiteSwitcher from '../components/SiteSwitcher';
+import KetepatanPeriodPanel from '../components/KetepatanPeriodPanel';
 import { EmptyState } from '../components/ui/empty-state';
 
 function DashboardPmLineWeeklyPage() {
@@ -89,6 +90,16 @@ function DashboardPmLineWeeklyPage() {
                         status="danger"
                     />
                 </div>
+            )}
+
+            {!isLoading && (
+                <KetepatanPeriodPanel
+                    ketepatan={data.ketepatan}
+                    items={[
+                        { key: 'monthly', label: 'Ketepatan PM Monthly', caption: 'Input sebelum poin lewat cap' },
+                        { key: 'weekly', label: 'Ketepatan PM Weekly', caption: 'Input dalam siklus hari weekly' },
+                    ]}
+                />
             )}
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
