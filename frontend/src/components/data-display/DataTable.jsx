@@ -103,6 +103,7 @@ function DataTable({
   skeletonRows = 5,
   selection,
   getRowLabel,
+  getRowClassName,
   scrollRegionLabel,
   wrapHeaders = false,
   className,
@@ -177,7 +178,14 @@ function DataTable({
                   {rows.map((row) => {
                     const rowKey = getRowKey(row);
                     return (
-                      <tr key={rowKey} className="border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary">
+                      <tr
+                        key={rowKey}
+                        data-row-key={rowKey}
+                        className={cn(
+                          'border-b border-[var(--border-soft)] last:border-b-0 hover:bg-secondary',
+                          getRowClassName?.(row)
+                        )}
+                      >
                         {selection && (
                           <td className="px-2.5 py-2.5">
                             {(!selection.isSelectable || selection.isSelectable(rowKey)) && (

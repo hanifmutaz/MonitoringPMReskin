@@ -77,7 +77,10 @@ function buildPmLineColumns({
   canEditDate = false,
   onEditMonthlyDate,
   onEditWeeklyDate,
+  activeInput = null, // { lineId, jenisPm } - tombol Input yang sedang membuka form
 }) {
+  const isActive = (line, jenisPm) => activeInput?.lineId === line.line_id && activeInput?.jenisPm === jenisPm;
+
   const columns = [
     {
       key: 'line',
@@ -153,7 +156,8 @@ function buildPmLineColumns({
                 <Button
                   type="button"
                   size="icon"
-                  variant="outline"
+                  variant={isActive(line, 'MONTHLY') ? 'default' : 'outline'}
+                  aria-pressed={isActive(line, 'MONTHLY')}
                   className="h-8 w-8"
                   aria-label="Input Monthly"
                   onClick={() => onInputMonthly(line)}
@@ -168,7 +172,8 @@ function buildPmLineColumns({
                 <Button
                   type="button"
                   size="icon"
-                  variant="outline"
+                  variant={isActive(line, 'WEEKLY') ? 'default' : 'outline'}
+                  aria-pressed={isActive(line, 'WEEKLY')}
                   className="h-8 w-8"
                   aria-label="Input Weekly"
                   onClick={() => onInputWeekly(line)}

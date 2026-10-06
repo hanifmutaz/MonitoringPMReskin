@@ -18,7 +18,7 @@
 // alasan Phase 7 mindahin buildPmPartColumns.jsx). Modal "Input PM"
 // (dengan/tanpa preset Line), Banner penjelasan formula, dan query TIDAK
 // disentuh.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, X, Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { usePmLineStatus } from '../hooks/usePmLineStatus';
@@ -139,6 +139,7 @@ function PmLineStatusPage() {
     canEditDate,
     onEditMonthlyDate: (line) => setEditDateTarget({ line, jenisPm: 'MONTHLY' }),
     onEditWeeklyDate: (line) => setEditDateTarget({ line, jenisPm: 'WEEKLY' }),
+    activeInput: inputTarget ? { lineId: inputTarget.line.line_id, jenisPm: inputTarget.jenisPm } : null,
   });
 
   // BUGFIX (iPad): form "Input PM" sebelumnya dibuka via Modal (Dialog)
@@ -150,9 +151,39 @@ function PmLineStatusPage() {
   // per-Line (link "Input Monthly"/"Input Weekly" di kolom tabel).
   const anyFormOpen = Boolean(inputTarget) || showInputForm;
 
+  // Form inline tampil DI ATAS tabel, sedangkan tombol Monthly/Weekly ada di baris
+  // Line yang bisa jauh di bawah -> tanpa scroll user tidak tahu klik-nya berhasil.
+  // Saat form (Input PM / koreksi tanggal) dibuka, geser layar ke form. scroll-mt-20
+  // menyisakan ruang untuk Topbar sticky (60px).
+  const formAreaRef = useRef(null);
+  const lastLineIdRef = useRef(null); // Line terakhir yang dibuka, buat balik ke barisnya saat form ditutup
+  const formOpen = anyFormOpen || Boolean(editDateTarget);
+  useEffect(() => {
+    if (!formOpen) return;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    formAreaRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  }, [formOpen, inputTarget, editDateTarget]);
+
+  // Baris Line yang sedang dibuka formnya di-highlight (Input PM maupun koreksi tanggal).
+  const activeLineId = inputTarget?.line.line_id ?? editDateTarget?.line.line_id ?? null;
+  useEffect(() => {
+    if (activeLineId !== null) lastLineIdRef.current = activeLineId;
+  }, [activeLineId]);
+
+  // Setelah form ditutup, balik ke baris Line tadi supaya user tidak kehilangan posisi.
+  function scrollBackToRow() {
+    const id = lastLineIdRef.current;
+    if (id === null) return;
+    lastLineIdRef.current = null;
+    requestAnimationFrame(() => {
+      document.querySelector(`tr[data-row-key="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
+
   function closeAllForms() {
     setInputTarget(null);
     setShowInputForm(false);
+    scrollBackToRow();
   }
 
   return (
@@ -185,6 +216,7 @@ function PmLineStatusPage() {
         </div>
       )}
 
+      <div ref={formAreaRef} className="flex scroll-mt-20 flex-col gap-4 empty:hidden">
       {showInputForm && <PmLineHistoryForm onCancel={closeAllForms} onSuccess={closeAllForms} />}
 
       {inputTarget && (
@@ -209,10 +241,11 @@ function PmLineStatusPage() {
           key={`${editDateTarget.line.line_id}-${editDateTarget.jenisPm}`}
           line={editDateTarget.line}
           jenisPm={editDateTarget.jenisPm}
-          onCancel={() => setEditDateTarget(null)}
-          onSuccess={() => setEditDateTarget(null)}
+          onCancel={() => { setEditDateTarget(null); scrollBackToRow(); }}
+          onSuccess={() => { setEditDateTarget(null); scrollBackToRow(); }}
         />
       )}
+      </div>
 
       <FilterBar
         actions={
@@ -238,6 +271,7 @@ function PmLineStatusPage() {
         columns={columns}
         rows={filteredLines}
         getRowKey={(line) => line.line_id}
+        getRowClassName={(line) => (line.line_id === activeLineId ? 'bg-[var(--accent-dim)] hover:bg-[var(--accent-dim)]' : undefined)}
         isLoading={isLoading && !data}
         isRefreshing={isFetching && !isLoading}
         isError={isError}

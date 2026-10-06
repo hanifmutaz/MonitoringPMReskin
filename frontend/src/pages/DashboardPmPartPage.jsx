@@ -7,7 +7,7 @@
 // border-border bg-card p-4.5, judul text-[15px] font-semibold). Data/logic
 // (hook, multi-site switching, permission gating) TIDAK berubah sama sekali.
 import { useState } from 'react';
-import { Package, CheckCircle2, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Package, CheckCircle2, AlertTriangle, ShieldAlert, Target } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboardPartSummary, useDashboardMultiSite } from '../hooks/useDashboardExtras';
@@ -15,7 +15,7 @@ import KpiCard from '../components/KpiCard';
 import LineStatusDonut from '../components/LineStatusDonut';
 import CriticalAlertsPanel from '../components/CriticalAlertsPanel';
 import SiteSwitcher from '../components/SiteSwitcher';
-import KetepatanPeriodPanel from '../components/KetepatanPeriodPanel';
+import { formatPct, ketepatanTone, ketepatanCaption } from '../components/KetepatanPeriodPanel';
 
 function DashboardPmPartPage() {
     usePageHeader({ title: 'Dashboard PM Part' });
@@ -35,6 +35,9 @@ function DashboardPmPartPage() {
     const data = isRemoteView ? remoteSite.data?.part_summary : local.data;
     const isLoading = isRemoteView ? false : local.isLoading;
     const isError = isRemoteView ? false : local.isError;
+
+    // Ketepatan PM Part tahun berjalan (Part tidak ditampilkan per bulan).
+    const ketepatanPart = data?.ketepatan?.part?.tahun_ini;
 
     if (isError) {
         return (
@@ -72,7 +75,7 @@ function DashboardPmPartPage() {
                     ))}
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${ketepatanPart ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
                     <KpiCard
                         icon={<Package size={18} />}
                         label="Total Parts"
@@ -97,15 +100,17 @@ function DashboardPmPartPage() {
                         value={data.status_danger.toLocaleString('id-ID')}
                         status="danger"
                     />
+                    {/* Field baru: site remote yang belum di-upgrade tidak mengirimnya -> kartu tidak dirender. */}
+                    {ketepatanPart && (
+                        <KpiCard
+                            icon={<Target size={18} />}
+                            label="Ketepatan PM Part"
+                            value={formatPct(ketepatanPart.percentage)}
+                            caption={ketepatanCaption(ketepatanPart, 'Diganti sebelum/tepat target shot', 'tahun ini')}
+                            status={ketepatanTone(ketepatanPart.percentage)}
+                        />
+                    )}
                 </div>
-            )}
-
-            {!isLoading && (
-                <KetepatanPeriodPanel
-                    ketepatan={data.ketepatan}
-                    showMonth={false}
-                    items={[{ key: 'part', label: 'Ketepatan PM Part', caption: 'Diganti sebelum/tepat target shot' }]}
-                />
             )}
 
             <div className="rounded-xl border border-border bg-card p-4.5">

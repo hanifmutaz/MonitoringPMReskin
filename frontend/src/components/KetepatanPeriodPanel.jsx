@@ -12,16 +12,16 @@ import { Target } from 'lucide-react';
 import KpiCard from './KpiCard';
 import { Card, CardHeader, CardTitle } from './ui/card';
 
-const formatPct = (p) => (p === null || p === undefined ? '-' : `${p}%`);
+export const formatPct = (p) => (p === null || p === undefined ? '-' : `${p}%`);
 
-function tone(p) {
+export function ketepatanTone(p) {
   if (p === null || p === undefined) return 'muted';
   if (p >= 90) return 'accent';
   if (p >= 50) return 'warn';
   return 'danger';
 }
 
-function caption(data, text, periodLabel) {
+export function ketepatanCaption(data, text, periodLabel) {
   if (!data || data.percentage === null || data.percentage === undefined) return `Belum ada event ${periodLabel}`;
   return `${text}, dari ${data.total} event`;
 }
@@ -33,17 +33,16 @@ function monthLabel(monthKey) {
 
 /**
  * @param {{ketepatan?: {month: string} & Record<string, {bulan_ini: object, tahun_ini: object}>,
- *          items: {key: string, label: string, caption: string}[],
- *          showMonth?: boolean}} props  (showMonth=false -> hanya baris Tahun Berjalan)
+ *          items: {key: string, label: string, caption: string}[]}} props
  */
-function KetepatanPeriodPanel({ ketepatan, items, showMonth = true }) {
+function KetepatanPeriodPanel({ ketepatan, items }) {
   if (!ketepatan) return null;
   const cols = items.length >= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2';
 
   const rows = [
     { id: 'bulan', title: `Bulan Ini (${monthLabel(ketepatan.month)})`, field: 'bulan_ini', period: 'bulan ini' },
     { id: 'tahun', title: 'Tahun Berjalan', field: 'tahun_ini', period: 'tahun ini' },
-  ].filter((r) => showMonth || r.id !== 'bulan');
+  ];
 
   return (
     <Card>
@@ -65,8 +64,8 @@ function KetepatanPeriodPanel({ ketepatan, items, showMonth = true }) {
                     icon={<Target size={18} />}
                     label={it.label}
                     value={formatPct(d?.percentage)}
-                    caption={caption(d, it.caption, r.period)}
-                    status={tone(d?.percentage)}
+                    caption={ketepatanCaption(d, it.caption, r.period)}
+                    status={ketepatanTone(d?.percentage)}
                   />
                 );
               })}
