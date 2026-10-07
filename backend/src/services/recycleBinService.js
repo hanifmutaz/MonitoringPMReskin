@@ -231,19 +231,26 @@ async function bulkRestore(entityKey, ids, userId) {
     // Row-by-row (bukan satu UPDATE ... ANY($ids)) SENGAJA - unique
     // constraint bentrok di satu row gak boleh nge-rollback seluruh batch,
     // row lain yang gak bentrok tetap harus jalan.
+    // SAVEPOINT per row WAJIB: di PostgreSQL, satu query error bikin seluruh
+    // transaksi berstatus aborted (25P02) - tanpa savepoint, `continue` di
+    // catch gak menyelamatkan row berikutnya & COMMIT diam-diam jadi ROLLBACK.
     for (const id of numericIds) {
+      await client.query('SAVEPOINT bulk_row');
       try {
         const result = await client.query(
           `UPDATE ${config.table} SET deleted_at = NULL, deleted_by = NULL
            WHERE id = $1 AND deleted_at IS NOT NULL RETURNING id`,
           [id]
         );
+        await client.query('RELEASE SAVEPOINT bulk_row');
         if (result.rows[0]) {
           restoredIds.push(id);
         } else {
           skippedIds.push(id);
         }
       } catch (err) {
+        await client.query('ROLLBACK TO SAVEPOINT bulk_row');
+        await client.query('RELEASE SAVEPOINT bulk_row');
         if (err.code === '23505') {
           skippedIds.push(id);
           continue;
@@ -309,6 +316,8 @@ async function bulkPermanentDelete(entityKey, ids, userId) {
         continue;
       }
 
+      // SAVEPOINT per row (lihat catatan di bulkRestore).
+      await client.query('SAVEPOINT bulk_row');
       try {
         await client.query(`DELETE FROM ${config.table} WHERE id = $1`, [id]);
         deletedIds.push(id);
@@ -325,7 +334,13 @@ async function bulkPermanentDelete(entityKey, ids, userId) {
           },
           client
         );
+        await client.query('RELEASE SAVEPOINT bulk_row');
       } catch (err) {
+        await client.query('ROLLBACK TO SAVEPOINT bulk_row');
+        await client.query('RELEASE SAVEPOINT bulk_row');
+        // Row gagal dihapus -> jangan dihitung sebagai terhapus.
+        const idx = deletedIds.indexOf(id);
+        if (idx !== -1) deletedIds.splice(idx, 1);
         if (err.code === '23503') {
           skippedIds.push(id);
           continue;
