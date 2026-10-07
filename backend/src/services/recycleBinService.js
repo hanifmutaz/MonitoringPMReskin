@@ -27,6 +27,31 @@ function requireEntity(entityKey) {
   return config;
 }
 
+// Nama tabel fisik -> label ramah buat pesan "dilewati" di FE.
+const TABLE_LABELS = {
+  lines: 'Lines',
+  parts: 'Parts',
+  suppliers: 'Suppliers',
+  inventory_items: 'Inventory Items',
+  roles: 'Roles',
+  users: 'Users',
+  part_cl_mapping: 'Part-CL Mapping',
+  part_suppliers: 'Part-Supplier Links',
+  pm_monthly_history: 'History PM Monthly/Weekly',
+  pm_part_history: 'History PM Part',
+  inventory_stock_movements: 'History Inventory',
+  audit_log: 'Audit Log',
+  login_audit_log: 'Login Audit Log',
+};
+
+/** Alasan ramah dari error FK 23503 (tabel pereferensi diambil dari err.detail pg). */
+function fkReason(err) {
+  const m = /referenced from table "([^"]+)"/.exec(err.detail || '');
+  const refTable = m ? m[1] : null;
+  if (!refTable) return 'Masih direferensikan data lain di sistem';
+  return `Masih dipakai di ${TABLE_LABELS[refTable] || refTable}`;
+}
+
 function listEntities() {
   return Object.entries(REGISTRY).map(([key, cfg]) => ({ key, label: cfg.label }));
 }
@@ -114,7 +139,7 @@ async function permanentDelete(entityKey, id, userId) {
       // dipaksakan lewat cascade - Admin harus tahu & bereskan dulu.
       if (err.code === '23503') {
         throw AppError.conflict(
-          `Tidak bisa dihapus permanen - data ${config.label} ini masih direferensikan data lain di sistem.`
+          `Tidak bisa dihapus permanen - data ${config.label} ini ${fkReason(err).charAt(0).toLowerCase()}${fkReason(err).slice(1)}. Hapus data tersebut dulu.`
         );
       }
       throw err;
@@ -227,6 +252,7 @@ async function bulkRestore(entityKey, ids, userId) {
 
     const restoredIds = [];
     const skippedIds = [];
+    const skipped = []; // [{ id, reason }] - ditampilkan di FE
 
     // Row-by-row (bukan satu UPDATE ... ANY($ids)) SENGAJA - unique
     // constraint bentrok di satu row gak boleh nge-rollback seluruh batch,
@@ -247,12 +273,14 @@ async function bulkRestore(entityKey, ids, userId) {
           restoredIds.push(id);
         } else {
           skippedIds.push(id);
+          skipped.push({ id, reason: 'Sudah tidak ada di Recycle Bin' });
         }
       } catch (err) {
         await client.query('ROLLBACK TO SAVEPOINT bulk_row');
         await client.query('RELEASE SAVEPOINT bulk_row');
         if (err.code === '23505') {
           skippedIds.push(id);
+          skipped.push({ id, reason: 'Nama/kode sudah dipakai data aktif lain' });
           continue;
         }
         throw err;
@@ -275,7 +303,7 @@ async function bulkRestore(entityKey, ids, userId) {
     );
 
     await client.query('COMMIT');
-    return { restoredIds, skippedIds };
+    return { restoredIds, skippedIds, skipped };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -306,6 +334,7 @@ async function bulkPermanentDelete(entityKey, ids, userId) {
 
     const deletedIds = [];
     const skippedIds = [];
+    const skipped = []; // [{ id, reason }] - ditampilkan di FE
 
     for (const id of numericIds) {
       const before = await client.query(`SELECT * FROM ${config.table} WHERE id = $1 AND deleted_at IS NOT NULL`, [
@@ -313,6 +342,7 @@ async function bulkPermanentDelete(entityKey, ids, userId) {
       ]);
       if (!before.rows[0]) {
         skippedIds.push(id);
+        skipped.push({ id, reason: 'Sudah tidak ada di Recycle Bin' });
         continue;
       }
 
@@ -343,6 +373,7 @@ async function bulkPermanentDelete(entityKey, ids, userId) {
         if (idx !== -1) deletedIds.splice(idx, 1);
         if (err.code === '23503') {
           skippedIds.push(id);
+          skipped.push({ id, reason: fkReason(err) });
           continue;
         }
         throw err;
@@ -350,7 +381,7 @@ async function bulkPermanentDelete(entityKey, ids, userId) {
     }
 
     await client.query('COMMIT');
-    return { deletedIds, skippedIds };
+    return { deletedIds, skippedIds, skipped };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

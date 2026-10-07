@@ -82,6 +82,23 @@ function RecycleBinBulkBar({ count, onRestore, onPermanentDelete, onClear, resto
   );
 }
 
+// Susun pesan "dilewati": kelompokkan per alasan, sebut label datanya (maks 3
+// per alasan, sisanya "+N lainnya") biar user tau persis kenapa & apa yang harus dibereskan.
+function buildSkippedMessage(skipped, items, okCount, okVerb) {
+  const labelById = new Map(items.map((i) => [i.id, i.label]));
+  const groups = new Map();
+  for (const { id, reason } of skipped) {
+    if (!groups.has(reason)) groups.set(reason, []);
+    groups.get(reason).push(labelById.get(id) || `#${id}`);
+  }
+  const lines = [...groups].map(([reason, labels]) => {
+    const shown = labels.slice(0, 3).join(', ');
+    const more = labels.length > 3 ? ` +${labels.length - 3} lainnya` : '';
+    return `• ${reason}: ${shown}${more}`;
+  });
+  return `${skipped.length} data dilewati, ${okCount} berhasil ${okVerb}.\n${lines.join('\n')}`;
+}
+
 function RecycleBinList({ entityKey }) {
   const { data: items = [], isLoading } = useDeletedItems(entityKey);
   const restore = useRestoreMutation(entityKey);
@@ -129,7 +146,9 @@ function RecycleBinList({ entityKey }) {
       selection.clear();
       if (result?.skippedIds?.length) {
         setError(
-          `${result.skippedIds.length} data dilewati (bentrok nama/kode dengan data aktif lain) - sisanya berhasil direstore.`
+          result.skipped?.length
+            ? buildSkippedMessage(result.skipped, items, result.restoredIds?.length ?? 0, 'direstore')
+            : `${result.skippedIds.length} data dilewati (bentrok nama/kode dengan data aktif lain) - sisanya berhasil direstore.`
         );
       }
     } catch (err) {
@@ -150,7 +169,9 @@ function RecycleBinList({ entityKey }) {
       selection.clear();
       if (result?.skippedIds?.length) {
         setError(
-          `${result.skippedIds.length} data dilewati (masih direferensikan data lain di sistem) - sisanya berhasil dihapus permanen.`
+          result.skipped?.length
+            ? buildSkippedMessage(result.skipped, items, result.deletedIds?.length ?? 0, 'dihapus permanen')
+            : `${result.skippedIds.length} data dilewati (masih direferensikan data lain di sistem) - sisanya berhasil dihapus permanen.`
         );
       }
     } catch (err) {
@@ -170,7 +191,7 @@ function RecycleBinList({ entityKey }) {
   return (
     <div>
       {error && (
-        <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{error}</div>
+        <div className="mb-3 whitespace-pre-line rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{error}</div>
       )}
 
       <RecycleBinBulkBar
