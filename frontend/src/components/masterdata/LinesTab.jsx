@@ -213,8 +213,15 @@ function LinesTab() {
     if (!(await confirm(`Hapus ${selection.selectedCount} Line terpilih (dari semua data, bukan cuma halaman ini)? Bisa direstore lewat Recycle Bin.`))) return;
     setBulkError('');
     try {
-      await bulkDelete.mutateAsync(selection.selectedIds);
+      const result = await bulkDelete.mutateAsync(selection.selectedIds);
       selection.clear();
+      if (result?.skipped?.length) {
+        const lines = result.skipped.slice(0, 5).map((s) => `• ${s.reason}`);
+        const more = result.skipped.length > 5 ? `\n+${result.skipped.length - 5} lainnya` : '';
+        setBulkError(
+          `${result.skipped.length} Line TIDAK dihapus, ${result.deletedIds?.length ?? 0} berhasil.\n${lines.join('\n')}${more}\nHapus Part-nya dulu (atau pindahkan ke Line lain), lalu hapus Line.`
+        );
+      }
     } catch (err) {
       setBulkError(err.response?.data?.message || 'Gagal menghapus Line terpilih');
     }
@@ -321,7 +328,7 @@ function LinesTab() {
       )}
 
       {bulkError && (
-        <div className="mb-3 rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
+        <div className="mb-3 whitespace-pre-line rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
           {bulkError}
         </div>
       )}

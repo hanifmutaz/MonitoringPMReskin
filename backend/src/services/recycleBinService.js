@@ -192,15 +192,26 @@ async function bulkSoftDelete(entityKey, ids, userId) {
 
     const protectClause = config.protectColumn ? `AND (${config.protectColumn} IS NOT TRUE)` : '';
 
+    // Guard referensial opsional per entity (lihat blockSql di registry).
+    const blocked = config.blockSql ? (await client.query(config.blockSql, [numericIds])).rows : [];
+    const blockedIds = blocked.map((b) => b.id);
+    const idsToDelete = numericIds.filter((id) => !blockedIds.includes(id));
+
     const result = await client.query(
       `UPDATE ${config.table} SET deleted_at = now(), deleted_by = $1
        WHERE id = ANY($2::int[]) AND deleted_at IS NULL ${protectClause}
        RETURNING id`,
-      [userId, numericIds]
+      [userId, idsToDelete]
     );
 
     const deletedIds = result.rows.map((r) => r.id);
     const skippedIds = numericIds.filter((id) => !deletedIds.includes(id));
+    const skipped = [
+      ...blocked.map((b) => ({ id: b.id, reason: b.reason })),
+      ...skippedIds
+        .filter((id) => !blockedIds.includes(id))
+        .map((id) => ({ id, reason: 'Dilindungi / sudah terhapus' })),
+    ];
 
     await recordAudit(
       {
@@ -211,14 +222,14 @@ async function bulkSoftDelete(entityKey, ids, userId) {
         newValue: null,
         userId,
         actionDetail: `BULK DELETE (${config.label}) - ${deletedIds.length} data masuk Recycle Bin${
-          skippedIds.length ? `, ${skippedIds.length} dilewati (dilindungi/sudah terhapus)` : ''
+          skippedIds.length ? `, ${skippedIds.length} dilewati (dilindungi/masih punya data aktif/sudah terhapus)` : ''
         }`,
       },
       client
     );
 
     await client.query('COMMIT');
-    return { deletedIds, skippedIds };
+    return { deletedIds, skippedIds, skipped };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

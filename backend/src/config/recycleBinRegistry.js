@@ -12,10 +12,25 @@
 // terhapus lewat aksi massal, meski jalur single-delete (roleManagementService)
 // sudah blokir ini juga di layer lain.
 
+//
+// `blockSql` (opsional) - query yang MENGEMBALIKAN baris { id, reason } untuk
+// id (param $1 = int[]) yang TIDAK boleh ikut bulk-delete. Dipakai untuk lines:
+// Line yang masih punya Part aktif ditolak, sama seperti hapus satuan
+// (lineService.deleteLine). Tanpa ini Part jadi "yatim" menunjuk ke Line di
+// Recycle Bin, dan Line itu tidak bisa dihapus permanen (FK RESTRICT) -
+// apalagi kalau Admin sudah bikin Line baru dengan nama yang sama.
+
 const REGISTRY = {
   lines: {
     table: 'lines',
     label: 'Lines',
+    blockSql: `
+      SELECT l.id, ('Line ' || l.line_name || ' masih punya ' || COUNT(p.id) || ' Part aktif') AS reason
+      FROM lines l
+      JOIN parts p ON p.line_id = l.id AND p.deleted_at IS NULL
+      WHERE l.id = ANY($1::int[]) AND l.deleted_at IS NULL
+      GROUP BY l.id, l.line_name
+    `,
     listSql: `
       SELECT l.id, l.line_name AS label, NULL AS context, l.deleted_at, u.full_name AS deleted_by_name
       FROM lines l
