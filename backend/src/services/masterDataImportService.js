@@ -354,6 +354,8 @@ async function parsePreview(fileBuffer) {
   // vs mana yang cuma nambah CL Mapping ke Part yang sudah ada.
   const existingLines = await lineQueries.findAll({});
   const lineMap = new Map(existingLines.map((l) => [l.line_name, l.id]));
+  // Line di Recycle Bin (nama sama) yang masih punya Part - jangan dibuat ulang diam-diam.
+  const deletedLineMap = new Map((await lineQueries.findDeletedWithParts()).map((l) => [l.line_name, l]));
 
   for (const row of parsedRows) {
     if (row.errors.length > 0) {
@@ -363,6 +365,16 @@ async function parsePreview(fileBuffer) {
       continue;
     }
     const lineId = lineMap.get(row.line_no);
+    const binLine = !lineId ? deletedLineMap.get(row.line_no) : null;
+    if (binLine) {
+      row.line_exists = false;
+      row.part_exists = false;
+      row.errors.push(
+        `Line "${row.line_no}" ada di Recycle Bin dengan ${binLine.part_count} Part. Restore Line itu dulu (Recycle Bin), atau pakai nama Line lain - kalau tidak, Part lama dan Part import terpisah di dua Line.`
+      );
+      row.status = 'error';
+      continue;
+    }
     row.line_exists = !!lineId;
     row.part_exists = false;
     row.existing_tgl_pasang_awal = null; // tanggal yang SAAT INI tersimpan di sistem (buat info di preview)
@@ -475,6 +487,12 @@ async function commitImport(rows, userId, { overwriteTglPasang = false, overwrit
           if (existingLine) {
             lineId = existingLine.id;
           } else {
+            const binLines = await lineQueries.findDeletedWithParts(row.line_no, client);
+            if (binLines.length > 0) {
+              throw new Error(
+                `Line "${row.line_no}" ada di Recycle Bin dengan ${binLines[0].part_count} Part. Restore Line itu dulu atau pakai nama Line lain`
+              );
+            }
             const createdLine = await lineQueries.create({ line_name: row.line_no }, client);
             lineId = createdLine.id;
             result.lines_created += 1;

@@ -131,10 +131,10 @@ const REGISTRY = {
     table: 'pm_monthly_history',
     label: 'History PM Monthly and Weekly',
     listSql: `
-      SELECT h.id, (l.line_name || ' - ' || h.jenis_pm || ' - ' || to_char(h.tgl_input, 'DD/MM/YYYY')) AS label,
+      SELECT h.id, (COALESCE(l.line_name, h.line_name_snapshot) || ' - ' || h.jenis_pm || ' - ' || to_char(h.tgl_input, 'DD/MM/YYYY')) AS label,
              h.keterangan AS context, h.deleted_at, u.full_name AS deleted_by_name
       FROM pm_monthly_history h
-      JOIN lines l ON l.id = h.line_id
+      LEFT JOIN lines l ON l.id = h.line_id
       LEFT JOIN users u ON u.id = h.deleted_by
       WHERE h.deleted_at IS NOT NULL
       ORDER BY h.deleted_at DESC

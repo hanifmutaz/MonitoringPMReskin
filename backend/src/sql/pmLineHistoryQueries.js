@@ -2,10 +2,10 @@
 const db = require('../config/db');
 
 const LIST_SELECT = `
-  SELECT h.id, h.line_id, l.line_name, h.tgl_input, h.jenis_pm, h.keterangan, h.pic_name, h.on_time,
+  SELECT h.id, h.line_id, COALESCE(l.line_name, h.line_name_snapshot) AS line_name, h.tgl_input, h.jenis_pm, h.keterangan, h.pic_name, h.on_time,
          h.user_id, u.full_name AS user_full_name, h.created_at
   FROM pm_monthly_history h
-  JOIN lines l ON l.id = h.line_id
+  LEFT JOIN lines l ON l.id = h.line_id
   JOIN users u ON u.id = h.user_id
 `;
 
@@ -117,15 +117,15 @@ async function getKetepatanPerLine({ dateFrom }, runner = db) {
   const result = await runner.query(
     `SELECT
        h.line_id,
-       l.line_name,
+       COALESCE(l.line_name, h.line_name_snapshot) AS line_name,
        h.jenis_pm,
        COUNT(*) FILTER (WHERE h.on_time IS NOT NULL) AS total,
        COUNT(*) FILTER (WHERE h.on_time = TRUE) AS on_time_count
      FROM pm_monthly_history h
-     JOIN lines l ON l.id = h.line_id
+     LEFT JOIN lines l ON l.id = h.line_id
      WHERE h.tgl_input >= $1 AND h.deleted_at IS NULL
-     GROUP BY h.line_id, l.line_name, h.jenis_pm
-     ORDER BY l.line_name ASC`,
+     GROUP BY h.line_id, COALESCE(l.line_name, h.line_name_snapshot), h.jenis_pm
+     ORDER BY COALESCE(l.line_name, h.line_name_snapshot) ASC`,
     [dateFrom]
   );
   return result.rows;

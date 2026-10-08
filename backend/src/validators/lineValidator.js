@@ -22,6 +22,14 @@ function validateCreateLine(body) {
     errors.jumlah_shift = 'Jumlah Shift harus 2 atau 3';
   }
 
+  if (
+    body &&
+    body.on_deleted_line_conflict !== undefined &&
+    !['restore', 'create_new'].includes(body.on_deleted_line_conflict)
+  ) {
+    errors.on_deleted_line_conflict = "Harus 'restore' atau 'create_new'";
+  }
+
   return { valid: Object.keys(errors).length === 0, errors };
 }
 

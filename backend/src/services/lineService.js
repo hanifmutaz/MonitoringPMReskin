@@ -14,6 +14,29 @@ async function createLine(data, userId) {
     throw AppError.badRequest('Validasi gagal', { line_name: 'Line Name sudah dipakai' });
   }
 
+  // Nama sama dengan Line di Recycle Bin yang masih punya Part? Jangan menebak
+  // diam-diam: minta konfirmasi (restore Line lama, atau sengaja buat baru).
+  // Part menunjuk ke ID Line, bukan nama - Line baru TIDAK mewarisi Part lama.
+  const deletedSameName = await lineQueries.findDeletedWithParts(data.line_name);
+  const mode = data.on_deleted_line_conflict; // 'restore' | 'create_new' | undefined
+  if (deletedSameName.length > 0 && !mode) {
+    const old = deletedSameName[0];
+    throw new AppError(
+      `Line "${old.line_name}" pernah dihapus dan masih punya ${old.part_count} Part di Recycle Bin. Restore Line lama, atau buat sebagai Line baru?`,
+      409,
+      {
+        code: 'LINE_IN_RECYCLE_BIN',
+        deleted_line_id: old.id,
+        line_name: old.line_name,
+        part_count: old.part_count,
+        active_part_count: old.active_part_count,
+      }
+    );
+  }
+  if (deletedSameName.length > 0 && mode === 'restore') {
+    return restoreDeletedLine(deletedSameName[0].id, userId);
+  }
+
   const client = await db.getClient();
   try {
     await client.query('BEGIN');
@@ -41,6 +64,34 @@ async function createLine(data, userId) {
 
     await client.query('COMMIT');
     return created;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function restoreDeletedLine(id, userId) {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+    const restored = await lineQueries.restoreDeleted(id, client);
+    if (!restored) throw AppError.notFound('Line di Recycle Bin tidak ditemukan');
+    await recordAudit(
+      {
+        tableName: 'lines',
+        recordId: id,
+        action: 'RESTORE',
+        oldValue: null,
+        newValue: restored,
+        userId,
+        actionDetail: `Line "${restored.line_name}" direstore dari Recycle Bin saat membuat Line bernama sama`,
+      },
+      client
+    );
+    await client.query('COMMIT');
+    return { ...restored, restored: true };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

@@ -72,17 +72,20 @@ function LineFormModal({ initial, onClose }) {
       : emptyForm
   );
   const [error, setError] = useState('');
+  // Nama Line sama dengan Line di Recycle Bin yang masih punya Part -> minta
+  // konfirmasi (restore Line lama / sengaja buat baru). null | { message, part_count }
+  const [binConflict, setBinConflict] = useState(null);
   const { create, update } = useLineMutations();
   const pending = create.isPending || update.isPending;
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function submit(extra = {}) {
     setError('');
     const payload = {
       line_name: form.line_name,
       jumlah_shift: Number(form.jumlah_shift),
       auto_reset_weekly_on_monthly:
         form.auto_reset_weekly_on_monthly === '' ? null : form.auto_reset_weekly_on_monthly === 'true',
+      ...extra,
     };
     try {
       if (isEdit) {
@@ -92,8 +95,19 @@ function LineFormModal({ initial, onClose }) {
       }
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || 'Gagal menyimpan Line');
+      const data = err.response?.data;
+      if (err.response?.status === 409 && data?.errors?.code === 'LINE_IN_RECYCLE_BIN') {
+        setBinConflict({ message: data.message, part_count: data.errors.part_count });
+        return;
+      }
+      setError(data?.message || 'Gagal menyimpan Line');
     }
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    setBinConflict(null);
+    return submit();
   }
 
   return (
@@ -143,6 +157,30 @@ function LineFormModal({ initial, onClose }) {
 
         {error && (
           <div className="rounded-lg bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">{error}</div>
+        )}
+
+        {binConflict && (
+          <div className="space-y-2 rounded-lg border border-[var(--warn)] bg-[var(--warn-dim)] px-3 py-2.5 text-xs">
+            <p className="text-[var(--text)]">{binConflict.message}</p>
+            <p className="text-[var(--text-faint)]">
+              Restore: Line lama kembali aktif beserta {binConflict.part_count} Part-nya (tidak ada data baru dibuat).
+              Buat baru: Line kosong baru dengan nama sama; Part lama tetap di Line lama di Recycle Bin.
+            </p>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" disabled={pending} onClick={() => submit({ on_deleted_line_conflict: 'restore' })}>
+                Restore Line lama
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={pending}
+                onClick={() => submit({ on_deleted_line_conflict: 'create_new' })}
+              >
+                Buat sebagai Line baru
+              </Button>
+            </div>
+          </div>
         )}
 
         <Button type="submit" disabled={pending}>

@@ -33,6 +33,35 @@ async function findByName(lineName, runner = db) {
   return result.rows[0] || null;
 }
 
+// Line di Recycle Bin yang NAMANYA sama & masih punya Part (aktif / di bin).
+// Dipakai buat konfirmasi saat Line baru dibuat dengan nama yang pernah ada
+// (form & import) - Part menunjuk ke ID Line, bukan nama, jadi Line baru TIDAK
+// otomatis mewarisi Part lama. nameFilter kosong = semua nama (buat preview import).
+async function findDeletedWithParts(lineName = null, runner = db) {
+  const result = await runner.query(
+    `SELECT l.id, l.line_name, l.deleted_at,
+            COUNT(p.id)::int AS part_count,
+            (COUNT(p.id) FILTER (WHERE p.deleted_at IS NULL))::int AS active_part_count
+     FROM lines l
+     JOIN parts p ON p.line_id = l.id
+     WHERE l.deleted_at IS NOT NULL AND ($1::text IS NULL OR l.line_name = $1)
+     GROUP BY l.id, l.line_name, l.deleted_at
+     ORDER BY l.deleted_at DESC`,
+    [lineName]
+  );
+  return result.rows;
+}
+
+async function restoreDeleted(id, runner = db) {
+  const result = await runner.query(
+    `UPDATE lines SET deleted_at = NULL, deleted_by = NULL
+     WHERE id = $1 AND deleted_at IS NOT NULL
+     RETURNING id, line_name, is_active, jumlah_shift, auto_reset_weekly_on_monthly, created_at`,
+    [id]
+  );
+  return result.rows[0] || null;
+}
+
 async function create({ line_name, jumlah_shift = 2, auto_reset_weekly_on_monthly = null }, runner = db) {
   const result = await runner.query(
     `INSERT INTO lines (line_name, jumlah_shift, auto_reset_weekly_on_monthly)
@@ -76,4 +105,14 @@ async function countPartsByLine(id, runner = db) {
   return result.rows[0].count;
 }
 
-module.exports = { findAll, findById, findByName, create, update, remove, countPartsByLine };
+module.exports = {
+  findAll,
+  findById,
+  findByName,
+  findDeletedWithParts,
+  restoreDeleted,
+  create,
+  update,
+  remove,
+  countPartsByLine,
+};
