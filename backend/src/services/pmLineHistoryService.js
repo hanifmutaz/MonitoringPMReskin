@@ -27,6 +27,7 @@ const pmLineHistoryQueries = require('../sql/pmLineHistoryQueries');
 const settingsService = require('./settingsService');
 const dateUtils = require('../utils/dateUtils');
 const { recordAudit } = require('../utils/auditLog');
+const { isWithinPmCutoff, isToleranceApplicable } = require('../utils/pmOnTimeRule');
 const AppError = require('../utils/AppError');
 
 /**
@@ -43,7 +44,12 @@ const AppError = require('../utils/AppError');
  */
 function determineHelperUpdate(jenisPm, tglInput, lineOverride, globalDefault) {
   if (jenisPm === 'WEEKLY') {
-    return { tgl_pm_weekly_terakhir: tglInput, akumulasi_poin_weekly: 0, akumulasi_poin_weekly_raw: 0 };
+    return {
+      tgl_pm_weekly_terakhir: tglInput,
+      akumulasi_poin_weekly: 0,
+      akumulasi_poin_weekly_raw: 0,
+      akumulasi_poin_weekly_raw_prev: 0,
+    };
   }
 
   // MONTHLY
@@ -54,11 +60,13 @@ function determineHelperUpdate(jenisPm, tglInput, lineOverride, globalDefault) {
     tgl_pm_monthly_terakhir: tglInput,
     akumulasi_poin_monthly: 0,
     akumulasi_poin_monthly_raw: 0,
+    akumulasi_poin_monthly_raw_prev: 0,
   };
   if (effectiveAutoReset) {
     fields.tgl_pm_weekly_terakhir = tglInput;
     fields.akumulasi_poin_weekly = 0;
     fields.akumulasi_poin_weekly_raw = 0;
+    fields.akumulasi_poin_weekly_raw_prev = 0;
   }
   return fields;
 }
@@ -90,10 +98,11 @@ async function listPmLineHistory({ lineId, jenis, dateFrom, dateTo, page, limit 
  * @param {'MONTHLY'|'WEEKLY'} jenisPm
  * @param {string} tglInput - 'YYYY-MM-DD'
  * @param {{tgl_pm_monthly_terakhir: string|null, tgl_pm_weekly_terakhir: string|null, akumulasi_poin_monthly: number, akumulasi_poin_weekly: number}|null} helperBefore
- * @param {{monthlyCap: number, weeklyTotalDays: number}} thresholds
+ * @param {{monthlyCap: number, weeklyTotalDays: number, cutoffTime?: string}} thresholds
+ * @param {string} [nowHHMM] - jam sekarang WIB 'HH:mm' (default: jam sistem; di-inject buat tes)
  * @returns {boolean}
  */
-function determineOnTime(jenisPm, tglInput, helperBefore, thresholds) {
+function determineOnTime(jenisPm, tglInput, helperBefore, thresholds, nowHHMM = dateUtils.nowTimeString()) {
   const isWeekly = jenisPm === 'WEEKLY';
   const lastDate = isWeekly ? helperBefore?.tgl_pm_weekly_terakhir : helperBefore?.tgl_pm_monthly_terakhir;
   if (!lastDate) return true; // PM pertama: belum ada due date yang bisa dilewati
@@ -104,7 +113,18 @@ function determineOnTime(jenisPm, tglInput, helperBefore, thresholds) {
   // Poin mentah (tanpa cap) tersedia: telat HANYA kalau sudah melewati cap.
   // poin == cap berarti jatuh tempo HARI INI -> PM hari ini masih tepat waktu.
   if (rawPoints !== null && rawPoints !== undefined) {
-    return Number(rawPoints) <= cap;
+    if (Number(rawPoints) <= cap) return true;
+    // Toleransi jam batas: hari jatuh tempo "diperpanjang" sampai pm_ontime_cutoff_time
+    // di hari berikutnya (shift 1 -> shift 2 -> shift 1 tanpa jeda, PM baru bisa
+    // dikerjakan setelah running). Berlaku hanya kalau cap baru terlewati di hari
+    // terakhir yang dihitung (poin mentah sebelum hari itu masih <= cap).
+    const rawPrev = isWeekly ? helperBefore.akumulasi_poin_weekly_raw_prev : helperBefore.akumulasi_poin_monthly_raw_prev;
+    return isToleranceApplicable({
+      raw: rawPoints,
+      rawPrev,
+      cap,
+      withinCutoff: isWithinPmCutoff(nowHHMM, thresholds.cutoffTime),
+    });
   }
 
   // Fallback (baris lama yang belum pernah di-recompute job accrual sejak
@@ -134,8 +154,12 @@ function resolveTglInput(jenisPm, requestedTgl, helperBefore, todayStr) {
 }
 
 async function getOnTimeThresholds() {
-  const s = await settingsService.getSettings(['pm_monthly_point_cap', 'pm_weekly_total_days']);
-  return { monthlyCap: s.pm_monthly_point_cap, weeklyTotalDays: s.pm_weekly_total_days };
+  const s = await settingsService.getSettings(['pm_monthly_point_cap', 'pm_weekly_total_days', 'pm_ontime_cutoff_time']);
+  return {
+    monthlyCap: s.pm_monthly_point_cap,
+    weeklyTotalDays: s.pm_weekly_total_days,
+    cutoffTime: s.pm_ontime_cutoff_time,
+  };
 }
 
 async function submitPmLineHistory(data, userId) {

@@ -16,6 +16,7 @@ import LineStatusDonut from '../components/LineStatusDonut';
 import StatusBadge from '../components/StatusBadge';
 import SiteSwitcher from '../components/SiteSwitcher';
 import KetepatanPeriodPanel from '../components/KetepatanPeriodPanel';
+import SisaHari from '../components/pm-line/SisaHari';
 import { EmptyState } from '../components/ui/empty-state';
 
 function DashboardPmLineWeeklyPage() {
@@ -170,13 +171,13 @@ function DashboardPmLineWeeklyPage() {
                                                 {line.line_name}
                                             </td>
                                             <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5 font-[var(--font-mono)] text-[13px]">
-                                                {line.sisa_hari_monthly ?? '-'}
+                                                <SisaHari sisa={line.sisa_hari_monthly} toleransi={line.toleransi_monthly} sampai={line.toleransi_sampai} />
                                             </td>
                                             <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5">
                                                 <StatusBadge status={line.status_monthly} />
                                             </td>
                                             <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5 font-[var(--font-mono)] text-[13px]">
-                                                {line.sisa_hari_weekly ?? '-'}
+                                                <SisaHari sisa={line.sisa_hari_weekly} toleransi={line.toleransi_weekly} sampai={line.toleransi_sampai} />
                                             </td>
                                             <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5">
                                                 <StatusBadge status={line.status_weekly} />

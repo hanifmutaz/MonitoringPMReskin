@@ -25,6 +25,7 @@ const SETTING_LABELS = {
   // Poin PM Monthly
   pm_monthly_point_full_run: 'Poin per Full Run',
   pm_monthly_point_cap: 'Poin Maksimal',
+  pm_ontime_cutoff_time: 'Batas Jam PM Hari Jatuh Tempo (WIB)',
   // Poin PM Weekly
   pm_weekly_point_full_run: 'Poin per Full Run',
   // Batas Status Monthly & Weekly
@@ -254,8 +255,8 @@ function SettingRow({ setting, canEdit, isAdmin }) {
               )}
               {setting.value_type === 'text' && setting.key !== 'backup_auto_format' && (
                 <Input
-                  type={setting.key === 'backup_auto_time' ? 'time' : 'text'}
-                  className={setting.key === 'backup_auto_time' ? 'w-[120px]' : 'w-[160px]'}
+                  type={setting.key === 'backup_auto_time' || setting.key === 'pm_ontime_cutoff_time' ? 'time' : 'text'}
+                  className={setting.key === 'backup_auto_time' || setting.key === 'pm_ontime_cutoff_time' ? 'w-[120px]' : 'w-[160px]'}
                   value={localValue}
                   disabled={updateMutation.isPending}
                   onChange={(e) => setLocalValue(e.target.value)}

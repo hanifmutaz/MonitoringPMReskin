@@ -10,6 +10,7 @@ describe('determineHelperUpdate - Reset Rule MASTER DOCUMENT Bagian 2.D', () => 
       tgl_pm_weekly_terakhir: '2026-07-11',
       akumulasi_poin_weekly: 0,
       akumulasi_poin_weekly_raw: 0,
+      akumulasi_poin_weekly_raw_prev: 0,
     });
   });
 
@@ -19,9 +20,11 @@ describe('determineHelperUpdate - Reset Rule MASTER DOCUMENT Bagian 2.D', () => 
       tgl_pm_monthly_terakhir: '2026-07-11',
       akumulasi_poin_monthly: 0,
       akumulasi_poin_monthly_raw: 0,
+      akumulasi_poin_monthly_raw_prev: 0,
       tgl_pm_weekly_terakhir: '2026-07-11',
       akumulasi_poin_weekly: 0,
       akumulasi_poin_weekly_raw: 0,
+      akumulasi_poin_weekly_raw_prev: 0,
     });
   });
 
@@ -31,6 +34,7 @@ describe('determineHelperUpdate - Reset Rule MASTER DOCUMENT Bagian 2.D', () => 
       tgl_pm_monthly_terakhir: '2026-07-11',
       akumulasi_poin_monthly: 0,
       akumulasi_poin_monthly_raw: 0,
+      akumulasi_poin_monthly_raw_prev: 0,
     });
   });
 
@@ -40,6 +44,7 @@ describe('determineHelperUpdate - Reset Rule MASTER DOCUMENT Bagian 2.D', () => 
       tgl_pm_monthly_terakhir: '2026-07-11',
       akumulasi_poin_monthly: 0,
       akumulasi_poin_monthly_raw: 0,
+      akumulasi_poin_monthly_raw_prev: 0,
     });
   });
 
@@ -49,9 +54,11 @@ describe('determineHelperUpdate - Reset Rule MASTER DOCUMENT Bagian 2.D', () => 
       tgl_pm_monthly_terakhir: '2026-07-11',
       akumulasi_poin_monthly: 0,
       akumulasi_poin_monthly_raw: 0,
+      akumulasi_poin_monthly_raw_prev: 0,
       tgl_pm_weekly_terakhir: '2026-07-11',
       akumulasi_poin_weekly: 0,
       akumulasi_poin_weekly_raw: 0,
+      akumulasi_poin_weekly_raw_prev: 0,
     });
   });
 
@@ -145,5 +152,44 @@ describe('resolveTglInput - tanggal ditentukan sistem', () => {
     const h = { tgl_pm_monthly_terakhir: '2026-09-01', tgl_pm_weekly_terakhir: null };
     assert.equal(resolveTglInput('WEEKLY', '2026-09-20', h, TODAY), '2026-09-20');
     assert.equal(resolveTglInput('MONTHLY', '2026-09-20', h, TODAY), TODAY);
+  });
+});
+
+describe('determineOnTime - toleransi jam batas PM (pm_ontime_cutoff_time)', () => {
+  const T = { monthlyCap: 30, weeklyTotalDays: 7, cutoffTime: '16:00' };
+  const mk = (raw, prev) => ({
+    tgl_pm_monthly_terakhir: '2026-06-01',
+    akumulasi_poin_monthly: 30,
+    akumulasi_poin_monthly_raw: raw,
+    akumulasi_poin_monthly_raw_prev: prev,
+  });
+
+  test('kasus lapangan: sisa 0,5 lalu shift 1+2 jalan (raw 30,5) - PM jam 15:00 besoknya -> TEPAT WAKTU', () => {
+    assert.equal(determineOnTime('MONTHLY', '2026-07-10', mk('30.5', '29.5'), T, '15:00'), true);
+  });
+  test('PM pagi sebelum running (07:00) -> tepat waktu', () => {
+    assert.equal(determineOnTime('MONTHLY', '2026-07-10', mk('30.5', '29.5'), T, '07:00'), true);
+  });
+  test('PM setelah jam batas (16:30) -> TELAT', () => {
+    assert.equal(determineOnTime('MONTHLY', '2026-07-10', mk('30.5', '29.5'), T, '16:30'), false);
+  });
+  test('sudah lewat cap sebelum hari terakhir (raw_prev > cap) -> TELAT walau sebelum jam batas', () => {
+    assert.equal(determineOnTime('MONTHLY', '2026-07-10', mk('31.5', '30.5'), T, '10:00'), false);
+  });
+  test('jam batas 00:00 (nonaktif) -> aturan lama: raw > cap = telat', () => {
+    assert.equal(determineOnTime('MONTHLY', '2026-07-10', mk('30.5', '29.5'), { ...T, cutoffTime: '00:00' }, '10:00'), false);
+  });
+  test('raw_prev belum terisi (NULL) -> aturan ketat', () => {
+    assert.equal(determineOnTime('MONTHLY', '2026-07-10', mk('30.5', null), T, '10:00'), false);
+  });
+  test('Weekly punya toleransi yang sama (cap 7)', () => {
+    const h = {
+      tgl_pm_weekly_terakhir: '2026-07-01',
+      akumulasi_poin_weekly: 7,
+      akumulasi_poin_weekly_raw: '7.5',
+      akumulasi_poin_weekly_raw_prev: '6.5',
+    };
+    assert.equal(determineOnTime('WEEKLY', '2026-07-10', h, T, '15:00'), true);
+    assert.equal(determineOnTime('WEEKLY', '2026-07-10', h, T, '17:00'), false);
   });
 });

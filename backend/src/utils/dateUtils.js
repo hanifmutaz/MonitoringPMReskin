@@ -53,6 +53,11 @@ function todayString() {
   return today().format(DATE_FORMAT);
 }
 
+/** Jam sekarang di WIB, format 'HH:mm' (zero-padded, bisa dibandingkan sebagai string). */
+function nowTimeString() {
+  return dayjs().tz(TZ).format('HH:mm');
+}
+
 /** Awal tahun berjalan (WIB) - basis filter "tahun berjalan" untuk fitur Ketepatan PM. */
 function startOfYearString() {
   return today().startOf('year').format(DATE_FORMAT);
@@ -84,6 +89,7 @@ module.exports = {
   addDaysToToday,
   formatDate,
   todayString,
+  nowTimeString,
   startOfYearString,
   TZ,
   DATE_FORMAT,

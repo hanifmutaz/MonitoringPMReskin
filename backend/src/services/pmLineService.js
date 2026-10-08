@@ -33,6 +33,7 @@ const db = require('../config/db');
 const { recordAudit } = require('../utils/auditLog');
 const pmMonthlyAccrualService = require('./pmMonthlyAccrualService');
 const pmWeeklyAccrualService = require('./pmWeeklyAccrualService');
+const { isWithinPmCutoff, isToleranceApplicable } = require('../utils/pmOnTimeRule');
 
 async function getThresholds() {
   const s = await settingsService.getSettings([
@@ -42,6 +43,7 @@ async function getThresholds() {
     'pm_weekly_total_days',
     'pm_weekly_danger_days',
     'pm_weekly_warning_days',
+    'pm_ontime_cutoff_time',
   ]);
   return {
     monthlyCap: s.pm_monthly_point_cap,
@@ -50,6 +52,7 @@ async function getThresholds() {
     weeklyTotalDays: s.pm_weekly_total_days,
     weeklyDangerDays: s.pm_weekly_danger_days,
     weeklyWarningDays: s.pm_weekly_warning_days,
+    cutoffTime: s.pm_ontime_cutoff_time,
   };
 }
 
@@ -60,42 +63,92 @@ function statusFromRemainingDays(remainingDays, dangerDays, warningDays) {
   return 'OK';
 }
 
-function computeLineStatus(row, thresholds) {
-  // --- Weekly (poin, SAMA POLA dengan Monthly - lihat komentar header) ---
-  const weeklyLastDate = row.tgl_pm_weekly_terakhir;
-  const akumulasiPoinWeekly = Number(row.akumulasi_poin_weekly) || 0;
-  let sisaHariWeekly = null;
-  let statusWeekly = 'DANGER';
-  if (weeklyLastDate) {
-    sisaHariWeekly = thresholds.weeklyTotalDays - akumulasiPoinWeekly;
-    statusWeekly = statusFromRemainingDays(sisaHariWeekly, thresholds.weeklyDangerDays, thresholds.weeklyWarningDays);
-  }
+function round1(n) {
+  return Math.round(n * 10) / 10;
+}
 
-  // --- Monthly ---
-  const monthlyLastDate = row.tgl_pm_monthly_terakhir;
-  const akumulasiPoin = Number(row.akumulasi_poin_monthly) || 0;
-  let sisaHariMonthly = null;
-  let statusMonthly = 'DANGER';
-  if (monthlyLastDate) {
-    sisaHariMonthly = thresholds.monthlyCap - akumulasiPoin;
-    statusMonthly = statusFromRemainingDays(
-      sisaHariMonthly,
-      thresholds.monthlyDangerDays,
-      thresholds.monthlyWarningDays
-    );
+/**
+ * Satu siklus (Monthly ATAU Weekly): Sisa Hari, Status, toleransi, estimasi.
+ *
+ * Sisa Hari dihitung dari poin MENTAH (tanpa cap) kalau tersedia, jadi bisa
+ * NEGATIF = sudah lewat jatuh tempo (telat). Sebelumnya dipakai poin ter-cap
+ * sehingga sisa hari mentok 0 dan "jatuh tempo hari ini" tidak bisa dibedakan
+ * dari "sudah telat" - padahal penilaian ketepatan memakai poin mentah.
+ *
+ * Toleransi jam batas (pm_ontime_cutoff_time): kalau cap baru terlewati di hari
+ * terakhir yang dihitung dan sekarang masih sebelum jam batas, PM yang disubmit
+ * sekarang dinilai TEPAT WAKTU -> ditampilkan sebagai jatuh tempo (0), bukan telat.
+ */
+function computeCycle({ lastDate, cappedPoints, raw, rawPrev, cap, dangerDays, warningDays, cutoffTime, nowHHMM }) {
+  if (!lastDate) {
+    return { sisaHari: null, status: 'DANGER', toleransi: false, estimasi: null };
   }
+  const rawNum = raw === null || raw === undefined ? null : Number(raw);
+  const effectivePoints = rawNum !== null ? rawNum : cappedPoints;
+  const toleransi = isToleranceApplicable({
+    raw: rawNum,
+    rawPrev: rawPrev === null || rawPrev === undefined ? null : Number(rawPrev),
+    cap,
+    withinCutoff: isWithinPmCutoff(nowHHMM, cutoffTime),
+  });
+  const sisaHari = toleransi ? 0 : round1(cap - effectivePoints);
+  return {
+    sisaHari,
+    status: statusFromRemainingDays(sisaHari, dangerDays, warningDays),
+    toleransi,
+    // Estimasi tanggal PM = hari ini + sisa hari (sudah lewat/hari ini -> hari ini).
+    // Asumsi Line running penuh tiap hari; Line yang sering libur akan lebih mundur.
+    estimasi: dateUtils.addDaysToToday(Math.max(sisaHari, 0)),
+  };
+}
+
+function computeLineStatus(row, thresholds, nowHHMM = dateUtils.nowTimeString()) {
+  const akumulasiPoinWeekly = Number(row.akumulasi_poin_weekly) || 0;
+  const akumulasiPoin = Number(row.akumulasi_poin_monthly) || 0;
+
+  const weekly = computeCycle({
+    lastDate: row.tgl_pm_weekly_terakhir,
+    cappedPoints: akumulasiPoinWeekly,
+    raw: row.akumulasi_poin_weekly_raw,
+    rawPrev: row.akumulasi_poin_weekly_raw_prev,
+    cap: thresholds.weeklyTotalDays,
+    dangerDays: thresholds.weeklyDangerDays,
+    warningDays: thresholds.weeklyWarningDays,
+    cutoffTime: thresholds.cutoffTime,
+    nowHHMM,
+  });
+  const monthly = computeCycle({
+    lastDate: row.tgl_pm_monthly_terakhir,
+    cappedPoints: akumulasiPoin,
+    raw: row.akumulasi_poin_monthly_raw,
+    rawPrev: row.akumulasi_poin_monthly_raw_prev,
+    cap: thresholds.monthlyCap,
+    dangerDays: thresholds.monthlyDangerDays,
+    warningDays: thresholds.monthlyWarningDays,
+    cutoffTime: thresholds.cutoffTime,
+    nowHHMM,
+  });
+
+  const rawOrCapped = (raw, capped) => (raw === null || raw === undefined ? capped : round1(Number(raw)));
 
   return {
     line_id: row.line_id,
     line_name: row.line_name,
-    tgl_pm_monthly_terakhir: dateUtils.formatDate(monthlyLastDate),
+    tgl_pm_monthly_terakhir: dateUtils.formatDate(row.tgl_pm_monthly_terakhir),
     akumulasi_poin_monthly: akumulasiPoin,
-    sisa_hari_monthly: sisaHariMonthly,
-    status_monthly: statusMonthly,
-    tgl_pm_weekly_terakhir: dateUtils.formatDate(weeklyLastDate),
+    akumulasi_poin_monthly_raw: rawOrCapped(row.akumulasi_poin_monthly_raw, akumulasiPoin),
+    sisa_hari_monthly: monthly.sisaHari,
+    status_monthly: monthly.status,
+    estimasi_pm_monthly: monthly.estimasi,
+    toleransi_monthly: monthly.toleransi,
+    tgl_pm_weekly_terakhir: dateUtils.formatDate(row.tgl_pm_weekly_terakhir),
     akumulasi_poin_weekly: akumulasiPoinWeekly,
-    sisa_hari_weekly: sisaHariWeekly,
-    status_weekly: statusWeekly,
+    akumulasi_poin_weekly_raw: rawOrCapped(row.akumulasi_poin_weekly_raw, akumulasiPoinWeekly),
+    sisa_hari_weekly: weekly.sisaHari,
+    status_weekly: weekly.status,
+    estimasi_pm_weekly: weekly.estimasi,
+    toleransi_weekly: weekly.toleransi,
+    toleransi_sampai: thresholds.cutoffTime || null,
   };
 }
 

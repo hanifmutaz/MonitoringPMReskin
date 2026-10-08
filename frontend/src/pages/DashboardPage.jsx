@@ -22,18 +22,18 @@ import { EmptyState } from '../components/ui/empty-state';
 import { Button } from '../components/ui/button';
 
 function formatKetepatan(percentage) {
-  return percentage === null || percentage === undefined ? '-' : `${percentage}%`;
+  return percentage === null || percentage === undefined ? '100%' : `${percentage}%`;
 }
 
 function ketepatanStatus(percentage) {
-  if (percentage === null || percentage === undefined) return 'muted';
+  if (percentage === null || percentage === undefined) return 'accent';
   if (percentage >= 90) return 'accent';
   if (percentage >= 50) return 'warn';
   return 'danger';
 }
 
 function ketepatanCaption(percentage, total, defaultCaption, periodLabel = 'tahun ini') {
-  if (percentage === null || percentage === undefined) return `Belum ada event ${periodLabel}`;
+  if (percentage === null || percentage === undefined) return `Belum ada event ${periodLabel} - default 100%`;
   return `${defaultCaption}, dari ${total} event`;
 }
 

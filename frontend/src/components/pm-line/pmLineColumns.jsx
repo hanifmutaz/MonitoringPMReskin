@@ -11,6 +11,7 @@ import { Button } from '../ui/button';
 import { Pencil, CalendarDays, CalendarRange } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { formatDate } from '../../utils/formatDate';
+import SisaHari from './SisaHari';
 
 function ketepatanTone(percentage) {
   if (percentage === null || percentage === undefined) return 'muted';
@@ -102,12 +103,25 @@ function buildPmLineColumns({
     {
       key: 'poin_monthly',
       header: 'Poin',
-      render: (line) => <span className="font-[var(--font-mono)] text-[13px]">{line.akumulasi_poin_monthly}</span>,
+      render: (line) => (
+        <span className="font-[var(--font-mono)] text-[13px]">{line.akumulasi_poin_monthly_raw ?? line.akumulasi_poin_monthly}</span>
+      ),
     },
     {
       key: 'sisa_hari_monthly',
       header: 'Sisa Hari Monthly',
-      render: (line) => <span className="font-[var(--font-mono)] text-[13px]">{line.sisa_hari_monthly ?? '-'}</span>,
+      render: (line) => (
+        <SisaHari sisa={line.sisa_hari_monthly} toleransi={line.toleransi_monthly} sampai={line.toleransi_sampai} />
+      ),
+    },
+    {
+      key: 'estimasi_monthly',
+      header: 'Estimasi PM Monthly',
+      render: (line) => (
+        <span className="font-[var(--font-mono)] text-[13px]" title="Perkiraan jika Line running penuh setiap hari">
+          {line.estimasi_pm_monthly ? formatDate(line.estimasi_pm_monthly) : '-'}
+        </span>
+      ),
     },
     {
       key: 'status_monthly',
@@ -129,12 +143,25 @@ function buildPmLineColumns({
     {
       key: 'poin_weekly',
       header: 'Poin',
-      render: (line) => <span className="font-[var(--font-mono)] text-[13px]">{line.akumulasi_poin_weekly}</span>,
+      render: (line) => (
+        <span className="font-[var(--font-mono)] text-[13px]">{line.akumulasi_poin_weekly_raw ?? line.akumulasi_poin_weekly}</span>
+      ),
     },
     {
       key: 'sisa_hari_weekly',
       header: 'Sisa Hari Weekly',
-      render: (line) => <span className="font-[var(--font-mono)] text-[13px]">{line.sisa_hari_weekly ?? '-'}</span>,
+      render: (line) => (
+        <SisaHari sisa={line.sisa_hari_weekly} toleransi={line.toleransi_weekly} sampai={line.toleransi_sampai} />
+      ),
+    },
+    {
+      key: 'estimasi_weekly',
+      header: 'Estimasi PM Weekly',
+      render: (line) => (
+        <span className="font-[var(--font-mono)] text-[13px]" title="Perkiraan jika Line running penuh setiap hari">
+          {line.estimasi_pm_weekly ? formatDate(line.estimasi_pm_weekly) : '-'}
+        </span>
+      ),
     },
     {
       key: 'status_weekly',

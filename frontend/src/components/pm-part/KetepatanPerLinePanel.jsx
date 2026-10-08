@@ -21,7 +21,7 @@ const KETEPATAN_CLASS = {
 };
 
 function ketepatanTone(percentage) {
-  if (percentage === null || percentage === undefined) return 'muted';
+  if (percentage === null || percentage === undefined) return 'ok';
   if (percentage >= 90) return 'ok';
   if (percentage >= 50) return 'warn';
   return 'danger';
@@ -41,10 +41,10 @@ function KetepatanPerLinePanel() {
           <div key={l.line_id} className="min-w-[120px] rounded-md border border-border bg-[var(--panel-2)] px-3.5 py-2.5">
             <div className="text-xs text-muted-foreground">{l.line_name}</div>
             <div className={`font-[var(--font-display)] text-[22px] font-semibold ${KETEPATAN_CLASS[ketepatanTone(l.percentage)]}`}>
-              {l.percentage === null ? '-' : `${l.percentage}%`}
+              {l.percentage === null ? '100%' : `${l.percentage}%`}
             </div>
             <div className="text-[11px] text-[var(--text-faint)]">
-              {l.percentage === null ? 'belum ada data' : `${l.total} event`}
+              {l.percentage === null ? 'belum ada event (default)' : `${l.total} event`}
             </div>
           </div>
         ))}

@@ -154,3 +154,63 @@ describe('computeLineStatus - PM Monthly (akumulasi poin, capped)', () => {
     assert.equal(result.status_monthly, 'DANGER');
   });
 });
+describe('computeLineStatus - Sisa Hari dari poin mentah (bisa negatif) + toleransi jam batas', () => {
+  const T = { ...THRESHOLDS, cutoffTime: '16:00' };
+  const row = (raw, prev, capped = 30) => ({
+    line_id: 1,
+    line_name: 'L1',
+    tgl_pm_monthly_terakhir: daysAgo(31),
+    akumulasi_poin_monthly: capped,
+    akumulasi_poin_monthly_raw: raw,
+    akumulasi_poin_monthly_raw_prev: prev,
+    tgl_pm_weekly_terakhir: daysAgo(3),
+    akumulasi_poin_weekly: 3,
+  });
+
+  test('poin mentah melewati cap -> Sisa Hari NEGATIF (telat), bukan mentok 0', () => {
+    const r = computeLineStatus(row('31.5', '30.5'), T, '10:00');
+    assert.equal(r.sisa_hari_monthly, -1.5);
+    assert.equal(r.status_monthly, 'DANGER');
+    assert.equal(r.toleransi_monthly, false);
+  });
+
+  test('tepat di cap (raw = 30) -> Sisa 0 (jatuh tempo hari ini), bukan telat', () => {
+    const r = computeLineStatus(row('30.0', '29.0'), T, '10:00');
+    assert.equal(r.sisa_hari_monthly, 0);
+    assert.equal(r.toleransi_monthly, false);
+  });
+
+  test('lewat 0,5 di hari terakhir + sebelum jam batas -> tampil 0 + toleransi (selaras dengan penilaian PM)', () => {
+    const r = computeLineStatus(row('30.5', '29.5'), T, '10:00');
+    assert.equal(r.sisa_hari_monthly, 0);
+    assert.equal(r.toleransi_monthly, true);
+    assert.equal(r.toleransi_sampai, '16:00');
+  });
+
+  test('lewat 0,5 di hari terakhir + SESUDAH jam batas -> Telat 0,5 (negatif), toleransi hilang', () => {
+    const r = computeLineStatus(row('30.5', '29.5'), T, '16:01');
+    assert.equal(r.sisa_hari_monthly, -0.5);
+    assert.equal(r.toleransi_monthly, false);
+  });
+
+  test('raw belum ada (NULL) -> fallback ke poin ter-cap seperti sebelumnya', () => {
+    const r = computeLineStatus(row(null, null, 28), T, '10:00');
+    assert.equal(r.sisa_hari_monthly, 2);
+  });
+
+  test('estimasi PM = hari ini + sisa (dibulatkan ke atas); telat/jatuh tempo -> hari ini', () => {
+    const today = daysAgo(0);
+    assert.equal(computeLineStatus(row('31.5', '30.5'), T, '10:00').estimasi_pm_monthly, today);
+    const plus3 = dayjs().tz('Asia/Jakarta').add(3, 'day').format('YYYY-MM-DD');
+    assert.equal(computeLineStatus(row('27.0', '26.0', 27), T, '10:00').estimasi_pm_monthly, plus3);
+    const plus1 = dayjs().tz('Asia/Jakarta').add(1, 'day').format('YYYY-MM-DD');
+    assert.equal(computeLineStatus(row('29.5', '28.5', 29.5), T, '10:00').estimasi_pm_monthly, plus1);
+  });
+
+  test('belum pernah PM -> sisa null, status DANGER, tanpa estimasi', () => {
+    const r = computeLineStatus({ line_id: 1, line_name: 'L', tgl_pm_monthly_terakhir: null, tgl_pm_weekly_terakhir: null }, T, '10:00');
+    assert.equal(r.sisa_hari_monthly, null);
+    assert.equal(r.status_monthly, 'DANGER');
+    assert.equal(r.estimasi_pm_monthly, null);
+  });
+});

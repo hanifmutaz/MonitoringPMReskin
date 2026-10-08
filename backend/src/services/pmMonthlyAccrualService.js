@@ -87,6 +87,10 @@ async function recomputeAllLines() {
     const pointFullRun = settings.pm_monthly_point_full_run ?? 1;
 
     let totalPoints = 0;
+    // Poin mentah SEBELUM hari terakhir yang dihitung (kemarin) - dipakai untuk
+    // toleransi jam batas PM (migration 1700000033000).
+    let totalPointsPrev = 0;
+    const lastCountedStr = today.subtract(1, 'day').format('YYYY-MM-DD');
     let cursor = baseline.add(1, 'day');
     while (!cursor.isAfter(today)) {
       const dateStr = cursor.format('YYYY-MM-DD');
@@ -95,6 +99,9 @@ async function recomputeAllLines() {
       // Proporsional: running penuh sesuai jumlah_shift Line -> full point;
       // running sebagian -> pecahan sebanding (bukan lagi binary full/half).
       totalPoints += computeDailyPoints(runCount, jumlahShift, pointFullRun);
+      if (dateStr < lastCountedStr) {
+        totalPointsPrev += computeDailyPoints(runCount, jumlahShift, pointFullRun);
+      }
       cursor = cursor.add(1, 'day');
     }
 
@@ -104,6 +111,7 @@ async function recomputeAllLines() {
     await pmLineQueries.updateHelper(line.id, {
       akumulasi_poin_monthly: cappedPoints,
       akumulasi_poin_monthly_raw: totalPoints,
+      akumulasi_poin_monthly_raw_prev: totalPointsPrev,
     });
     updatedCount += 1;
   }

@@ -12,17 +12,18 @@ import { Target } from 'lucide-react';
 import KpiCard from './KpiCard';
 import { Card, CardHeader, CardTitle } from './ui/card';
 
-export const formatPct = (p) => (p === null || p === undefined ? '-' : `${p}%`);
+// Belum ada event di periode itu = belum ada yang telat -> default 100% (captionnya menjelaskan).
+export const formatPct = (p) => (p === null || p === undefined ? '100%' : `${p}%`);
 
 export function ketepatanTone(p) {
-  if (p === null || p === undefined) return 'muted';
+  if (p === null || p === undefined) return 'accent';
   if (p >= 90) return 'accent';
   if (p >= 50) return 'warn';
   return 'danger';
 }
 
 export function ketepatanCaption(data, text, periodLabel) {
-  if (!data || data.percentage === null || data.percentage === undefined) return `Belum ada event ${periodLabel}`;
+  if (!data || data.percentage === null || data.percentage === undefined) return `Belum ada event ${periodLabel} - default 100%`;
   return `${text}, dari ${data.total} event`;
 }
 

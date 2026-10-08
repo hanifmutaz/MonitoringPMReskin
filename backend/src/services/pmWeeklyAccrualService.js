@@ -76,12 +76,19 @@ async function recomputeAllLines() {
     const pointFullRun = settings.pm_weekly_point_full_run ?? 1;
 
     let totalPoints = 0;
+    // Poin mentah SEBELUM hari terakhir yang dihitung (kemarin) - dipakai untuk
+    // toleransi jam batas PM (migration 1700000033000).
+    let totalPointsPrev = 0;
+    const lastCountedStr = today.subtract(1, 'day').format('YYYY-MM-DD');
     let cursor = baseline.add(1, 'day');
     while (!cursor.isAfter(today)) {
       const dateStr = cursor.format('YYYY-MM-DD');
       const runCount = lineRunCounts.get(dateStr) || 0;
 
       totalPoints += computeDailyPoints(runCount, jumlahShift, pointFullRun);
+      if (dateStr < lastCountedStr) {
+        totalPointsPrev += computeDailyPoints(runCount, jumlahShift, pointFullRun);
+      }
       cursor = cursor.add(1, 'day');
     }
 
@@ -91,6 +98,7 @@ async function recomputeAllLines() {
     await pmLineQueries.updateHelper(line.id, {
       akumulasi_poin_weekly: cappedPoints,
       akumulasi_poin_weekly_raw: totalPoints,
+      akumulasi_poin_weekly_raw_prev: totalPointsPrev,
     });
     updatedCount += 1;
   }
