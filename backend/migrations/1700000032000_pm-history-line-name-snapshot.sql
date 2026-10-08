@@ -44,7 +44,7 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_pm_monthly_history_fill_line_name
   BEFORE INSERT ON pm_monthly_history
-  FOR EACH ROW EXECUTE FUNCTION pm_monthly_history_fill_line_name();
+  FOR EACH ROW EXECUTE PROCEDURE pm_monthly_history_fill_line_name();
 
 CREATE OR REPLACE FUNCTION lines_refresh_history_snapshot()
 RETURNS TRIGGER AS $$
@@ -56,6 +56,6 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_lines_refresh_history_snapshot
   BEFORE DELETE ON lines
-  FOR EACH ROW EXECUTE FUNCTION lines_refresh_history_snapshot();
+  FOR EACH ROW EXECUTE PROCEDURE lines_refresh_history_snapshot();
 
 COMMENT ON COLUMN pm_monthly_history.line_name_snapshot IS 'Nama Line saat history dibuat / saat Line dihapus. Dipakai kalau line_id sudah NULL (Line dihapus permanen).';
