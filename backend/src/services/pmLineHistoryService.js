@@ -26,6 +26,7 @@ const pmLineQueries = require('../sql/pmLineQueries');
 const pmLineHistoryQueries = require('../sql/pmLineHistoryQueries');
 const settingsService = require('./settingsService');
 const dateUtils = require('../utils/dateUtils');
+const { shiftsStartedAt } = require('../utils/pmShiftSchedule');
 const { recordAudit } = require('../utils/auditLog');
 const { isWithinPmCutoff, isToleranceApplicable } = require('../utils/pmOnTimeRule');
 const { clampFrom } = require('../utils/ketepatanStart');
@@ -45,13 +46,16 @@ const AppError = require('../utils/AppError');
  *   Weekly belum punya baseline, biar operator mengisi tanggal Weekly aslinya sendiri)
  * @returns {object} field yang harus di-UPDATE ke pm_monthly_helper
  */
-function determineHelperUpdate(jenisPm, tglInput, lineOverride, globalDefault, skipWeeklyReset = false) {
+function determineHelperUpdate(jenisPm, tglInput, lineOverride, globalDefault, skipWeeklyReset = false, shiftCut = undefined) {
+  // shiftCut (opsional): jumlah shift di tanggal PM yang sudah mulai saat PM disubmit; null = tidak diketahui.
+  const withCut = shiftCut === undefined;
   if (jenisPm === 'WEEKLY') {
     return {
       tgl_pm_weekly_terakhir: tglInput,
       akumulasi_poin_weekly: 0,
       akumulasi_poin_weekly_raw: 0,
       akumulasi_poin_weekly_raw_prev: 0,
+      ...(withCut ? {} : { pm_weekly_baseline_shift_cut: shiftCut }),
     };
   }
 
@@ -70,7 +74,9 @@ function determineHelperUpdate(jenisPm, tglInput, lineOverride, globalDefault, s
     fields.akumulasi_poin_weekly = 0;
     fields.akumulasi_poin_weekly_raw = 0;
     fields.akumulasi_poin_weekly_raw_prev = 0;
+    if (!withCut) fields.pm_weekly_baseline_shift_cut = shiftCut;
   }
+  if (!withCut) fields.pm_monthly_baseline_shift_cut = shiftCut;
   return fields;
 }
 
@@ -194,12 +200,20 @@ async function submitPmLineHistory(data, userId) {
       !helperBefore?.tgl_pm_weekly_terakhir &&
       tglInput !== dateUtils.todayString();
 
+    // Jam PM -> berapa shift di tanggal PM yang sudah mulai. Hanya kalau PM di-submit hari ini;
+    // tanggal lampau (backdate PM pertama) jam-nya tidak diketahui -> null (seluruh tanggal dibuang).
+    const shiftCut =
+      tglInput === dateUtils.todayString()
+        ? shiftsStartedAt(line.jumlah_shift || 2, dateUtils.nowTimeString())
+        : null;
+
     const helperUpdateFields = determineHelperUpdate(
       data.jenis_pm,
       tglInput,
       line.auto_reset_weekly_on_monthly,
       globalDefault,
-      skipWeeklyReset
+      skipWeeklyReset,
+      shiftCut
     );
 
     await pmLineQueries.updateHelper(data.line_id, helperUpdateFields, client);

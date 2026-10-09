@@ -72,7 +72,8 @@ async function fetchDailyRunCounts(lookbackDays) {
     SELECT
       TRIM(cluster_1_17_t) AS line_code,
       cluster_1_44_d::date AS tanggal,
-      COUNT(*) AS run_count
+      COUNT(*) AS run_count,
+      ARRAY_AGG(TRIM(cluster_1_68_t)) AS shifts
     FROM ${SOURCE_TABLE}
     WHERE cluster_1_44_d >= CURRENT_DATE - $1::int
       AND (${outputChecks})

@@ -198,13 +198,16 @@ describe('computeLineStatus - Sisa Hari dari poin mentah (bisa negatif) + tolera
     assert.equal(r.sisa_hari_monthly, 2);
   });
 
-  test('estimasi PM = hari ini + sisa (dibulatkan ke atas); telat/jatuh tempo -> hari ini', () => {
+  test('estimasi PM = hari ini + sisa (dibulatkan ke BAWAH); sisa < 1 hari/telat -> hari ini', () => {
     const today = daysAgo(0);
     assert.equal(computeLineStatus(row('31.5', '30.5'), T, '10:00').estimasi_pm_monthly, today);
     const plus3 = dayjs().tz('Asia/Jakarta').add(3, 'day').format('YYYY-MM-DD');
     assert.equal(computeLineStatus(row('27.0', '26.0', 27), T, '10:00').estimasi_pm_monthly, plus3);
+    // sisa 0,5 (1 shift lagi dari cap) -> PM dimajukan ke hari ini
+    assert.equal(computeLineStatus(row('29.5', '28.5', 29.5), T, '10:00').estimasi_pm_monthly, today);
+    // sisa 1,5 -> besok (bukan lusa)
     const plus1 = dayjs().tz('Asia/Jakarta').add(1, 'day').format('YYYY-MM-DD');
-    assert.equal(computeLineStatus(row('29.5', '28.5', 29.5), T, '10:00').estimasi_pm_monthly, plus1);
+    assert.equal(computeLineStatus(row('28.5', '27.5', 28.5), T, '10:00').estimasi_pm_monthly, plus1);
   });
 
   test('belum pernah PM -> sisa null, status DANGER, tanpa estimasi', () => {

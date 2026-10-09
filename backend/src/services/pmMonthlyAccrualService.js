@@ -38,6 +38,8 @@ const settingsService = require('./settingsService');
 const dateUtils = require('../utils/dateUtils');
 const logger = require('../utils/logger');
 const { computeDailyPoints } = require('../utils/pmPointFormula');
+const { computeLookbackDays } = require('../utils/accrualLookback');
+const { countEligibleRuns } = require('../utils/pmShiftSchedule');
 
 async function recomputeAllLines() {
   if (!conmasDb.isConfigured()) {
@@ -51,9 +53,14 @@ async function recomputeAllLines() {
     'pm_monthly_point_full_run',
   ]);
 
+  // Rentang query harus mencakup baseline tertua, bukan cuma sync_lookback_days -
+  // kalau tidak, Line dengan Tgl PM terakhir lebih tua dari itu poinnya under-count.
+  const oldestBaselines = await pmLineQueries.findOldestBaselineDates();
+  const lookbackDays = computeLookbackDays(settings.sync_lookback_days, dateUtils.daysSince(oldestBaselines.monthly));
+
   let runCountRows;
   try {
-    runCountRows = await conmasQueries.fetchDailyRunCounts(settings.sync_lookback_days || 90);
+    runCountRows = await conmasQueries.fetchDailyRunCounts(lookbackDays);
   } catch (err) {
     logger.error('Recompute PM Monthly accrual gagal - query ConMas error', err);
     return { skipped: false, error: true };
@@ -63,7 +70,7 @@ async function recomputeAllLines() {
   const byLine = new Map();
   for (const row of runCountRows) {
     if (!byLine.has(row.line_code)) byLine.set(row.line_code, new Map());
-    byLine.get(row.line_code).set(dateUtils.formatDate(row.tanggal), Number(row.run_count));
+    byLine.get(row.line_code).set(dateUtils.formatDate(row.tanggal), { count: Number(row.run_count), shifts: row.shifts || [] });
   }
 
   const activeLines = await lineQueries.findAll({ isActive: true });
@@ -91,10 +98,21 @@ async function recomputeAllLines() {
     // toleransi jam batas PM (migration 1700000033000).
     let totalPointsPrev = 0;
     const lastCountedStr = today.subtract(1, 'day').format('YYYY-MM-DD');
-    let cursor = baseline.add(1, 'day');
+    const baselineStr = baseline.format('YYYY-MM-DD');
+    const shiftCut = helper.pm_monthly_baseline_shift_cut;
+    const hasShiftCut = shiftCut !== null && shiftCut !== undefined;
+    // PM sadar-shift: kalau jam PM tersimpan, tanggal PM ikut dihitung untuk shift yang mulai SETELAH PM.
+    let cursor = hasShiftCut ? baseline : baseline.add(1, 'day');
     while (!cursor.isAfter(today)) {
       const dateStr = cursor.format('YYYY-MM-DD');
-      const runCount = lineRunCounts.get(dateStr) || 0;
+      const dayEntry = lineRunCounts.get(dateStr);
+      const runCount = countEligibleRuns({
+        dateStr,
+        baselineStr,
+        cut: shiftCut,
+        runCount: dayEntry ? dayEntry.count : 0,
+        shifts: dayEntry ? dayEntry.shifts : [],
+      });
 
       // Proporsional: running penuh sesuai jumlah_shift Line -> full point;
       // running sebagian -> pecahan sebanding (bukan lagi binary full/half).

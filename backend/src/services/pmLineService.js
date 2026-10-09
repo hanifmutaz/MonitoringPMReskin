@@ -96,9 +96,12 @@ function computeCycle({ lastDate, cappedPoints, raw, rawPrev, cap, dangerDays, w
     sisaHari,
     status: statusFromRemainingDays(sisaHari, dangerDays, warningDays),
     toleransi,
-    // Estimasi tanggal PM = hari ini + sisa hari (sudah lewat/hari ini -> hari ini).
+    // Estimasi tanggal PM = hari ini + FLOOR(sisa hari) (sudah lewat/hari ini -> hari ini).
+    // Dibulatkan ke BAWAH karena PM hanya bisa dilakukan di jeda antar-shift, dan 1 hari
+    // penuh Line running = +1 poin. Kalau sisa < 1 hari (mis. poin 6,5 dari cap 7), jendela
+    // PM berikutnya sudah akan melewati cap -> PM harus dimajukan ke hari ini.
     // Asumsi Line running penuh tiap hari; Line yang sering libur akan lebih mundur.
-    estimasi: dateUtils.addDaysToToday(Math.max(sisaHari, 0)),
+    estimasi: dateUtils.addDaysToToday(Math.floor(Math.max(sisaHari, 0))),
   };
 }
 
@@ -210,7 +213,9 @@ async function updateLastPmDate({ lineId, jenisPm, tgl, alasan, userId }) {
       throw AppError.badRequest('Validasi gagal', { tgl: 'Tanggal sama dengan yang sekarang' });
     }
 
-    helperAfter = await pmLineQueries.updateHelper(lineId, { [column]: tgl }, client);
+    // Edit tanggal manual: jam PM tidak diketahui -> cut dikosongkan (seluruh tanggal baseline dibuang).
+    const cutColumn = jenisPm === 'WEEKLY' ? 'pm_weekly_baseline_shift_cut' : 'pm_monthly_baseline_shift_cut';
+    helperAfter = await pmLineQueries.updateHelper(lineId, { [column]: tgl, [cutColumn]: null }, client);
 
     await recordAudit(
       {

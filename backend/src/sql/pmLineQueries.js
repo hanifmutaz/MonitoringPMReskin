@@ -39,7 +39,7 @@ async function findAllStatus({ lineId } = {}, runner = db) {
 
 async function findLineById(lineId, runner = db) {
   const result = await runner.query(
-    `SELECT id, line_name, is_active, auto_reset_weekly_on_monthly FROM lines WHERE id = $1 AND deleted_at IS NULL`,
+    `SELECT id, line_name, is_active, auto_reset_weekly_on_monthly, jumlah_shift FROM lines WHERE id = $1 AND deleted_at IS NULL`,
     [lineId]
   );
   return result.rows[0] || null;
@@ -68,4 +68,16 @@ async function updateHelper(lineId, fields, runner = db) {
   return result.rows[0];
 }
 
-module.exports = { ensureHelperExists, findAllStatus, findLineById, findHelperByLine, updateHelper };
+// Baseline (Tgl PM Terakhir) tertua di antara Line aktif - dipakai job akrual supaya
+// rentang query ConMas mencakup seluruh periode yang harus dihitung.
+async function findOldestBaselineDates(runner = db) {
+  const result = await runner.query(
+    `SELECT MIN(h.tgl_pm_monthly_terakhir) AS monthly, MIN(h.tgl_pm_weekly_terakhir) AS weekly
+     FROM pm_monthly_helper h
+     JOIN lines l ON l.id = h.line_id
+     WHERE l.is_active = TRUE AND l.deleted_at IS NULL`
+  );
+  return result.rows[0] || { monthly: null, weekly: null };
+}
+
+module.exports = { ensureHelperExists, findAllStatus, findLineById, findHelperByLine, updateHelper, findOldestBaselineDates };

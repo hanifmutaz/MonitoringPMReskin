@@ -213,3 +213,20 @@ describe('determineHelperUpdate - skipWeeklyReset (PM Monthly pertama dengan tan
     assert.equal(r.tgl_pm_weekly_terakhir, '2023-02-09');
   });
 });
+
+describe('determineHelperUpdate - shiftCut (poin sadar-shift di tanggal PM)', () => {
+  test('WEEKLY dengan shiftCut menyimpan pm_weekly_baseline_shift_cut', () => {
+    const r = determineHelperUpdate('WEEKLY', '2026-10-09', null, true, false, 1);
+    assert.equal(r.pm_weekly_baseline_shift_cut, 1);
+    assert.equal(r.pm_monthly_baseline_shift_cut, undefined);
+  });
+  test('MONTHLY + auto-reset weekly: cut ikut disimpan untuk keduanya', () => {
+    const r = determineHelperUpdate('MONTHLY', '2026-10-09', true, false, false, 1);
+    assert.equal(r.pm_monthly_baseline_shift_cut, 1);
+    assert.equal(r.pm_weekly_baseline_shift_cut, 1);
+  });
+  test('shiftCut null (jam tidak diketahui) dikosongkan eksplisit', () => {
+    const r = determineHelperUpdate('WEEKLY', '2026-10-01', null, true, false, null);
+    assert.equal(r.pm_weekly_baseline_shift_cut, null);
+  });
+});
