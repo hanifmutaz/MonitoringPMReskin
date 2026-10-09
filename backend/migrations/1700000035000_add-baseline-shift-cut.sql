@@ -6,5 +6,5 @@
 -- NULL = tidak diketahui (edit tanggal manual oleh Admin / PM pertama backdate):
 -- seluruh tanggal baseline dibuang dari akrual, perilaku lama.
 ALTER TABLE pm_monthly_helper
-  ADD COLUMN IF NOT EXISTS pm_monthly_baseline_shift_cut SMALLINT,
-  ADD COLUMN IF NOT EXISTS pm_weekly_baseline_shift_cut SMALLINT;
+  ADD COLUMN pm_monthly_baseline_shift_cut SMALLINT,
+  ADD COLUMN pm_weekly_baseline_shift_cut SMALLINT;
