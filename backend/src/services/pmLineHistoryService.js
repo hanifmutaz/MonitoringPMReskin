@@ -28,6 +28,7 @@ const settingsService = require('./settingsService');
 const dateUtils = require('../utils/dateUtils');
 const { recordAudit } = require('../utils/auditLog');
 const { isWithinPmCutoff, isToleranceApplicable } = require('../utils/pmOnTimeRule');
+const { clampFrom } = require('../utils/ketepatanStart');
 const AppError = require('../utils/AppError');
 
 /**
@@ -40,9 +41,11 @@ const AppError = require('../utils/AppError');
  * @param {string} tglInput - 'YYYY-MM-DD'
  * @param {boolean|null|undefined} lineOverride - lines.auto_reset_weekly_on_monthly
  * @param {boolean} globalDefault - app_settings.auto_reset_weekly_on_monthly
+ * @param {boolean} [skipWeeklyReset] - true = JANGAN ikut reset Weekly (PM Monthly PERTAMA dengan tanggal lampau:
+ *   Weekly belum punya baseline, biar operator mengisi tanggal Weekly aslinya sendiri)
  * @returns {object} field yang harus di-UPDATE ke pm_monthly_helper
  */
-function determineHelperUpdate(jenisPm, tglInput, lineOverride, globalDefault) {
+function determineHelperUpdate(jenisPm, tglInput, lineOverride, globalDefault, skipWeeklyReset = false) {
   if (jenisPm === 'WEEKLY') {
     return {
       tgl_pm_weekly_terakhir: tglInput,
@@ -62,7 +65,7 @@ function determineHelperUpdate(jenisPm, tglInput, lineOverride, globalDefault) {
     akumulasi_poin_monthly_raw: 0,
     akumulasi_poin_monthly_raw_prev: 0,
   };
-  if (effectiveAutoReset) {
+  if (effectiveAutoReset && !skipWeeklyReset) {
     fields.tgl_pm_weekly_terakhir = tglInput;
     fields.akumulasi_poin_weekly = 0;
     fields.akumulasi_poin_weekly_raw = 0;
@@ -182,11 +185,21 @@ async function submitPmLineHistory(data, userId) {
 
     const tglInput = resolveTglInput(data.jenis_pm, data.tgl_input, helperBefore, dateUtils.todayString());
 
+    // PM Monthly PERTAMA dengan tanggal lampau (backdate) + Weekly belum punya baseline:
+    // jangan ikut menimpa Weekly dengan tanggal itu, supaya Weekly masih bisa diisi
+    // tanggal aslinya sendiri (aturan "PM pertama boleh isi tanggal").
+    const skipWeeklyReset =
+      data.jenis_pm === 'MONTHLY' &&
+      !helperBefore?.tgl_pm_monthly_terakhir &&
+      !helperBefore?.tgl_pm_weekly_terakhir &&
+      tglInput !== dateUtils.todayString();
+
     const helperUpdateFields = determineHelperUpdate(
       data.jenis_pm,
       tglInput,
       line.auto_reset_weekly_on_monthly,
-      globalDefault
+      globalDefault,
+      skipWeeklyReset
     );
 
     await pmLineQueries.updateHelper(data.line_id, helperUpdateFields, client);
@@ -239,11 +252,16 @@ function emptyJenisResult() {
 // malah kabur maknanya.
 
 // period: 'year' (default, tahun berjalan) | 'month' (bulan kalender berjalan, WIB).
+async function getKetepatanStartDate() {
+  return settingsService.getSetting('ketepatan_start_date');
+}
+
 async function getKetepatanSummary({ period = 'year' } = {}) {
+  const startDate = await getKetepatanStartDate();
   const range =
     period === 'month'
-      ? { dateFrom: dateUtils.startOfMonthString(), dateTo: dateUtils.endOfMonthString() }
-      : { dateFrom: dateUtils.startOfYearString() };
+      ? { dateFrom: clampFrom(dateUtils.startOfMonthString(), startDate), dateTo: dateUtils.endOfMonthString() }
+      : { dateFrom: clampFrom(dateUtils.startOfYearString(), startDate) };
   const rows = await pmLineHistoryQueries.getKetepatanOverall(range);
 
   const result = { monthly: emptyJenisResult(), weekly: emptyJenisResult() };
@@ -259,8 +277,9 @@ async function getKetepatanSummary({ period = 'year' } = {}) {
 // Tren N bulan terakhir (termasuk bulan ini) -> Map 'YYYY-MM' -> {monthly, weekly}.
 // Bulan/jenis tanpa event tidak ada di Map (pemanggil yang mengisi kosongnya).
 async function getKetepatanMonthlyTrend(months = 6) {
+  const startDate = await getKetepatanStartDate();
   const rows = await pmLineHistoryQueries.getKetepatanByMonth({
-    dateFrom: dateUtils.startOfMonthString(-(months - 1)),
+    dateFrom: clampFrom(dateUtils.startOfMonthString(-(months - 1)), startDate),
     dateTo: dateUtils.endOfMonthString(),
   });
   const result = new Map();
@@ -275,7 +294,7 @@ async function getKetepatanMonthlyTrend(months = 6) {
 }
 
 async function getKetepatanPerLine() {
-  const dateFrom = dateUtils.startOfYearString();
+  const dateFrom = clampFrom(dateUtils.startOfYearString(), await getKetepatanStartDate());
   const rows = await pmLineHistoryQueries.getKetepatanPerLine({ dateFrom });
 
   const perLine = new Map();

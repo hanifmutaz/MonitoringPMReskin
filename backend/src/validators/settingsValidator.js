@@ -7,6 +7,12 @@ const BACKUP_FORMATS = ['dump', 'sql', 'xlsx'];
 // atau null.
 const KEY_RULES = {
   pm_ontime_cutoff_time: (v) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? null : 'Format jam harus HH:MM (00:00 - 23:59); 00:00 = nonaktif'),
+  ketepatan_start_date: (v) => {
+    if (v === '') return null; // kosong = nonaktif
+    if (!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(v)) return 'Format tanggal harus YYYY-MM-DD (kosongkan untuk nonaktif)';
+    const d = new Date(`${v}T00:00:00Z`);
+    return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== v ? 'Tanggal tidak valid' : null;
+  },
   backup_auto_time: (v) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? null : 'Format jam harus HH:MM (00:00 - 23:59)'),
   backup_auto_format: (v) => (BACKUP_FORMATS.includes(v) ? null : `Pilih salah satu: ${BACKUP_FORMATS.join(', ')}`),
   backup_auto_interval_days: (v) =>

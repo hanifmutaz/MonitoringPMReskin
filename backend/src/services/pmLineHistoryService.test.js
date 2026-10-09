@@ -193,3 +193,23 @@ describe('determineOnTime - toleransi jam batas PM (pm_ontime_cutoff_time)', () 
     assert.equal(determineOnTime('WEEKLY', '2026-07-10', h, T, '17:00'), false);
   });
 });
+
+describe('determineHelperUpdate - skipWeeklyReset (PM Monthly pertama dengan tanggal lampau)', () => {
+  test('auto-reset aktif TAPI skipWeeklyReset=true -> Weekly TIDAK disentuh', () => {
+    const r = determineHelperUpdate('MONTHLY', '2023-02-09', null, true, true);
+    assert.deepEqual(r, {
+      tgl_pm_monthly_terakhir: '2023-02-09',
+      akumulasi_poin_monthly: 0,
+      akumulasi_poin_monthly_raw: 0,
+      akumulasi_poin_monthly_raw_prev: 0,
+    });
+  });
+  test('auto-reset aktif + skipWeeklyReset=false (default) -> Weekly ikut reset seperti biasa', () => {
+    const r = determineHelperUpdate('MONTHLY', '2026-10-09', null, true);
+    assert.equal(r.tgl_pm_weekly_terakhir, '2026-10-09');
+  });
+  test('skipWeeklyReset tidak mempengaruhi submit WEEKLY', () => {
+    const r = determineHelperUpdate('WEEKLY', '2023-02-09', null, true, true);
+    assert.equal(r.tgl_pm_weekly_terakhir, '2023-02-09');
+  });
+});

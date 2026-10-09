@@ -12,6 +12,8 @@ const pmPartHistoryQueries = require('../sql/pmPartHistoryQueries');
 const inventoryService = require('./inventoryService');
 const { recordAudit } = require('../utils/auditLog');
 const dateUtils = require('../utils/dateUtils');
+const settingsService = require('./settingsService');
+const { clampFrom } = require('../utils/ketepatanStart');
 const AppError = require('../utils/AppError');
 const jenisQueries = require('../sql/jenisPenggantianQueries');
 
@@ -119,10 +121,11 @@ function toPercentage(total, onTimeCount) {
 
 // period: 'year' (default, tahun berjalan) | 'month' (bulan kalender berjalan, WIB).
 async function getKetepatanSummary({ period = 'year' } = {}) {
+  const startDate = await settingsService.getSetting('ketepatan_start_date');
   const range =
     period === 'month'
-      ? { dateFrom: dateUtils.startOfMonthString(), dateTo: dateUtils.endOfMonthString() }
-      : { dateFrom: dateUtils.startOfYearString() };
+      ? { dateFrom: clampFrom(dateUtils.startOfMonthString(), startDate), dateTo: dateUtils.endOfMonthString() }
+      : { dateFrom: clampFrom(dateUtils.startOfYearString(), startDate) };
   const row = await pmPartHistoryQueries.getKetepatanOverall(range);
   const total = Number(row.total);
   const onTimeCount = Number(row.on_time_count);
@@ -130,7 +133,7 @@ async function getKetepatanSummary({ period = 'year' } = {}) {
 }
 
 async function getKetepatanPerLine() {
-  const dateFrom = dateUtils.startOfYearString();
+  const dateFrom = clampFrom(dateUtils.startOfYearString(), await settingsService.getSetting('ketepatan_start_date'));
   const rows = await pmPartHistoryQueries.getKetepatanPerLine({ dateFrom });
   return rows.map((r) => {
     const total = Number(r.total);
@@ -148,8 +151,9 @@ async function getKetepatanPerLine() {
 // Tren N bulan terakhir (termasuk bulan ini) -> Map 'YYYY-MM' -> {total, on_time_count, percentage}.
 // Bulan tanpa event tidak ada di Map (pemanggil yang mengisi kosongnya).
 async function getKetepatanMonthlyTrend(months = 6) {
+  const startDate = await settingsService.getSetting('ketepatan_start_date');
   const rows = await pmPartHistoryQueries.getKetepatanByMonth({
-    dateFrom: dateUtils.startOfMonthString(-(months - 1)),
+    dateFrom: clampFrom(dateUtils.startOfMonthString(-(months - 1)), startDate),
     dateTo: dateUtils.endOfMonthString(),
   });
   const result = new Map();
