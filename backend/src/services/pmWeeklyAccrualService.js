@@ -27,9 +27,8 @@ const pmLineQueries = require('../sql/pmLineQueries');
 const settingsService = require('./settingsService');
 const dateUtils = require('../utils/dateUtils');
 const logger = require('../utils/logger');
-const { computeDailyPoints } = require('../utils/pmPointFormula');
+const { computeAccruedPoints } = require('../utils/pmAccrual');
 const { computeLookbackDays } = require('../utils/accrualLookback');
-const { countEligibleRuns } = require('../utils/pmShiftSchedule');
 
 async function recomputeAllLines() {
   if (!conmasDb.isConfigured()) {
@@ -76,39 +75,20 @@ async function recomputeAllLines() {
       continue;
     }
 
-    const baseline = dateUtils.parseDbDate(helper.tgl_pm_weekly_terakhir);
-    const today = dateUtils.today();
     const lineRunCounts = byLine.get(line.line_name) || new Map();
     const jumlahShift = line.jumlah_shift || 2;
     const pointFullRun = settings.pm_weekly_point_full_run ?? 1;
 
-    let totalPoints = 0;
-    // Poin mentah SEBELUM hari terakhir yang dihitung (kemarin) - dipakai untuk
-    // toleransi jam batas PM (migration 1700000033000).
-    let totalPointsPrev = 0;
-    const lastCountedStr = today.subtract(1, 'day').format('YYYY-MM-DD');
-    const baselineStr = baseline.format('YYYY-MM-DD');
-    const shiftCut = helper.pm_weekly_baseline_shift_cut;
-    const hasShiftCut = shiftCut !== null && shiftCut !== undefined;
-    // PM sadar-shift: kalau jam PM tersimpan, tanggal PM ikut dihitung untuk shift yang mulai SETELAH PM.
-    let cursor = hasShiftCut ? baseline : baseline.add(1, 'day');
-    while (!cursor.isAfter(today)) {
-      const dateStr = cursor.format('YYYY-MM-DD');
-      const dayEntry = lineRunCounts.get(dateStr);
-      const runCount = countEligibleRuns({
-        dateStr,
-        baselineStr,
-        cut: shiftCut,
-        runCount: dayEntry ? dayEntry.count : 0,
-        shifts: dayEntry ? dayEntry.shifts : [],
-      });
-
-      totalPoints += computeDailyPoints(runCount, jumlahShift, pointFullRun);
-      if (dateStr < lastCountedStr) {
-        totalPointsPrev += computeDailyPoints(runCount, jumlahShift, pointFullRun);
-      }
-      cursor = cursor.add(1, 'day');
-    }
+    // Hari ini (WIB) IKUT dihitung (realtime). totalPointsPrev = poin mentah sampai
+    // KEMARIN - dipakai untuk toleransi jam batas PM (migration 1700000033000).
+    const { total: totalPoints, totalPrev: totalPointsPrev } = computeAccruedPoints({
+      baselineStr: dateUtils.formatDate(helper.tgl_pm_weekly_terakhir),
+      todayStr: dateUtils.todayString(),
+      shiftCut: helper.pm_weekly_baseline_shift_cut,
+      runCountsByDate: lineRunCounts,
+      jumlahShift,
+      pointFullRun,
+    });
 
     const cappedPoints = Math.min(totalPoints, settings.pm_weekly_total_days || 7);
     // Poin mentah (tanpa cap) disimpan terpisah khusus buat menilai ketepatan
