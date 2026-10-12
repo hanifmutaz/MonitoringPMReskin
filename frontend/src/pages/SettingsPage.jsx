@@ -26,6 +26,7 @@ const SETTING_LABELS = {
   pm_monthly_point_full_run: 'Poin per Full Run',
   pm_monthly_point_cap: 'Poin Maksimal',
   pm_ontime_cutoff_time: 'Batas Jam PM Hari Jatuh Tempo (WIB)',
+  pm_today_point_threshold: 'Batas Poin "PM Hari Ini" (poin/hari)',
   ketepatan_start_date: 'Mulai Hitung Ketepatan dari Tanggal',
   // Poin PM Weekly
   pm_weekly_point_full_run: 'Poin per Full Run',
@@ -231,6 +232,7 @@ function SettingRow({ setting, canEdit, isAdmin }) {
               {setting.value_type === 'number' && (
                 <Input
                   type="number"
+                  step="any"
                   className="w-[70px] text-right font-[var(--font-mono)]"
                   value={localValue}
                   disabled={updateMutation.isPending}

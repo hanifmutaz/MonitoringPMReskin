@@ -39,6 +39,7 @@ const STATUS_OPTIONS = [
   { value: 'OK', label: 'OK' },
   { value: 'WARNING', label: 'Warning' },
   { value: 'DANGER', label: 'Danger' },
+  { value: 'OVERDUE', label: 'Overdue' },
 ];
 
 // Filter disimpan di URL (?q=line1&sm=DANGER&sw=WARNING): bisa di-bookmark/dibagikan

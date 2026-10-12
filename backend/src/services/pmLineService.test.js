@@ -27,7 +27,12 @@ describe('statusFromRemainingDays - fungsi threshold generik', () => {
   test('DANGER ketika sisa hari <= dangerDays', () => {
     assert.equal(statusFromRemainingDays(2, 2, 5), 'DANGER');
     assert.equal(statusFromRemainingDays(0, 2, 5), 'DANGER');
-    assert.equal(statusFromRemainingDays(-1, 2, 5), 'DANGER');
+  });
+  test('OVERDUE ketika sisa hari NEGATIF (poin sudah melewati cap), bukan lagi DANGER', () => {
+    assert.equal(statusFromRemainingDays(-0.5, 2, 5), 'OVERDUE');
+    assert.equal(statusFromRemainingDays(-1, 2, 5), 'OVERDUE');
+    // tepat 0 = jatuh tempo hari ini, belum lewat cap -> tetap DANGER
+    assert.equal(statusFromRemainingDays(0, 2, 5), 'DANGER');
   });
   test('WARNING ketika sisa hari < warningDays (dan bukan DANGER)', () => {
     assert.equal(statusFromRemainingDays(3, 2, 5), 'WARNING');
@@ -170,7 +175,7 @@ describe('computeLineStatus - Sisa Hari dari poin mentah (bisa negatif) + tolera
   test('poin mentah melewati cap -> Sisa Hari NEGATIF (telat), bukan mentok 0', () => {
     const r = computeLineStatus(row('31.5', '30.5'), T, '10:00');
     assert.equal(r.sisa_hari_monthly, -1.5);
-    assert.equal(r.status_monthly, 'DANGER');
+    assert.equal(r.status_monthly, 'OVERDUE');
     assert.equal(r.toleransi_monthly, false);
   });
 
@@ -190,7 +195,13 @@ describe('computeLineStatus - Sisa Hari dari poin mentah (bisa negatif) + tolera
   test('lewat 0,5 di hari terakhir + SESUDAH jam batas -> Telat 0,5 (negatif), toleransi hilang', () => {
     const r = computeLineStatus(row('30.5', '29.5'), T, '16:01');
     assert.equal(r.sisa_hari_monthly, -0.5);
+    assert.equal(r.status_monthly, 'OVERDUE');
     assert.equal(r.toleransi_monthly, false);
+  });
+
+  test('toleransi jam batas aktif (sisa 0) -> DANGER, BUKAN Overdue', () => {
+    const r = computeLineStatus(row('30.5', '29.5'), T, '10:00');
+    assert.equal(r.status_monthly, 'DANGER');
   });
 
   test('raw belum ada (NULL) -> fallback ke poin ter-cap seperti sebelumnya', () => {
@@ -215,5 +226,68 @@ describe('computeLineStatus - Sisa Hari dari poin mentah (bisa negatif) + tolera
     assert.equal(r.sisa_hari_monthly, null);
     assert.equal(r.status_monthly, 'DANGER');
     assert.equal(r.estimasi_pm_monthly, null);
+  });
+});
+
+describe('computeLineStatus - batas poin "PM hari ini" (pm_today_point_threshold)', () => {
+  const T = { ...THRESHOLDS, cutoffTime: '16:00', todayThreshold: 0.5 };
+  const row = (raw, capped = raw) => ({
+    line_id: 1,
+    line_name: 'L1',
+    tgl_pm_monthly_terakhir: daysAgo(31),
+    akumulasi_poin_monthly: capped,
+    akumulasi_poin_monthly_raw: String(raw),
+    akumulasi_poin_monthly_raw_prev: String(Number(raw) - 1),
+    tgl_pm_weekly_terakhir: daysAgo(3),
+    akumulasi_poin_weekly: 3,
+  });
+
+  test('sisa 0,5 (<= batas 0,5) -> perlu PM hari ini, status masih DANGER (belum overdue)', () => {
+    const r = computeLineStatus(row(29.5), T, '10:00');
+    assert.equal(r.sisa_hari_monthly, 0.5);
+    assert.equal(r.perlu_pm_hari_ini_monthly, true);
+    assert.equal(r.status_monthly, 'DANGER');
+  });
+
+  test('sisa 1,0 / 1,5 (> batas 0,5) -> BUKAN PM hari ini', () => {
+    assert.equal(computeLineStatus(row(29), T, '10:00').perlu_pm_hari_ini_monthly, false);
+    assert.equal(computeLineStatus(row(28.5), T, '10:00').perlu_pm_hari_ini_monthly, false);
+  });
+
+  test('sisa tepat 0 (jatuh tempo / toleransi) -> perlu PM hari ini', () => {
+    assert.equal(computeLineStatus(row(30), T, '10:00').perlu_pm_hari_ini_monthly, true);
+  });
+
+  test('sudah overdue (sisa negatif) -> status OVERDUE, flag hari ini FALSE (sudah lewat, bukan lagi "hari ini")', () => {
+    const r = computeLineStatus(row(30.5), T, '16:30');
+    assert.equal(r.status_monthly, 'OVERDUE');
+    assert.equal(r.perlu_pm_hari_ini_monthly, false);
+  });
+
+  test('batas dinaikkan jadi 1,0 -> sisa 1,0 ikut ditandai (opsi konservatif untuk Line 3 shift)', () => {
+    const r = computeLineStatus(row(29), { ...T, todayThreshold: 1 }, '10:00');
+    assert.equal(r.perlu_pm_hari_ini_monthly, true);
+  });
+
+  test('batas 0 -> penanda dinonaktifkan kecuali sisa tepat 0', () => {
+    const t0 = { ...T, todayThreshold: 0 };
+    assert.equal(computeLineStatus(row(29.5), t0, '10:00').perlu_pm_hari_ini_monthly, false);
+  });
+
+  test('belum pernah PM (tanggal null) -> flag hari ini FALSE', () => {
+    const r = computeLineStatus({ line_id: 1, line_name: 'L', tgl_pm_monthly_terakhir: null, tgl_pm_weekly_terakhir: null }, T, '10:00');
+    assert.equal(r.perlu_pm_hari_ini_monthly, false);
+    assert.equal(r.perlu_pm_hari_ini_weekly, false);
+  });
+
+  test('Weekly punya flag sendiri, tidak ikut Monthly', () => {
+    const r = computeLineStatus({
+      line_id: 1, line_name: 'L',
+      tgl_pm_monthly_terakhir: daysAgo(1), akumulasi_poin_monthly: 1,
+      tgl_pm_weekly_terakhir: daysAgo(7), akumulasi_poin_weekly: 6.5,
+    }, T, '10:00');
+    assert.equal(r.sisa_hari_weekly, 0.5);
+    assert.equal(r.perlu_pm_hari_ini_weekly, true);
+    assert.equal(r.perlu_pm_hari_ini_monthly, false);
   });
 });

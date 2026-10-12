@@ -111,7 +111,7 @@ function buildPmLineColumns({
       key: 'sisa_hari_monthly',
       header: 'Sisa Hari Monthly',
       render: (line) => (
-        <SisaHari sisa={line.sisa_hari_monthly} toleransi={line.toleransi_monthly} sampai={line.toleransi_sampai} />
+        <SisaHari sisa={line.sisa_hari_monthly} toleransi={line.toleransi_monthly} sampai={line.toleransi_sampai} hariIni={line.perlu_pm_hari_ini_monthly} />
       ),
     },
     {
@@ -151,7 +151,7 @@ function buildPmLineColumns({
       key: 'sisa_hari_weekly',
       header: 'Sisa Hari Weekly',
       render: (line) => (
-        <SisaHari sisa={line.sisa_hari_weekly} toleransi={line.toleransi_weekly} sampai={line.toleransi_sampai} />
+        <SisaHari sisa={line.sisa_hari_weekly} toleransi={line.toleransi_weekly} sampai={line.toleransi_sampai} hariIni={line.perlu_pm_hari_ini_weekly} />
       ),
     },
     {

@@ -59,6 +59,8 @@
   --color-warn-dim: var(--warn-dim);
   --color-danger: var(--danger);
   --color-danger-dim: var(--danger-dim);
+  --color-overdue: var(--overdue);
+  --color-overdue-dim: var(--overdue-dim);
 
   /* Cuma --font-sans yang di-expose ke Tailwind (buat komponen shadcn yang
      butuh font-sans sebagai default). --font-display/--font-mono SENGAJA

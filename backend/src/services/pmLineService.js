@@ -8,12 +8,20 @@
 //   Weekly (berbasis akumulasi poin, di-cap - SAMA POLA dengan Monthly):
 //     Sisa Hari Weekly  = pm_weekly_total_days (dipakai sebagai cap poin) - akumulasi_poin_weekly
 //     Estimasi PM Weekly = Hari Ini + Sisa Hari Weekly
-//     Status: <= pm_weekly_danger_days -> DANGER, < pm_weekly_warning_days -> WARNING, else OK
+//     Status: < 0 -> OVERDUE, <= pm_weekly_danger_days -> DANGER, < pm_weekly_warning_days -> WARNING, else OK
 //
 //   Monthly (berbasis akumulasi poin, di-cap):
 //     Sisa Hari Monthly = pm_monthly_point_cap - akumulasi_poin_monthly
 //     Estimasi PM Monthly = Hari Ini + Sisa Hari Monthly
-//     Status: <= pm_monthly_danger_days -> DANGER, < pm_monthly_warning_days -> WARNING, else OK
+//     Status: < 0 -> OVERDUE, <= pm_monthly_danger_days -> DANGER, < pm_monthly_warning_days -> WARNING, else OK
+//
+//   OVERDUE = poin sudah MELEWATI cap (Sisa Hari negatif). Sisa Hari tepat 0
+//   (jatuh tempo hari ini / toleransi jam batas) tetap DANGER.
+//
+//   perlu_pm_hari_ini: 0 <= Sisa Hari <= pm_today_point_threshold (default 0,5).
+//   PM hanya boleh di luar jam Line running, jadi kalau sisa poin lebih kecil
+//   dari poin yang bisa terkumpul di hari berikutnya, PM harus dimajukan ke
+//   hari ini supaya poin tidak berubah jadi minus.
 //
 // CATATAN: akumulasi_poin_monthly & akumulasi_poin_weekly di sini DIBACA APA
 // ADANYA dari cache pm_monthly_helper. Job yang MENAMBAH poin keduanya
@@ -44,6 +52,7 @@ async function getThresholds() {
     'pm_weekly_danger_days',
     'pm_weekly_warning_days',
     'pm_ontime_cutoff_time',
+    'pm_today_point_threshold',
   ]);
   return {
     monthlyCap: s.pm_monthly_point_cap,
@@ -53,11 +62,14 @@ async function getThresholds() {
     weeklyDangerDays: s.pm_weekly_danger_days,
     weeklyWarningDays: s.pm_weekly_warning_days,
     cutoffTime: s.pm_ontime_cutoff_time,
+    // null/undefined (migration belum jalan) -> 0,5 (default = satu shift)
+    todayThreshold: s.pm_today_point_threshold === undefined || s.pm_today_point_threshold === null ? 0.5 : s.pm_today_point_threshold,
   };
 }
 
 function statusFromRemainingDays(remainingDays, dangerDays, warningDays) {
   if (remainingDays === null) return 'DANGER'; // belum pernah PM sama sekali -> butuh perhatian
+  if (remainingDays < 0) return 'OVERDUE'; // poin sudah melewati cap
   if (remainingDays <= dangerDays) return 'DANGER';
   if (remainingDays < warningDays) return 'WARNING';
   return 'OK';
@@ -79,9 +91,9 @@ function round1(n) {
  * terakhir yang dihitung dan sekarang masih sebelum jam batas, PM yang disubmit
  * sekarang dinilai TEPAT WAKTU -> ditampilkan sebagai jatuh tempo (0), bukan telat.
  */
-function computeCycle({ lastDate, cappedPoints, raw, rawPrev, cap, dangerDays, warningDays, cutoffTime, nowHHMM }) {
+function computeCycle({ lastDate, cappedPoints, raw, rawPrev, cap, dangerDays, warningDays, cutoffTime, nowHHMM, todayThreshold = 0.5 }) {
   if (!lastDate) {
-    return { sisaHari: null, status: 'DANGER', toleransi: false, estimasi: null };
+    return { sisaHari: null, status: 'DANGER', toleransi: false, estimasi: null, perluHariIni: false };
   }
   const rawNum = raw === null || raw === undefined ? null : Number(raw);
   const effectivePoints = rawNum !== null ? rawNum : cappedPoints;
@@ -95,6 +107,8 @@ function computeCycle({ lastDate, cappedPoints, raw, rawPrev, cap, dangerDays, w
   return {
     sisaHari,
     status: statusFromRemainingDays(sisaHari, dangerDays, warningDays),
+    // Belum overdue tapi sisa poin <= batas (default 0,5) -> PM harus hari ini.
+    perluHariIni: sisaHari >= 0 && sisaHari <= todayThreshold,
     toleransi,
     // Estimasi tanggal PM = hari ini + FLOOR(sisa hari) (sudah lewat/hari ini -> hari ini).
     // Dibulatkan ke BAWAH karena PM hanya bisa dilakukan di jeda antar-shift, dan 1 hari
@@ -119,6 +133,7 @@ function computeLineStatus(row, thresholds, nowHHMM = dateUtils.nowTimeString())
     warningDays: thresholds.weeklyWarningDays,
     cutoffTime: thresholds.cutoffTime,
     nowHHMM,
+    todayThreshold: thresholds.todayThreshold,
   });
   const monthly = computeCycle({
     lastDate: row.tgl_pm_monthly_terakhir,
@@ -130,6 +145,7 @@ function computeLineStatus(row, thresholds, nowHHMM = dateUtils.nowTimeString())
     warningDays: thresholds.monthlyWarningDays,
     cutoffTime: thresholds.cutoffTime,
     nowHHMM,
+    todayThreshold: thresholds.todayThreshold,
   });
 
   const rawOrCapped = (raw, capped) => (raw === null || raw === undefined ? capped : round1(Number(raw)));
@@ -144,6 +160,7 @@ function computeLineStatus(row, thresholds, nowHHMM = dateUtils.nowTimeString())
     status_monthly: monthly.status,
     estimasi_pm_monthly: monthly.estimasi,
     toleransi_monthly: monthly.toleransi,
+    perlu_pm_hari_ini_monthly: monthly.perluHariIni,
     tgl_pm_weekly_terakhir: dateUtils.formatDate(row.tgl_pm_weekly_terakhir),
     akumulasi_poin_weekly: akumulasiPoinWeekly,
     akumulasi_poin_weekly_raw: rawOrCapped(row.akumulasi_poin_weekly_raw, akumulasiPoinWeekly),
@@ -151,6 +168,7 @@ function computeLineStatus(row, thresholds, nowHHMM = dateUtils.nowTimeString())
     status_weekly: weekly.status,
     estimasi_pm_weekly: weekly.estimasi,
     toleransi_weekly: weekly.toleransi,
+    perlu_pm_hari_ini_weekly: weekly.perluHariIni,
     toleransi_sampai: thresholds.cutoffTime || null,
   };
 }

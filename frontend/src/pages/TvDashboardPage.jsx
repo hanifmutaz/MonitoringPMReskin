@@ -19,11 +19,11 @@ import {
 dayjs.locale('id');
 
 const num = (v) => (v === undefined || v === null ? '-' : Number(v).toLocaleString('id-ID'));
-const WORST = { DANGER: 0, WARNING: 1, OK: 2 };
-const TONE = { OK: 'text-ok', WARNING: 'text-warn', DANGER: 'text-danger' };
-const PILL = { OK: 'bg-ok text-black', WARNING: 'bg-warn text-black', DANGER: 'bg-danger text-white' };
-// Label status SERAGAM di semua tabel: OK / Warning / Danger.
-const STATUS_LABEL = { OK: 'OK', WARNING: 'Warning', DANGER: 'Danger' };
+const WORST = { OVERDUE: -1, DANGER: 0, WARNING: 1, OK: 2 };
+const TONE = { OK: 'text-ok', WARNING: 'text-warn', DANGER: 'text-danger', OVERDUE: 'text-overdue' };
+const PILL = { OK: 'bg-ok text-black', WARNING: 'bg-warn text-black', DANGER: 'bg-danger text-white', OVERDUE: 'bg-overdue text-white' };
+// Label status SERAGAM di semua tabel: OK / Warning / Danger / Overdue (Overdue = poin Line sudah lewat cap).
+const STATUS_LABEL = { OK: 'OK', WARNING: 'Warning', DANGER: 'Danger', OVERDUE: 'Overdue' };
 // Warna jenis PM sengaja BEDA dari warna status (merah/oranye/hijau) dan saling
 // berjauhan hue-nya (magenta vs cyan) biar kebaca jelas dari jauh di TV.
 const TAG_TONE = { M: 'text-[#e040fb]', W: 'text-[#00bcd4]', P: 'text-[#94a3b8]' };
@@ -90,18 +90,18 @@ function overallCompliance(s) {
 // Gabungan line-summary.attention (yang non-OK) + upcoming (jadwal 7 hari), 1 baris per Line+Jenis.
 function buildNextActions(attention, upcoming) {
   const map = new Map();
-  const put = (line, jenis, sisa, status) => {
+  const put = (line, jenis, sisa, status, hariIni = false) => {
     if (sisa === null || sisa === undefined) return;
     const key = `${line}|${jenis}`;
-    if (!map.has(key)) map.set(key, { key, line, jenis, sisa, status });
+    if (!map.has(key)) map.set(key, { key, line, jenis, sisa, status, hariIni: Boolean(hariIni) });
   };
   for (const l of attention) {
-    put(l.line_name, 'Monthly', l.sisa_hari_monthly, l.status_monthly);
-    put(l.line_name, 'Weekly', l.sisa_hari_weekly, l.status_weekly);
+    put(l.line_name, 'Monthly', l.sisa_hari_monthly, l.status_monthly, l.perlu_pm_hari_ini_monthly);
+    put(l.line_name, 'Weekly', l.sisa_hari_weekly, l.status_weekly, l.perlu_pm_hari_ini_weekly);
   }
   for (const u of upcoming) {
-    if (u.type === 'PM_LINE_MONTHLY') put(u.line_name, 'Monthly', dayDiff(u.estimated_date), u.status);
-    if (u.type === 'PM_LINE_WEEKLY') put(u.line_name, 'Weekly', dayDiff(u.estimated_date), u.status);
+    if (u.type === 'PM_LINE_MONTHLY') put(u.line_name, 'Monthly', dayDiff(u.estimated_date), u.status, u.perlu_pm_hari_ini);
+    if (u.type === 'PM_LINE_WEEKLY') put(u.line_name, 'Weekly', dayDiff(u.estimated_date), u.status, u.perlu_pm_hari_ini);
   }
   return [...map.values()].sort((a, b) => a.sisa - b.sisa || WORST[a.status] - WORST[b.status]);
 }
@@ -258,8 +258,8 @@ function TvDashboardPage() {
   const kBulanMonth = ld?.ketepatan?.month;
 
   const priority = [
-    ...nextActions.filter((r) => r.sisa <= 0).map((r) => ({
-      key: `l-${r.key}`, title: r.line, sub: `PM ${r.jenis}`, info: sisaLabel(r.sisa), status: r.status,
+    ...nextActions.filter((r) => r.sisa <= 0 || r.hariIni).map((r) => ({
+      key: `l-${r.key}`, title: r.line, sub: `PM ${r.jenis}`, info: r.hariIni && r.sisa > 0 ? `PM hari ini (sisa ${r.sisa})` : sisaLabel(r.sisa), status: r.status,
     })),
     ...(pd?.top_attention ?? []).filter((p) => p.status === 'DANGER').map((p) => ({
       key: `p-${p.part_id}`, title: p.line_name, sub: [p.drawing_no, p.part_name].filter(Boolean).join(' • '), info: `Sisa ${num(p.remaining_shot)} shot`, status: 'DANGER',
@@ -363,7 +363,7 @@ function TvDashboardPage() {
               ) : (
                 <div className="flex flex-col gap-1.5">
                   {priority.slice(0, 7).map((p) => (
-                    <div key={p.key} className={`flex items-center justify-between gap-2 rounded-lg px-3 py-1.5 ${p.status === 'DANGER' ? 'bg-danger-dim' : 'bg-warn-dim'}`}>
+                    <div key={p.key} className={`flex items-center justify-between gap-2 rounded-lg px-3 py-1.5 ${p.status === 'OVERDUE' ? 'bg-overdue-dim' : p.status === 'DANGER' ? 'bg-danger-dim' : 'bg-warn-dim'}`}>
                       <div className="min-w-0">
                         <div className="font-[var(--font-mono)] font-semibold">{p.title}</div>
                         <div className="truncate text-xs text-muted-foreground">{p.sub}</div>
@@ -390,7 +390,10 @@ function TvDashboardPage() {
                         <td className="px-2 py-1">
                           <span className={`inline-block min-w-[4.5rem] rounded-full px-2.5 py-0.5 text-center text-xs font-semibold ${JENIS_CHIP[r.jenis]}`}>{r.jenis}</span>
                         </td>
-                        <td className={`px-2 py-1 text-center font-semibold ${TONE[r.status]}`}>{sisaLabel(r.sisa)}</td>
+                        <td className={`px-2 py-1 text-center font-semibold ${TONE[r.status]}`}>
+                          {sisaLabel(r.sisa)}
+                          {r.hariIni && r.sisa > 0 && <span className="ml-2 rounded bg-danger px-1.5 py-0.5 text-[0.65rem] font-semibold text-white">PM hari ini</span>}
+                        </td>
                         <td className="px-2 py-1 text-center"><Pill status={r.status} label={STATUS_LABEL[r.status]} /></td>
                       </tr>
                     ))}

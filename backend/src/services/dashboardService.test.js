@@ -110,6 +110,34 @@ describe('dashboardService', () => {
       assert.equal(result.lines_critical, 1);
       assert.equal(result.lines_warning, 0);
     });
+
+    test('line OVERDUE dihitung sebagai kritis (lebih parah dari DANGER) + muncul di lines_overdue', async () => {
+      mock.method(pmPartService, 'getAllComputedMetrics', async () => []);
+      mock.method(pmLineService, 'getPmLineStatus', async () => [
+        line({ line_id: 1, status_monthly: 'OVERDUE', status_weekly: 'OK' }),
+        line({ line_id: 2, status_monthly: 'DANGER', status_weekly: 'OVERDUE' }),
+        line({ line_id: 3, status_monthly: 'OK', status_weekly: 'DANGER' }),
+      ]);
+
+      const result = await dashboardService.getSummary();
+
+      assert.equal(result.lines_overdue, 2);
+      assert.equal(result.lines_critical, 3); // Danger + Overdue
+      assert.equal(result.lines_healthy, 0);
+    });
+
+    test('lines_pm_today menghitung line yang perlu PM hari ini (Monthly ATAU Weekly)', async () => {
+      mock.method(pmPartService, 'getAllComputedMetrics', async () => []);
+      mock.method(pmLineService, 'getPmLineStatus', async () => [
+        line({ line_id: 1, perlu_pm_hari_ini_monthly: true }),
+        line({ line_id: 2, perlu_pm_hari_ini_weekly: true }),
+        line({ line_id: 3, perlu_pm_hari_ini_monthly: true, perlu_pm_hari_ini_weekly: true }),
+        line({ line_id: 4 }),
+      ]);
+
+      const result = await dashboardService.getSummary();
+      assert.equal(result.lines_pm_today, 3);
+    });
   });
 
   describe('getAttention', () => {
@@ -192,6 +220,20 @@ describe('dashboardService', () => {
       assert.equal(result.length, 1);
       assert.equal(result[0].type, 'PM_LINE_MONTHLY');
       assert.equal(result[0].estimated_date, dateUtils.todayString(), 'overdue harus di-clamp ke hari ini, bukan negative date');
+    });
+
+    test('sisa 0,5 hari -> estimated_date HARI INI (dibulatkan ke bawah) + flag perlu_pm_hari_ini ikut terbawa', async () => {
+      mock.method(pmPartService, 'getAllComputedMetrics', async () => []);
+      mock.method(pmLineService, 'getPmLineStatus', async () => [
+        line({
+          line_name: 'CL-Half', sisa_hari_weekly: 0.5, status_weekly: 'DANGER',
+          estimasi_pm_weekly: dateUtils.todayString(), perlu_pm_hari_ini_weekly: true,
+        }),
+      ]);
+
+      const result = await dashboardService.getUpcoming();
+      assert.equal(result[0].estimated_date, dateUtils.todayString());
+      assert.equal(result[0].perlu_pm_hari_ini, true);
     });
 
     test('hasil digabung dari Part + Line Monthly + Line Weekly, diurutkan berdasarkan estimated_date ASCENDING', async () => {
@@ -306,6 +348,20 @@ describe('dashboardService', () => {
       assert.equal(result.monthly.OK, 0);
       assert.equal(result.weekly.OK, 1);
       assert.equal(result.weekly.DANGER, 0);
+    });
+
+    test('OVERDUE punya bucket sendiri dan attention mengurutkan OVERDUE paling atas, lalu DANGER, lalu WARNING', async () => {
+      mock.method(pmLineService, 'getPmLineStatus', async () => [
+        line({ line_name: 'W', status_monthly: 'WARNING', status_weekly: 'OK' }),
+        line({ line_name: 'D', status_monthly: 'DANGER', status_weekly: 'OK' }),
+        line({ line_name: 'O', status_monthly: 'OK', status_weekly: 'OVERDUE' }),
+      ]);
+
+      const result = await dashboardService.getLineSummary();
+
+      assert.equal(result.weekly.OVERDUE, 1);
+      assert.equal(result.monthly.OVERDUE, 0);
+      assert.deepEqual(result.attention.map((l) => l.line_name), ['O', 'D', 'W']);
     });
 
     test('line dengan monthly & weekly SAMA-SAMA OK tidak masuk daftar attention', async () => {

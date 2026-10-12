@@ -30,7 +30,8 @@ function getCachedLineStatuses() {
   return getCached('lineStatuses', () => pmLineService.getPmLineStatus({}));
 }
 
-const STATUS_RANK = { OK: 0, WARNING: 1, DANGER: 2 };
+// OVERDUE = poin Line sudah melewati cap (hanya muncul di status Line Monthly/Weekly).
+const STATUS_RANK = { OK: 0, WARNING: 1, DANGER: 2, OVERDUE: 3 };
 
 function worstStatus(a, b) {
   return STATUS_RANK[a] >= STATUS_RANK[b] ? a : b;
@@ -124,7 +125,7 @@ async function getSummary() {
   const statusCounts = { OK: 0, WARNING: 0, DANGER: 0 };
   for (const p of partMetrics) statusCounts[p.status] += 1;
 
-  const lineBuckets = { OK: 0, WARNING: 0, DANGER: 0 };
+  const lineBuckets = { OK: 0, WARNING: 0, DANGER: 0, OVERDUE: 0 };
   for (const l of lineStatuses) {
     const worst = worstStatus(l.status_monthly, l.status_weekly);
     lineBuckets[worst] += 1;
@@ -138,7 +139,11 @@ async function getSummary() {
     active_lines: activeLines,
     lines_healthy: lineBuckets.OK,
     lines_warning: lineBuckets.WARNING,
-    lines_critical: lineBuckets.DANGER,
+    // Line kritis = Danger + Overdue (Overdue adalah kondisi yang lebih parah dari Danger).
+    lines_critical: lineBuckets.DANGER + lineBuckets.OVERDUE,
+    lines_overdue: lineBuckets.OVERDUE,
+    // Line yang perlu PM hari ini (sisa poin <= batas setting) tapi belum overdue.
+    lines_pm_today: lineStatuses.filter((l) => l.perlu_pm_hari_ini_monthly || l.perlu_pm_hari_ini_weekly).length,
     ketepatan_pm_part_percentage: ketepatanPart.percentage,
     ketepatan_pm_part_total: ketepatanPart.total,
     ketepatan_pm_monthly_percentage: ketepatanLine.monthly.percentage,
@@ -198,7 +203,9 @@ async function getUpcoming() {
 
   for (const l of lineStatuses) {
     if (l.sisa_hari_monthly !== null) {
-      const estDate = dateUtils.addDaysToToday(Math.max(l.sisa_hari_monthly, 0));
+      // estimasi_pm_monthly sudah dibulatkan KE BAWAH (PM hanya bisa di jeda antar-shift),
+      // jadi sisa 0,5 hari -> hari ini, bukan besok. Fallback hitung sendiri kalau tidak ada.
+      const estDate = l.estimasi_pm_monthly || dateUtils.addDaysToToday(Math.floor(Math.max(l.sisa_hari_monthly, 0)));
       if (withinUpcomingWindow(estDate)) {
         items.push({
           type: 'PM_LINE_MONTHLY',
@@ -206,11 +213,12 @@ async function getUpcoming() {
           label: 'PM Monthly',
           estimated_date: estDate,
           status: l.status_monthly,
+          perlu_pm_hari_ini: Boolean(l.perlu_pm_hari_ini_monthly),
         });
       }
     }
     if (l.sisa_hari_weekly !== null) {
-      const estDate = dateUtils.addDaysToToday(Math.max(l.sisa_hari_weekly, 0));
+      const estDate = l.estimasi_pm_weekly || dateUtils.addDaysToToday(Math.floor(Math.max(l.sisa_hari_weekly, 0)));
       if (withinUpcomingWindow(estDate)) {
         items.push({
           type: 'PM_LINE_WEEKLY',
@@ -218,6 +226,7 @@ async function getUpcoming() {
           label: 'PM Weekly',
           estimated_date: estDate,
           status: l.status_weekly,
+          perlu_pm_hari_ini: Boolean(l.perlu_pm_hari_ini_weekly),
         });
       }
     }
@@ -331,8 +340,8 @@ async function getPartSummary() {
 async function getLineSummary() {
   const [lineStatuses, ketepatan] = await Promise.all([getCachedLineStatuses(), getLineKetepatan()]);
 
-  const monthlyBuckets = { OK: 0, WARNING: 0, DANGER: 0 };
-  const weeklyBuckets = { OK: 0, WARNING: 0, DANGER: 0 };
+  const monthlyBuckets = { OK: 0, WARNING: 0, DANGER: 0, OVERDUE: 0 };
+  const weeklyBuckets = { OK: 0, WARNING: 0, DANGER: 0, OVERDUE: 0 };
   for (const l of lineStatuses) {
     monthlyBuckets[l.status_monthly] += 1;
     weeklyBuckets[l.status_weekly] += 1;
@@ -340,7 +349,7 @@ async function getLineSummary() {
 
   const attention = lineStatuses
     .filter((l) => l.status_monthly !== 'OK' || l.status_weekly !== 'OK')
-    .sort((a, b) => worstStatus(b.status_monthly, b.status_weekly) === 'DANGER' ? 1 : -1);
+    .sort((a, b) => STATUS_RANK[worstStatus(b.status_monthly, b.status_weekly)] - STATUS_RANK[worstStatus(a.status_monthly, a.status_weekly)]);
 
   return {
     total_lines: lineStatuses.length,

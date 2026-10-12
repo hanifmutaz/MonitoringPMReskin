@@ -13,14 +13,14 @@ export function sisaHariLabel(sisa) {
   return String(sisa);
 }
 
-export default function SisaHari({ sisa, toleransi = false, sampai = null }) {
+export default function SisaHari({ sisa, toleransi = false, sampai = null, hariIni = false }) {
   if (sisa === null || sisa === undefined) {
     return <span className="font-[var(--font-mono)] text-[13px]">-</span>;
   }
   if (sisa < 0) {
     return (
       <span
-        className="font-[var(--font-mono)] text-[13px] font-semibold text-danger"
+        className="font-[var(--font-mono)] text-[13px] font-semibold text-overdue"
         title="Sudah melewati jatuh tempo"
       >
         {sisaHariLabel(sisa)}
@@ -30,6 +30,14 @@ export default function SisaHari({ sisa, toleransi = false, sampai = null }) {
   return (
     <span className="font-[var(--font-mono)] text-[13px]">
       {sisa}
+      {hariIni && (
+        <span
+          className="ml-1.5 rounded bg-danger-dim px-1 py-0.5 text-[10px] font-semibold text-danger"
+          title="Sisa poin kurang dari poin yang bisa terkumpul di shift berikutnya. PM hanya bisa di luar jam running, jadi kerjakan hari ini"
+        >
+          PM hari ini
+        </span>
+      )}
       {toleransi && (
         <span
           className="ml-1.5 rounded bg-warn-dim px-1 py-0.5 text-[10px] font-semibold text-warn"

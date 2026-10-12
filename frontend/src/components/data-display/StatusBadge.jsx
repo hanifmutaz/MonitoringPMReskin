@@ -40,6 +40,8 @@ const CONFIG = {
   OK: { label: 'OK', bg: 'bg-ok-dim', text: 'text-ok', dot: 'bg-ok' },
   WARNING: { label: 'Warning', bg: 'bg-warn-dim', text: 'text-warn', dot: 'bg-warn' },
   DANGER: { label: 'Danger', bg: 'bg-danger-dim', text: 'text-danger', dot: 'bg-danger' },
+  // Poin Line sudah melewati cap (sisa hari negatif).
+  OVERDUE: { label: 'Overdue', bg: 'bg-overdue-dim', text: 'text-overdue', dot: 'bg-overdue' },
 };
 const FALLBACK = { bg: 'bg-[var(--panel-3)]', text: 'text-[var(--text-faint)]', dot: 'bg-[var(--text-faint)]' };
 
@@ -52,7 +54,7 @@ function StatusBadge({ status }) {
   const [flashKey, setFlashKey] = useState(0);
 
   useEffect(() => {
-    if (prevRef.current !== normalized && normalized === 'DANGER') {
+    if (prevRef.current !== normalized && (normalized === 'DANGER' || normalized === 'OVERDUE')) {
       setFlashKey((k) => k + 1);
     }
     prevRef.current = normalized;

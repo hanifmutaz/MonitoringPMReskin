@@ -77,6 +77,9 @@
   --warn-dim: rgba(245, 166, 35, 0.14);
   --danger: #f5484b;
   --danger-dim: rgba(245, 72, 75, 0.14);
+  /* Overdue = poin Line sudah melewati cap. Lebih parah dari danger, sengaja beda hue (pink-magenta gelap). */
+  --overdue: #ff3d8b;
+  --overdue-dim: rgba(255, 61, 139, 0.16);
 
   /* NEW - neutral buat badge non-status (mis. "Nonaktif"). Beda dari muted
      lama (text-faint di panel-3, kontras 2.49:1 = gagal WCAG per
@@ -115,6 +118,8 @@
   --warn-dim: rgba(194, 104, 10, 0.12);
   --danger: #d63a3d;
   --danger-dim: rgba(214, 58, 61, 0.10);
+  --overdue: #b3125a;
+  --overdue-dim: rgba(179, 18, 90, 0.11);
 
   --neutral: #64748b;
   --neutral-dim: rgba(100, 116, 139, 0.12);

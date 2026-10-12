@@ -31,7 +31,7 @@ function groupByLine(items) {
   return Array.from(map.entries());
 }
 
-const STATUS_CLASS = { OK: 'bg-ok', WARNING: 'bg-warn', DANGER: 'bg-danger' };
+const STATUS_CLASS = { OK: 'bg-ok', WARNING: 'bg-warn', DANGER: 'bg-danger', OVERDUE: 'bg-overdue' };
 
 function GanttUpcomingPanel({ items = [] }) {
   const columns = buildColumns();

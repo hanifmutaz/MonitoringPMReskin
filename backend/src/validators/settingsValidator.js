@@ -6,6 +6,7 @@ const BACKUP_FORMATS = ['dump', 'sql', 'xlsx'];
 // sudah lolos, jadi `value` di sini pasti bertipe benar. Return pesan error
 // atau null.
 const KEY_RULES = {
+  pm_today_point_threshold: (v) => (v >= 0 && v <= 3 ? null : 'Harus antara 0 - 3 (poin/hari); 0 = nonaktif'),
   pm_ontime_cutoff_time: (v) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? null : 'Format jam harus HH:MM (00:00 - 23:59); 00:00 = nonaktif'),
   ketepatan_start_date: (v) => {
     if (v === '') return null; // kosong = nonaktif
