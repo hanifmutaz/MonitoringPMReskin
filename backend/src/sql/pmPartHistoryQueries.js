@@ -5,7 +5,7 @@ const LIST_SELECT = `
   SELECT
     h.id, h.part_id, p.line_id, l.line_name, p.jig_name, p.drawing_no, p.part_name,
     h.tgl_ganti, h.shift, h.counter_saat_diganti, h.jenis_penggantian, h.remark, h.pic_name,
-    h.on_time, h.user_id, u.full_name AS user_full_name, h.created_at
+    h.on_time, h.alasan_telat, h.user_id, u.full_name AS user_full_name, h.created_at
   FROM pm_part_history h
   JOIN parts p ON p.id = h.part_id
   JOIN lines l ON l.id = p.line_id
@@ -71,7 +71,7 @@ async function findAllForExport({ lineId, partId, jenis, dateFrom, dateTo, maxRo
     `SELECT h.id, l.line_name, p.jig_name, p.drawing_no, p.part_name,
             h.tgl_ganti, h.shift, h.counter_saat_diganti,
             h.jenis_penggantian, COALESCE(j.label, h.jenis_penggantian) AS jenis_label,
-            h.pic_name, h.on_time, h.remark, u.full_name AS user_full_name, h.created_at
+            h.pic_name, h.on_time, h.alasan_telat, h.remark, u.full_name AS user_full_name, h.created_at
      FROM pm_part_history h
      JOIN parts p ON p.id = h.part_id
      JOIN lines l ON l.id = p.line_id
@@ -114,9 +114,9 @@ async function findPartForHistory(partId, runner = db) {
 
 async function create(data, runner = db) {
   const result = await runner.query(
-    `INSERT INTO pm_part_history (part_id, tgl_ganti, shift, counter_saat_diganti, jenis_penggantian, remark, pic_name, user_id, on_time)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     RETURNING id, part_id, tgl_ganti, shift, counter_saat_diganti, jenis_penggantian, remark, pic_name, user_id, on_time, created_at`,
+    `INSERT INTO pm_part_history (part_id, tgl_ganti, shift, counter_saat_diganti, jenis_penggantian, remark, pic_name, user_id, on_time, alasan_telat)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     RETURNING id, part_id, tgl_ganti, shift, counter_saat_diganti, jenis_penggantian, remark, pic_name, user_id, on_time, alasan_telat, created_at`,
     [
       data.part_id,
       data.tgl_ganti,
@@ -127,9 +127,24 @@ async function create(data, runner = db) {
       data.pic_name,
       data.user_id,
       data.on_time,
+      data.alasan_telat ?? null,
     ]
   );
   return result.rows[0];
+}
+
+// PM Part yang dinilai telat (on_time = FALSE) untuk semua Part di 1 Line sejak dateFrom.
+async function findLateEventsByLine({ lineId, dateFrom }, runner = db) {
+  const result = await runner.query(
+    `SELECT h.id, h.tgl_ganti, h.counter_saat_diganti, h.pic_name, h.remark, h.alasan_telat,
+            p.part_name, p.drawing_no, p.target_shot
+     FROM pm_part_history h
+     JOIN parts p ON p.id = h.part_id
+     WHERE p.line_id = $1 AND h.on_time = FALSE AND h.deleted_at IS NULL AND h.tgl_ganti >= $2
+     ORDER BY h.tgl_ganti DESC, h.id DESC`,
+    [lineId, dateFrom]
+  );
+  return result.rows;
 }
 
 // --- Ketepatan PM Part (lihat pmPartHistoryService.js buat definisi on_time) ---
@@ -188,6 +203,7 @@ async function getKetepatanPerLine({ dateFrom }, runner = db) {
 }
 
 module.exports = {
+  findLateEventsByLine,
   findAllForExport,
   findPartForHistory,
   findAll,

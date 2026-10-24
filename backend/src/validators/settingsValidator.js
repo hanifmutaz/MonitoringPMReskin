@@ -14,6 +14,8 @@ const KEY_RULES = {
     const d = new Date(`${v}T00:00:00Z`);
     return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== v ? 'Tanggal tidak valid' : null;
   },
+  idle_min_days: (v) => (Number.isInteger(v) && v >= 1 && v <= 365 ? null : 'Harus bilangan bulat 1 - 365 hari'),
+  idle_cleaning_interval_days: (v) => (Number.isInteger(v) && v >= 1 && v <= 730 ? null : 'Harus bilangan bulat 1 - 730 hari'),
   backup_auto_time: (v) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? null : 'Format jam harus HH:MM (00:00 - 23:59)'),
   backup_auto_format: (v) => (BACKUP_FORMATS.includes(v) ? null : `Pilih salah satu: ${BACKUP_FORMATS.join(', ')}`),
   backup_auto_interval_days: (v) =>

@@ -57,6 +57,10 @@ const SETTING_LABELS = {
   notif_inventory_repeat: 'Ulangi Pengingat Inventory',
   // Stok Pengaman
   inventory_safety_stock_percentage: 'Persen Stok Pengaman',
+  // Line Tidak Running & Cleaning
+  idle_monitoring_enabled: 'Aktifkan Deteksi Line Tidak Running',
+  idle_min_days: 'Dianggap Tidak Running Setelah (hari tanpa output)',
+  idle_cleaning_interval_days: 'Wajib Cleaning Setiap (hari)',
   // Backup Otomatis
   backup_auto_enabled: 'Aktifkan Backup Otomatis',
   backup_auto_time: 'Jam Backup (WIB)',

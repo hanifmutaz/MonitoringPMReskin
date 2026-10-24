@@ -43,3 +43,20 @@ export async function fetchMultiSite() {
   const { data } = await apiClient.get('/dashboard/multi-site');
   return data.data;
 }
+
+// Line dengan PM terlambat (ringkas) + bukti keterlambatan 1 Line (data sistem).
+export async function fetchLateLines() {
+  const { data } = await apiClient.get('/dashboard/late-lines');
+  return data.data;
+}
+
+export async function fetchLateLineEvidence(lineId) {
+  const { data } = await apiClient.get(`/dashboard/late-lines/${lineId}/evidence`);
+  return data.data;
+}
+
+// Line yang tidak running (tanpa output >= idle_min_days) + status cleaning.
+export async function fetchIdleLines() {
+  const { data } = await apiClient.get('/dashboard/idle-lines');
+  return data.data;
+}

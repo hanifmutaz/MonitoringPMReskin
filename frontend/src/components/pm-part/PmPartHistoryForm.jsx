@@ -44,6 +44,7 @@ const emptyForm = {
   jenis_penggantian: 'TERJADWAL',
   pic_name: '',
   remark: '',
+  alasan_telat: '',
 };
 
 // presetPart datang dari baris Monitoring yang diklik (part_id, line_id belum
@@ -113,6 +114,17 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart, standalone = false
 
   const createMutation = useCreatePmPartHistory();
 
+  // Perkiraan telat di sisi client: counter yang diisi sudah melewati target shot Part.
+  // Penentu akhirnya backend (jenis tertentu mis. BROKEN dikecualikan dari ketepatan),
+  // makanya field ini tidak di-`required` di browser kecuali server memintanya lewat
+  // error alasan_telat - lihat handleSubmit.
+  const selectedPart = (partsData?.items || []).find((p) => String(p.id) === String(form.part_id)) || lockedPart;
+  const targetShot = Number(selectedPart?.target_shot);
+  const counterNum = Number(form.counter_saat_diganti);
+  const maybeLate = Number.isFinite(targetShot) && targetShot > 0 && form.counter_saat_diganti !== '' && counterNum > targetShot;
+  const serverWantsAlasan = Boolean(errors.alasan_telat);
+  const showAlasanTelat = maybeLate || serverWantsAlasan;
+
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value, ...(field === 'line_id' ? { part_id: '' } : {}) }));
   }
@@ -177,6 +189,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart, standalone = false
         jenis_penggantian: form.jenis_penggantian,
         pic_name: form.pic_name,
         remark: form.remark || undefined,
+        ...(showAlasanTelat && form.alasan_telat ? { alasan_telat: form.alasan_telat } : {}),
       });
       setForm(buildInitialForm(presetPart));
       setScannedPart(null);
@@ -339,6 +352,31 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart, standalone = false
           />
           {errors.pic_name && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.pic_name}</p>}
         </div>
+
+        {showAlasanTelat && (
+          <div className="sm:col-span-2">
+            <div className="mb-2 rounded-lg border border-danger/30 bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
+              {maybeLate ? (
+                <>
+                  Counter ({counterNum.toLocaleString('id-ID')}) melewati target shot ({targetShot.toLocaleString('id-ID')}),
+                  jadi penggantian ini dinilai <strong>terlambat</strong>.{' '}
+                </>
+              ) : null}
+              Tulis alasan keterlambatannya (wajib kalau penggantian dinilai terlambat).
+            </div>
+            <Label className="mb-2.5">Alasan Keterlambatan</Label>
+            <Textarea
+              className="min-h-[60px]"
+              value={form.alasan_telat}
+              onChange={(e) => update('alasan_telat', e.target.value)}
+              placeholder="Contoh: Menunggu spare part datang"
+              maxLength={500}
+              required={serverWantsAlasan}
+              aria-label="Alasan keterlambatan penggantian part"
+            />
+            {errors.alasan_telat && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.alasan_telat}</p>}
+          </div>
+        )}
 
         <div className="sm:col-span-2">
           <Label className="mb-2.5">Remark (opsional)</Label>

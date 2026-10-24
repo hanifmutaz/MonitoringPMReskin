@@ -221,7 +221,7 @@ function PmPartHistoryPage() {
                           />
                         </th>
                       )}
-                      {['Tanggal', 'Line / Part', 'Shift', 'Counter', 'Jenis', 'PIC', 'Ketepatan', 'Remark', 'Oleh'].map(
+                      {['Tanggal', 'Line / Part', 'Shift', 'Counter', 'Jenis', 'PIC', 'Ketepatan', 'Alasan Telat', 'Remark', 'Oleh'].map(
                         (h) => (
                           <th
                             key={h}
@@ -264,6 +264,7 @@ function PmPartHistoryPage() {
                         <td className="px-2.5 py-2.5">
                           <OnTimeBadge onTime={item.on_time} />
                         </td>
+                        <td className="max-w-[200px] px-2.5 py-2.5 text-xs text-[var(--text-dim)]">{item.alasan_telat || '-'}</td>
                         <td className="max-w-[200px] px-2.5 py-2.5 text-xs text-[var(--text-dim)]">{item.remark || '-'}</td>
                         <td className="px-2.5 py-2.5 text-xs text-[var(--text-dim)]">{item.user_full_name}</td>
                       </tr>

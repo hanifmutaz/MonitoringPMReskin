@@ -22,6 +22,7 @@ export const CATEGORY_META = {
   notifikasi: { title: 'Notifikasi Email' },
   inventory: { title: 'Stok Pengaman' },
   backup_otomatis: { title: 'Backup Otomatis' },
+  line_tidak_running: { title: 'Line Tidak Running & Cleaning' },
 };
 
 export const SETTINGS_MENU = [
@@ -31,6 +32,7 @@ export const SETTINGS_MENU = [
     title: 'PM Monthly & Weekly',
     categories: ['skema_poin_monthly', 'skema_poin_weekly', 'threshold_monthly_weekly', 'relasi_monthly_weekly'],
   },
+  { key: 'line-tidak-running', title: 'Line Tidak Running', categories: ['line_tidak_running'] },
   { key: 'inventory', title: 'Inventory', categories: ['inventory'] },
   {
     key: 'umum',

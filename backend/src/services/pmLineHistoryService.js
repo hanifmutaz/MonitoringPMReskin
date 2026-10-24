@@ -31,6 +31,7 @@ const { recordAudit } = require('../utils/auditLog');
 const { isWithinPmCutoff, isToleranceApplicable } = require('../utils/pmOnTimeRule');
 const { clampFrom } = require('../utils/ketepatanStart');
 const AppError = require('../utils/AppError');
+const { resolveAlasanTelat } = require('../utils/alasanTelat');
 
 /**
  * Fungsi MURNI (tanpa DB) yang implementasikan reset rule Bagian 2.D —
@@ -219,8 +220,12 @@ async function submitPmLineHistory(data, userId) {
     await pmLineQueries.updateHelper(data.line_id, helperUpdateFields, client);
 
     const onTime = determineOnTime(data.jenis_pm, tglInput, helperBefore, onTimeThresholds);
+    // PM telat WAJIB disertai alasan. Diperiksa di sini (bukan di validator) karena
+    // telat-tidaknya baru diketahui setelah poin Line dibaca. Throw sebelum insert
+    // -> transaksi di-rollback, helper tidak ke-reset.
+    const alasanTelat = resolveAlasanTelat(onTime, data.alasan_telat);
     const createdHistory = await pmLineHistoryQueries.create(
-      { ...data, tgl_input: tglInput, user_id: userId, on_time: onTime },
+      { ...data, tgl_input: tglInput, user_id: userId, on_time: onTime, alasan_telat: alasanTelat },
       client
     );
 

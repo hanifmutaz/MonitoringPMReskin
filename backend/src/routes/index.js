@@ -21,6 +21,7 @@ const partSupplierRoutes = require('./partSupplierRoutes');
 const notificationRoutes = require('./notificationRoutes');
 const recycleBinRoutes = require('./recycleBinRoutes');
 const jenisPenggantianRoutes = require('./jenisPenggantianRoutes');
+const lineCleaningRoutes = require('./lineCleaningRoutes');
 
 const router = express.Router();
 
@@ -45,5 +46,6 @@ router.use('/part-suppliers', partSupplierRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/recycle-bin', recycleBinRoutes);
 router.use('/jenis-penggantian', jenisPenggantianRoutes);
+router.use('/line-cleaning', lineCleaningRoutes);
 
 module.exports = router;

@@ -2,7 +2,7 @@
 const db = require('../config/db');
 
 const LIST_SELECT = `
-  SELECT h.id, h.line_id, COALESCE(l.line_name, h.line_name_snapshot) AS line_name, h.tgl_input, h.jenis_pm, h.keterangan, h.pic_name, h.on_time,
+  SELECT h.id, h.line_id, COALESCE(l.line_name, h.line_name_snapshot) AS line_name, h.tgl_input, h.jenis_pm, h.keterangan, h.pic_name, h.on_time, h.alasan_telat,
          h.user_id, u.full_name AS user_full_name, h.created_at
   FROM pm_monthly_history h
   LEFT JOIN lines l ON l.id = h.line_id
@@ -64,10 +64,19 @@ async function findAllForExport({ lineId, jenis, dateFrom, dateTo, maxRows } = {
 
 async function create(data, runner = db) {
   const result = await runner.query(
-    `INSERT INTO pm_monthly_history (line_id, tgl_input, jenis_pm, keterangan, pic_name, user_id, on_time)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING id, line_id, tgl_input, jenis_pm, keterangan, pic_name, user_id, on_time, created_at`,
-    [data.line_id, data.tgl_input, data.jenis_pm, data.keterangan ?? null, data.pic_name, data.user_id, data.on_time]
+    `INSERT INTO pm_monthly_history (line_id, tgl_input, jenis_pm, keterangan, pic_name, user_id, on_time, alasan_telat)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id, line_id, tgl_input, jenis_pm, keterangan, pic_name, user_id, on_time, alasan_telat, created_at`,
+    [
+      data.line_id,
+      data.tgl_input,
+      data.jenis_pm,
+      data.keterangan ?? null,
+      data.pic_name,
+      data.user_id,
+      data.on_time,
+      data.alasan_telat ?? null,
+    ]
   );
   return result.rows[0];
 }
@@ -131,7 +140,20 @@ async function getKetepatanPerLine({ dateFrom }, runner = db) {
   return result.rows;
 }
 
+// PM Monthly/Weekly yang dinilai telat (on_time = FALSE) untuk 1 Line sejak dateFrom.
+async function findLateEvents({ lineId, dateFrom }, runner = db) {
+  const result = await runner.query(
+    `SELECT h.id, h.tgl_input, h.jenis_pm, h.pic_name, h.keterangan, h.alasan_telat, h.created_at
+     FROM pm_monthly_history h
+     WHERE h.line_id = $1 AND h.on_time = FALSE AND h.deleted_at IS NULL AND h.tgl_input >= $2
+     ORDER BY h.tgl_input DESC, h.id DESC`,
+    [lineId, dateFrom]
+  );
+  return result.rows;
+}
+
 module.exports = {
+  findLateEvents,
   findAllForExport,
   findAll,
   create,

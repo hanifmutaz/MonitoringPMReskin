@@ -40,6 +40,12 @@ const pmLineHistoryColumns = [
     render: (item) => <OnTimeBadge onTime={item.on_time} />,
   },
   {
+    key: 'alasan_telat',
+    header: 'Alasan Telat',
+    className: 'max-w-[240px] text-xs text-[var(--text-dim)]',
+    render: (item) => item.alasan_telat || '-',
+  },
+  {
     key: 'keterangan',
     header: 'Keterangan',
     className: 'max-w-[240px] text-xs text-[var(--text-dim)]',

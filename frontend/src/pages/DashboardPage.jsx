@@ -9,12 +9,16 @@ import {
   useDashboardAttention,
   useDashboardUpcoming,
   useDashboardKetepatanAttention,
+  useDashboardLateLines,
+  useDashboardIdleLines,
   useDashboardMultiSite,
 } from '../hooks/useDashboardExtras';
 import KpiCard from '../components/KpiCard';
 import LineStatusDonut from '../components/LineStatusDonut';
 import CriticalAlertsPanel from '../components/CriticalAlertsPanel';
 import GanttUpcomingPanel from '../components/GanttUpcomingPanel';
+import LateLinesPanel from '../components/LateLinesPanel';
+import IdleLinesPanel from '../components/IdleLinesPanel';
 import SiteSwitcher from '../components/SiteSwitcher';
 import { Card, CardHeader, CardTitle } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
@@ -193,6 +197,8 @@ function DashboardPage() {
   const localAttention = useDashboardAttention();
   const localUpcoming = useDashboardUpcoming();
   const localKetepatan = useDashboardKetepatanAttention();
+  const localLate = useDashboardLateLines();
+  const localIdle = useDashboardIdleLines();
 
   const summary = isRemoteView ? remoteSite.data?.summary : localSummary.data;
   const attention = isRemoteView ? remoteSite.data?.attention ?? [] : localAttention.data ?? [];
@@ -286,6 +292,14 @@ function DashboardPage() {
         {!(isRemoteView ? false : localAttention.isLoading) && <CriticalAlertsPanel items={attention} />}
         {!(isRemoteView ? false : localUpcoming.isLoading) && <GanttUpcomingPanel items={upcoming} />}
       </div>
+
+      {/* Evidence & status idle dihitung dari data lokal; tidak tersedia untuk tampilan site lain. */}
+      {!isRemoteView && (
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <LateLinesPanel data={localLate.data ?? []} isLoading={localLate.isLoading} />
+          <IdleLinesPanel data={localIdle.data} isLoading={localIdle.isLoading} />
+        </div>
+      )}
     </div>
   );
 }

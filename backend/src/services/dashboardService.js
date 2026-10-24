@@ -5,6 +5,7 @@ const pmPartHistoryService = require('./pmPartHistoryService');
 const pmLineHistoryService = require('./pmLineHistoryService');
 const settingsService = require('./settingsService');
 const dateUtils = require('../utils/dateUtils');
+const lineIdleService = require('./lineIdleService');
 
 const DASHBOARD_CACHE_TTL_MS = 5000;
 const cache = new Map();
@@ -182,14 +183,19 @@ function withinUpcomingWindow(dateStr) {
 }
 
 async function getUpcoming() {
-  const [partMetrics, lineStatuses] = await Promise.all([
+  const [partMetrics, lineStatuses, idleLineNames] = await Promise.all([
     getCachedPartMetrics(),
     getCachedLineStatuses(),
+    lineIdleService.getIdleLineNameSet(),
   ]);
 
   const items = [];
 
+  // Line yang tidak running (tanpa output >= idle_min_days) TIDAK masuk jadwal: tidak ada
+  // yang bisa dijadwalkan selama Line mati. PM yang sudah terlambat tetap tampil di panel
+  // "Line Terlambat" (lateLineService), jadi tidak hilang dari pantauan.
   for (const p of partMetrics) {
+    if (idleLineNames.has(p.line_name)) continue;
     if (withinUpcomingWindow(p.estimated_pm_date)) {
       items.push({
         type: 'PM_PART',
@@ -202,6 +208,7 @@ async function getUpcoming() {
   }
 
   for (const l of lineStatuses) {
+    if (idleLineNames.has(l.line_name)) continue;
     if (l.sisa_hari_monthly !== null) {
       // estimasi_pm_monthly sudah dibulatkan KE BAWAH (PM hanya bisa di jeda antar-shift),
       // jadi sisa 0,5 hari -> hari ini, bukan besok. Fallback hitung sendiri kalau tidak ada.
@@ -362,6 +369,8 @@ async function getLineSummary() {
 }
 
 module.exports = {
+  getCachedPartMetrics,
+  getCachedLineStatuses,
   getSummary,
   getAttention,
   getUpcoming,

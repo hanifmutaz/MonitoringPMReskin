@@ -16,6 +16,7 @@ const settingsService = require('./settingsService');
 const { clampFrom } = require('../utils/ketepatanStart');
 const AppError = require('../utils/AppError');
 const jenisQueries = require('../sql/jenisPenggantianQueries');
+const { resolveAlasanTelat } = require('../utils/alasanTelat');
 
 async function listHistory({ lineId, partId, jenis, dateFrom, dateTo, page, limit }) {
   const pageNum = Number(page) > 0 ? Number(page) : 1;
@@ -86,7 +87,13 @@ async function createHistory(data, userId) {
     }
 
     const onTime = determineOnTime(jenis.counts_in_ketepatan, data.counter_saat_diganti, part.target_shot);
-    const created = await pmPartHistoryQueries.create({ ...data, user_id: userId, on_time: onTime }, client);
+    // Part yang diganti melewati target shot (telat) WAJIB disertai alasan; throw
+    // sebelum insert -> transaksi di-rollback.
+    const alasanTelat = resolveAlasanTelat(onTime, data.alasan_telat);
+    const created = await pmPartHistoryQueries.create(
+      { ...data, user_id: userId, on_time: onTime, alasan_telat: alasanTelat },
+      client
+    );
 
     const stock = await applyStockDeduction(part, created.id, userId, client);
 

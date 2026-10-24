@@ -36,6 +36,7 @@ const emptyForm = {
   tgl_input: todayStr(),
   pic_name: '',
   keterangan: '',
+  alasan_telat: '',
 };
 
 // presetLine datang dari baris Monitoring yang diklik ("Input Monthly" /
@@ -80,6 +81,17 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm, sta
   const lastDateField = form.jenis_pm === 'WEEKLY' ? 'tgl_pm_weekly_terakhir' : 'tgl_pm_monthly_terakhir';
   const isFirstPm = Boolean(form.line_id) && Boolean(selectedStatus) && !selectedStatus[lastDateField];
 
+  // PM yang disubmit saat siklusnya sudah OVERDUE dinilai TELAT -> operator wajib
+  // menuliskan alasan keterlambatan. Status OVERDUE dihitung dengan aturan yang sama
+  // dengan penilaian ketepatan di backend (termasuk toleransi jam batas), jadi field
+  // muncul tepat saat dibutuhkan. Kalau backend ternyata menilai telat (mis. status
+  // basi), error alasan_telat dari server juga memunculkan field ini.
+  const statusKey = form.jenis_pm === 'WEEKLY' ? 'status_weekly' : 'status_monthly';
+  const sisaKey = form.jenis_pm === 'WEEKLY' ? 'sisa_hari_weekly' : 'sisa_hari_monthly';
+  const isLate = Boolean(selectedStatus) && selectedStatus[statusKey] === 'OVERDUE' && !isFirstPm;
+  const lateDays = isLate && typeof selectedStatus[sisaKey] === 'number' ? Math.abs(selectedStatus[sisaKey]) : null;
+  const showAlasanTelat = isLate || Boolean(errors.alasan_telat);
+
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
@@ -101,6 +113,7 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm, sta
         ...(isFirstPm ? { tgl_input: form.tgl_input } : {}),
         pic_name: form.pic_name,
         keterangan: form.keterangan || undefined,
+        ...(showAlasanTelat ? { alasan_telat: form.alasan_telat } : {}),
       });
       setForm(buildInitialForm(presetLine, presetJenisPm));
       onSuccess?.();
@@ -173,6 +186,28 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm, sta
           />
           {errors.pic_name && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.pic_name}</p>}
         </div>
+
+        {showAlasanTelat && (
+          <div className="sm:col-span-2">
+            <div className="mb-2 rounded-lg border border-danger/30 bg-[var(--danger-dim)] px-3 py-2 text-xs text-[var(--danger)]">
+              PM {form.jenis_pm === 'WEEKLY' ? 'Weekly' : 'Monthly'} Line ini sudah{' '}
+              <strong>terlambat{lateDays ? ` ${lateDays.toLocaleString('id-ID')} hari` : ''}</strong>. Tulis alasan
+              keterlambatannya.
+            </div>
+            <Label className="mb-2.5">Alasan Keterlambatan</Label>
+            <Textarea
+              className="min-h-[60px]"
+              value={form.alasan_telat}
+              onChange={(e) => update('alasan_telat', e.target.value)}
+              placeholder="Contoh: Line running terus tanpa jeda, tidak ada waktu untuk PM"
+              minLength={5}
+              maxLength={500}
+              required
+              aria-label="Alasan keterlambatan PM"
+            />
+            {errors.alasan_telat && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.alasan_telat}</p>}
+          </div>
+        )}
 
         <div className="sm:col-span-2">
           <Label className="mb-2.5">Keterangan (opsional)</Label>

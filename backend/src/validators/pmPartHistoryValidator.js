@@ -1,5 +1,6 @@
 // src/validators/pmPartHistoryValidator.js
 const dateUtils = require('../utils/dateUtils');
+const { validateAlasanTelatShape } = require('../utils/alasanTelat');
 
 function validateCreateHistory(body) {
   const errors = {};
@@ -33,6 +34,10 @@ function validateCreateHistory(body) {
   } else if (body.pic_name.length > 150) {
     errors.pic_name = 'PIC maksimal 150 karakter';
   }
+
+  // Wajib-tidaknya ditentukan service (hanya kalau PM terbukti telat); di sini cuma cek bentuk.
+  const alasanErr = validateAlasanTelatShape(body && body.alasan_telat);
+  if (alasanErr) errors.alasan_telat = alasanErr;
 
   return { valid: Object.keys(errors).length === 0, errors };
 }

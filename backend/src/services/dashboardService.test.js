@@ -16,6 +16,7 @@ const dashboardQueries = require('../sql/dashboardQueries');
 const pmPartHistoryService = require('./pmPartHistoryService');
 const pmLineHistoryService = require('./pmLineHistoryService');
 const settingsService = require('./settingsService');
+const lineIdleService = require('./lineIdleService');
 const dateUtils = require('../utils/dateUtils');
 
 const dashboardService = require('./dashboardService');
@@ -59,6 +60,8 @@ function stubDefaults() {
   mock.method(pmPartHistoryService, 'getKetepatanMonthlyTrend', async () => new Map());
   mock.method(pmLineHistoryService, 'getKetepatanMonthlyTrend', async () => new Map());
   mock.method(settingsService, 'getSetting', async () => 10);
+  // Default: tidak ada Line yang tidak running (tanpa ini getUpcoming menyentuh DB).
+  mock.method(lineIdleService, 'getIdleLineNameSet', async () => new Set());
 }
 
 describe('dashboardService', () => {
@@ -178,6 +181,23 @@ describe('dashboardService', () => {
   });
 
   describe('getUpcoming', () => {
+    test('Line yang TIDAK RUNNING tidak masuk jadwal (PM Part, Monthly, dan Weekly), Line lain tetap muncul', async () => {
+      mock.method(lineIdleService, 'getIdleLineNameSet', async () => new Set(['CL-Mati']));
+      mock.method(pmPartService, 'getAllComputedMetrics', async () => [
+        part({ line_name: 'CL-Mati', part_name: 'Part Mati', estimated_pm_date: dateUtils.addDaysToToday(2) }),
+        part({ line_name: 'CL-Jalan', part_name: 'Part Jalan', estimated_pm_date: dateUtils.addDaysToToday(2) }),
+      ]);
+      mock.method(pmLineService, 'getPmLineStatus', async () => [
+        line({ line_name: 'CL-Mati', sisa_hari_monthly: 2, sisa_hari_weekly: 1 }),
+        line({ line_id: 2, line_name: 'CL-Jalan', sisa_hari_monthly: 2, sisa_hari_weekly: null }),
+      ]);
+
+      const result = await dashboardService.getUpcoming();
+
+      assert.ok(result.every((i) => i.line_name !== 'CL-Mati'), 'Line tidak running tidak boleh ada di jadwal');
+      assert.deepEqual(result.map((i) => i.type).sort(), ['PM_LINE_MONTHLY', 'PM_PART']);
+    });
+
     test('PM Part dengan estimated_pm_date di luar window 7 hari (terlalu jauh) TIDAK muncul', async () => {
       mock.method(pmPartService, 'getAllComputedMetrics', async () => [
         part({ part_name: 'Jauh', estimated_pm_date: dateUtils.addDaysToToday(30) }),

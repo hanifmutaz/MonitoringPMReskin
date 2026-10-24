@@ -16,6 +16,9 @@ router.get('/sync-status', dashboardController.syncStatus);
 router.get('/part-summary', dashboardController.partSummary);
 router.get('/line-summary', dashboardController.lineSummary);
 router.get('/ketepatan-attention', dashboardController.ketepatanAttention);
+router.get('/late-lines', dashboardController.lateLines);
+router.get('/late-lines/:lineId/evidence', dashboardController.lateLineEvidence);
+router.get('/idle-lines', dashboardController.idleLines);
 
 // Beda dari endpoint lain di atas (yang view-only buat semua user login) -
 // ini butuh permission granular 'dashboard.multi_site' karena narik data

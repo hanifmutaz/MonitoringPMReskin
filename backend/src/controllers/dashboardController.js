@@ -1,6 +1,8 @@
 // src/controllers/dashboardController.js
 const dashboardService = require('../services/dashboardService');
 const multiSiteService = require('../services/multiSiteService');
+const lateLineService = require('../services/lateLineService');
+const lineIdleService = require('../services/lineIdleService');
 const env = require('../config/env');
 const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
@@ -40,6 +42,28 @@ const ketepatanAttention = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Success', data });
 });
 
+// GET /api/dashboard/late-lines - Line dengan PM terlambat (ringkas).
+const lateLines = asyncHandler(async (req, res) => {
+  const data = await lateLineService.getLateLines();
+  res.status(200).json({ success: true, message: 'Success', data });
+});
+
+// GET /api/dashboard/late-lines/:lineId/evidence - bukti keterlambatan 1 Line.
+const lateLineEvidence = asyncHandler(async (req, res) => {
+  const lineId = Number(req.params.lineId);
+  if (!Number.isInteger(lineId) || lineId <= 0) {
+    throw AppError.badRequest('Validasi gagal', { lineId: 'lineId harus bilangan bulat positif' });
+  }
+  const data = await lateLineService.getLateLineEvidence(lineId);
+  res.status(200).json({ success: true, message: 'Success', data });
+});
+
+// GET /api/dashboard/idle-lines - Line tidak running + status cleaning.
+const idleLines = asyncHandler(async (req, res) => {
+  const data = await lineIdleService.getIdleLines();
+  res.status(200).json({ success: true, message: 'Success', data });
+});
+
 // GET /api/dashboard/multi-site
 // Cuma bermakna di instance Internal (satu-satunya yang boleh narik data
 // Subcont - lihat topologi 1-arah di doc/Architecture.md). Instance Subcont
@@ -61,5 +85,8 @@ module.exports = {
   partSummary,
   lineSummary,
   ketepatanAttention,
+  lateLines,
+  lateLineEvidence,
+  idleLines,
   multiSite,
 };

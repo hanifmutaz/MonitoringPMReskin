@@ -6,6 +6,9 @@ import {
   fetchPartSummary,
   fetchLineSummary,
   fetchKetepatanAttention,
+  fetchLateLines,
+  fetchLateLineEvidence,
+  fetchIdleLines,
   fetchMultiSite,
 } from '../api/dashboardApi';
 
@@ -30,6 +33,24 @@ export function useDashboardLineSummary() {
 
 export function useDashboardKetepatanAttention() {
   return useQuery({ queryKey: ['dashboard', 'ketepatan-attention'], queryFn: fetchKetepatanAttention, ...DASHBOARD_REFRESH });
+}
+
+export function useDashboardLateLines() {
+  return useQuery({ queryKey: ['dashboard', 'late-lines'], queryFn: fetchLateLines, ...DASHBOARD_REFRESH });
+}
+
+export function useDashboardIdleLines() {
+  return useQuery({ queryKey: ['dashboard', 'idle-lines'], queryFn: fetchIdleLines, ...DASHBOARD_REFRESH });
+}
+
+// Evidence hanya diambil saat modal dibuka (lineId terisi); tanpa auto-refresh
+// karena ini bukti per kejadian, bukan angka live di dashboard.
+export function useLateLineEvidence(lineId) {
+  return useQuery({
+    queryKey: ['dashboard', 'late-lines', lineId, 'evidence'],
+    queryFn: () => fetchLateLineEvidence(lineId),
+    enabled: Boolean(lineId),
+  });
 }
 
 // Refetch tiap 60 detik - dipake sebagai site switcher di 3 halaman
