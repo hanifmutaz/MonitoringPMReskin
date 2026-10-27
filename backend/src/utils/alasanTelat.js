@@ -26,6 +26,20 @@ function resolveAlasanTelat(onTime, alasan) {
   return trimmed;
 }
 
+/**
+ * Alasan telat saat EDIT history. Baris yang tidak telat tidak berubah. Baris telat:
+ * alasan tidak dikirim = tetap; dikirim = tetap harus valid (tidak bisa dikosongkan).
+ * @param {boolean|null} onTime - ketepatan baris itu (tidak berubah saat edit)
+ * @param {string|null|undefined} existing - alasan yang tersimpan sekarang
+ * @param {string|null|undefined} incoming - alasan dari request (undefined = tidak diubah)
+ * @returns {string|null}
+ */
+function resolveAlasanTelatOnEdit(onTime, existing, incoming) {
+  if (onTime !== false) return existing ?? null;
+  if (incoming === undefined) return existing ?? null;
+  return resolveAlasanTelat(onTime, incoming);
+}
+
 /** Validasi bentuk (opsional) di validator: kalau diisi harus string <= MAX_LENGTH. */
 function validateAlasanTelatShape(value) {
   if (value === undefined || value === null || value === '') return null;
@@ -34,4 +48,4 @@ function validateAlasanTelatShape(value) {
   return null;
 }
 
-module.exports = { resolveAlasanTelat, validateAlasanTelatShape, MIN_LENGTH, MAX_LENGTH };
+module.exports = { resolveAlasanTelat, resolveAlasanTelatOnEdit, validateAlasanTelatShape, MIN_LENGTH, MAX_LENGTH };

@@ -188,7 +188,7 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart, standalone = false
         counter_saat_diganti: Number(form.counter_saat_diganti),
         jenis_penggantian: form.jenis_penggantian,
         pic_name: form.pic_name,
-        remark: form.remark || undefined,
+        remark: form.remark.trim(),
         ...(showAlasanTelat && form.alasan_telat ? { alasan_telat: form.alasan_telat } : {}),
       });
       setForm(buildInitialForm(presetPart));
@@ -379,8 +379,19 @@ function PmPartHistoryForm({ onSuccess, onCancel, presetPart, standalone = false
         )}
 
         <div className="sm:col-span-2">
-          <Label className="mb-2.5">Remark (opsional)</Label>
-          <Textarea className="min-h-[60px]" value={form.remark} onChange={(e) => update('remark', e.target.value)} />
+          <Label className="mb-2.5">
+            Remark <span className="text-[var(--danger)]">*</span>
+          </Label>
+          <Textarea
+            className="min-h-[60px]"
+            value={form.remark}
+            onChange={(e) => update('remark', e.target.value)}
+            maxLength={500}
+            required
+            placeholder="Contoh: Punch aus, diganti baru"
+            aria-label="Remark penggantian part"
+          />
+          {errors.remark && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.remark}</p>}
         </div>
       </div>
 

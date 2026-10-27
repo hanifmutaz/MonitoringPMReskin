@@ -17,4 +17,8 @@ router.get('/export', requirePermission('pm_line.view'), pmLineHistoryController
 // catatan yang sama di pmPartHistoryRoutes.js: biasanya butuh 'pm_line.view' juga)
 router.post('/', requirePermission('pm_line.submit'), pmLineHistoryController.create);
 
+// Edit Keterangan / PIC / Alasan Telat history - permission sama dengan submit ('pm_line.submit').
+// Tanggal, jenis PM dan ketepatan TIDAK bisa diubah lewat endpoint ini.
+router.patch('/:id', requirePermission('pm_line.submit'), pmLineHistoryController.update);
+
 module.exports = router;

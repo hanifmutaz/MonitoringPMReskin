@@ -1,12 +1,14 @@
 // src/components/pm-line/pmLineHistoryColumns.jsx
 // Fase 1 (A1/D3): kolom Tanggal pakai formatDate() -> "04 Jul 2026" (bukan
 // tgl_input mentah). Sisanya tidak berubah.
+import { Pencil } from 'lucide-react';
 import OnTimeBadge from '../OnTimeBadge';
+import { Button } from '../ui/button';
 import { formatDate, formatDateTime } from '../../utils/formatDate';
 
 const JENIS_LABEL = { MONTHLY: 'Monthly', WEEKLY: 'Weekly' };
 
-const pmLineHistoryColumns = [
+const baseColumns = [
   {
     key: 'tgl_input',
     header: 'Tanggal',
@@ -49,7 +51,7 @@ const pmLineHistoryColumns = [
     key: 'keterangan',
     header: 'Keterangan',
     className: 'max-w-[240px] text-xs text-[var(--text-dim)]',
-    render: (item) => item.keterangan || '-',
+    render: (item) => item.keterangan || <span className="font-semibold text-warn">Belum diisi</span>,
   },
   {
     key: 'oleh',
@@ -59,5 +61,24 @@ const pmLineHistoryColumns = [
   },
 ];
 
-export { JENIS_LABEL };
-export default pmLineHistoryColumns;
+// Kolom Aksi (Edit Keterangan/PIC/Alasan Telat) hanya muncul kalau user punya hak input PM Line.
+function getPmLineHistoryColumns({ onEdit } = {}) {
+  if (!onEdit) return baseColumns;
+  return [
+    ...baseColumns,
+    {
+      key: 'aksi',
+      header: '',
+      srHeader: 'Aksi',
+      render: (item) => (
+        <Button type="button" size="sm" variant="outline" onClick={() => onEdit(item)} aria-label={`Edit riwayat ${item.line_name}`}>
+          <Pencil size={13} />
+          Edit
+        </Button>
+      ),
+    },
+  ];
+}
+
+export { JENIS_LABEL, getPmLineHistoryColumns };
+export default baseColumns;

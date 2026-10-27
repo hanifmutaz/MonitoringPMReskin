@@ -37,7 +37,7 @@
 import { useMemo, useState } from 'react';
 import { Plus, X, Inbox } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
-import { usePmLineHistoryList } from '../hooks/usePmLineHistory';
+import { usePmLineHistoryList, useUpdatePmLineHistory } from '../hooks/usePmLineHistory';
 import { useUrlFilters } from '../hooks/useUrlFilters';
 import { isDateString } from '../utils/urlFilters';
 import { useLines } from '../hooks/useLines';
@@ -49,7 +49,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmDialogContext';
 import { fetchPmLineHistoryList } from '../api/pmLineHistoryApi';
 import PmLineHistoryForm from '../components/pm-line/PmLineHistoryForm';
-import pmLineHistoryColumns, { JENIS_LABEL } from '../components/pm-line/pmLineHistoryColumns';
+import { getPmLineHistoryColumns, JENIS_LABEL } from '../components/pm-line/pmLineHistoryColumns';
+import HistoryEditModal from '../components/HistoryEditModal';
+import { formatDate } from '../utils/formatDate';
 import BulkDeleteBar from '../components/BulkDeleteBar';
 import SelectAllAcrossPagesBar from '../components/SelectAllAcrossPagesBar';
 import { DataTable, DataTableNoResult } from '../components/data-display/DataTable';
@@ -82,6 +84,7 @@ function PmLineHistoryPage() {
   const { line: lineId, jenis, from: dateFrom, to: dateTo } = filters;
   const [page, setPage] = useState(1);
   const [bulkError, setBulkError] = useState('');
+  const [editing, setEditing] = useState(null);
   const confirm = useConfirm();
 
   // FIX BUG (infinite render loop): `actions` sebelumnya JSX inline yang
@@ -126,7 +129,11 @@ function PmLineHistoryPage() {
   const pageIds = data?.items?.map((h) => h.id) ?? [];
   const selection = useRowSelection(pageIds);
   // Hapus massal = Recycle Bin engine, Admin-only di backend.
-  const { isAdmin: canBulkDelete } = useAuth();
+  const { isAdmin: canBulkDelete, hasPermission } = useAuth();
+  // Edit Keterangan/PIC/Alasan Telat: permission sama dengan input PM Line (pm_line.submit).
+  const canEdit = hasPermission('pm_line.submit');
+  const updateMutation = useUpdatePmLineHistory();
+  const columns = useMemo(() => getPmLineHistoryColumns(canEdit ? { onEdit: setEditing } : {}), [canEdit]);
   // Entity registry-nya 'pm-line-history' (lihat recycleBinRegistry.js) -
   // dipakai sama query key react-query yang di-invalidate abis bulk-delete
   // (lihat ENTITY_QUERY_KEYS di useRecycleBin.js: ikut nyegerin ['pm-line']
@@ -248,7 +255,7 @@ function PmLineHistoryPage() {
       )}
 
       <DataTable
-        columns={pmLineHistoryColumns}
+        columns={columns}
         rows={data?.items}
         getRowKey={(item) => item.id}
         isLoading={isLoading && !data}
@@ -267,6 +274,18 @@ function PmLineHistoryPage() {
           )
         }
       />
+
+      {editing && (
+        <HistoryEditModal
+          title="Edit Riwayat PM Line"
+          subtitle={`${formatDate(editing.tgl_input)} · ${editing.line_name} · PM ${JENIS_LABEL[editing.jenis_pm]}`}
+          remarkField="keterangan"
+          remarkLabel="Keterangan"
+          item={editing}
+          mutation={updateMutation}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
   );
 }

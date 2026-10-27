@@ -3,7 +3,9 @@
 // sudah ada (view-only), cuma ditambah auto-refresh. refetchIntervalInBackground
 // true supaya tetap update walau tab TV tidak sedang fokus.
 import { useQuery } from '@tanstack/react-query';
-import { fetchSummary, fetchLineSummary, fetchPartSummary, fetchUpcoming, fetchSyncStatus } from '../api/dashboardApi';
+import {
+  fetchSummary, fetchLineSummary, fetchPartSummary, fetchUpcoming, fetchSyncStatus, fetchIdleLines, fetchKetepatanBelowTarget,
+} from '../api/dashboardApi';
 import { fetchInventoryRopStatus } from '../api/inventoryApi';
 
 const REFRESH_MS = 60_000;
@@ -28,6 +30,22 @@ export function useTvUpcoming() {
 
 export function useTvSyncStatus() {
   return useQuery({ queryKey: ['dashboard', 'sync-status'], queryFn: fetchSyncStatus, ...tvOptions });
+}
+
+// Line tidak running (>= idle_min_days) + status cleaning, buat "Prioritas Hari Ini".
+// Gagal/belum ada endpoint (backend lama) tidak boleh merusak layar TV: retry:false, error diabaikan di page.
+export function useTvIdleLines() {
+  return useQuery({ queryKey: ['dashboard', 'idle-lines'], queryFn: fetchIdleLines, ...tvOptions, retry: 1 });
+}
+
+// Line dengan ketepatan PM < 100% bulan ini, buat "Prioritas Hari Ini".
+export function useTvKetepatanBelowTarget() {
+  return useQuery({
+    queryKey: ['dashboard', 'ketepatan-below-target', 'month'],
+    queryFn: () => fetchKetepatanBelowTarget('month'),
+    ...tvOptions,
+    retry: 1,
+  });
 }
 
 // Angka ringkas (dipakai buat PM Compliance / ketepatan PM tahun berjalan).

@@ -437,6 +437,57 @@ describe('dashboardService', () => {
     });
   });
 
+  describe('getKetepatanBelowTarget', () => {
+    test('hanya Line dengan nilai terburuk < 100, terburuk dulu, tanpa batas 5', async () => {
+      const partRows = Array.from({ length: 8 }, (_, i) => ({ line_id: i, line_name: `L${i}`, percentage: 99 - i }));
+      partRows.push({ line_id: 50, line_name: 'Sempurna', percentage: 100 });
+      mock.method(pmPartHistoryService, 'getKetepatanPerLine', async () => partRows);
+      mock.method(pmLineHistoryService, 'getKetepatanPerLine', async () => [
+        { line_id: 50, line_name: 'Sempurna', monthly: { percentage: 100 }, weekly: { percentage: 100 } },
+      ]);
+
+      const { items, period } = await dashboardService.getKetepatanBelowTarget();
+
+      assert.equal(period, 'month');
+      assert.equal(items.length, 8); // 'Sempurna' (100%) tidak ikut, dan tidak dipotong 5
+      assert.equal(items[0].line_name, 'L7'); // 92% terburuk
+      assert.ok(items.every((r) => r.worst_percentage < 100));
+    });
+
+    test('worst_label menunjukkan jenis PM yang terburuk', async () => {
+      mock.method(pmPartHistoryService, 'getKetepatanPerLine', async () => [{ line_id: 1, line_name: 'CL-01', percentage: 100 }]);
+      mock.method(pmLineHistoryService, 'getKetepatanPerLine', async () => [
+        { line_id: 1, line_name: 'CL-01', monthly: { percentage: 100 }, weekly: { percentage: 94.4 } },
+      ]);
+
+      const { items } = await dashboardService.getKetepatanBelowTarget();
+
+      assert.equal(items[0].worst_percentage, 94.4);
+      assert.equal(items[0].worst_label, 'PM Weekly');
+    });
+
+    test('period diteruskan ke service per-Line; nilai tidak valid jatuh ke month', async () => {
+      const part = mock.method(pmPartHistoryService, 'getKetepatanPerLine', async () => []);
+      const lineM = mock.method(pmLineHistoryService, 'getKetepatanPerLine', async () => []);
+
+      await dashboardService.getKetepatanBelowTarget({ period: 'year' });
+      assert.deepEqual(part.mock.calls[0].arguments[0], { period: 'year' });
+      assert.deepEqual(lineM.mock.calls[0].arguments[0], { period: 'year' });
+
+      const res = await dashboardService.getKetepatanBelowTarget({ period: 'aneh' });
+      assert.equal(res.period, 'month');
+    });
+
+    test('Line tanpa event (semua null) tidak muncul', async () => {
+      mock.method(pmPartHistoryService, 'getKetepatanPerLine', async () => []);
+      mock.method(pmLineHistoryService, 'getKetepatanPerLine', async () => [
+        { line_id: 1, line_name: 'CL-01', monthly: { percentage: null }, weekly: { percentage: null } },
+      ]);
+      const { items } = await dashboardService.getKetepatanBelowTarget();
+      assert.equal(items.length, 0);
+    });
+  });
+
   describe('ketepatan per bulan', () => {
     test('getSummary: ketepatan_bulan_ini + ketepatan_trend (6 bulan) ikut keluar', async () => {
       mock.method(pmLineHistoryService, 'getKetepatanSummary', async ({ period } = {}) =>

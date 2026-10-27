@@ -36,6 +36,12 @@ export async function fetchKetepatanAttention() {
   return data.data;
 }
 
+// Semua Line dengan ketepatan PM < 100% (nilai terburuk Part/Monthly/Weekly). period: 'month' | 'year'.
+export async function fetchKetepatanBelowTarget(period = 'month') {
+  const { data } = await apiClient.get('/dashboard/ketepatan-below-target', { params: { period } });
+  return data.data; // { period, items: [...] }
+}
+
 // Butuh permission 'dashboard.multi_site' - kalau backend balikin 403 (role
 // gak punya akses), biarkan error itu naik apa adanya, ditangani di hook/page
 // (bukan di-swallow di sini).

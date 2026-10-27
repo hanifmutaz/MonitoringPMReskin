@@ -31,7 +31,7 @@ const { recordAudit } = require('../utils/auditLog');
 const { isWithinPmCutoff, isToleranceApplicable } = require('../utils/pmOnTimeRule');
 const { clampFrom } = require('../utils/ketepatanStart');
 const AppError = require('../utils/AppError');
-const { resolveAlasanTelat } = require('../utils/alasanTelat');
+const { resolveAlasanTelat, resolveAlasanTelatOnEdit } = require('../utils/alasanTelat');
 
 /**
  * Fungsi MURNI (tanpa DB) yang implementasikan reset rule Bagian 2.D —
@@ -256,6 +256,49 @@ async function submitPmLineHistory(data, userId) {
   }
 }
 
+/**
+ * Edit history PM Line: hanya Keterangan, PIC, dan Alasan Telat. Tanggal, jenis PM, baseline dan
+ * ketepatan tidak disentuh. Perubahan dicatat di audit log.
+ */
+async function updatePmLineHistory(id, data, userId) {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const before = await pmLineHistoryQueries.findById(id, client);
+    if (!before) throw AppError.notFound('Riwayat PM Line tidak ditemukan');
+
+    const next = {
+      keterangan: data.keterangan.trim(),
+      pic_name: data.pic_name !== undefined ? data.pic_name.trim() : before.pic_name,
+      alasan_telat: resolveAlasanTelatOnEdit(before.on_time, before.alasan_telat, data.alasan_telat),
+    };
+    await pmLineHistoryQueries.updateEditable(id, next, client);
+    const after = await pmLineHistoryQueries.findById(id, client);
+
+    await recordAudit(
+      {
+        tableName: 'pm_monthly_history',
+        recordId: id,
+        action: 'UPDATE',
+        oldValue: { keterangan: before.keterangan, pic_name: before.pic_name, alasan_telat: before.alasan_telat },
+        newValue: next,
+        userId,
+        actionDetail: 'Edit keterangan/PIC/alasan telat history PM Line',
+      },
+      client
+    );
+
+    await client.query('COMMIT');
+    return after;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 function toPercentage(total, onTimeCount) {
   if (!total) return null; // belum ada data yang bisa dihitung tahun ini
   return Math.round((onTimeCount / total) * 1000) / 10; // 1 desimal
@@ -312,8 +355,10 @@ async function getKetepatanMonthlyTrend(months = 6) {
   return result;
 }
 
-async function getKetepatanPerLine() {
-  const dateFrom = clampFrom(dateUtils.startOfYearString(), await getKetepatanStartDate());
+// period: 'year' (default, tahun berjalan) | 'month' (bulan kalender berjalan, WIB).
+async function getKetepatanPerLine({ period = 'year' } = {}) {
+  const periodFrom = period === 'month' ? dateUtils.startOfMonthString() : dateUtils.startOfYearString();
+  const dateFrom = clampFrom(periodFrom, await getKetepatanStartDate());
   const rows = await pmLineHistoryQueries.getKetepatanPerLine({ dateFrom });
 
   const perLine = new Map();
@@ -337,6 +382,7 @@ async function getKetepatanPerLine() {
 module.exports = {
   listPmLineHistory,
   submitPmLineHistory,
+  updatePmLineHistory,
   determineHelperUpdate,
   determineOnTime,
   resolveTglInput,

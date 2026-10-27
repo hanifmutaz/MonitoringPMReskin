@@ -21,9 +21,9 @@
 //   pakai <FilterBar> yang sama biar 1 bahasa layout filter se-grup
 //   Monitoring. Nol behavior change - FilterBar cuma wrapper layout.
 import { useState } from 'react';
-import { Inbox } from 'lucide-react';
+import { Inbox, Pencil } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
-import { usePmPartHistoryList } from '../hooks/usePmPartHistory';
+import { usePmPartHistoryList, useUpdatePmPartHistory } from '../hooks/usePmPartHistory';
 import { useLines } from '../hooks/useLines';
 import LineCombobox from '../components/LineCombobox';
 import ExportExcelButton from '../components/ExportExcelButton';
@@ -38,6 +38,8 @@ import BulkDeleteBar from '../components/BulkDeleteBar';
 import SelectAllAcrossPagesBar from '../components/SelectAllAcrossPagesBar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { EmptyState } from '../components/ui/empty-state';
+import { Button } from '../components/ui/button';
+import HistoryEditModal from '../components/HistoryEditModal';
 import { FilterBar } from '../components/data-display/FilterBar';
 import { DateRangeFilter } from '../components/data-display/DateRangeFilter';
 import { useJenisPenggantian } from '../hooks/useJenisPenggantian';
@@ -52,6 +54,7 @@ function PmPartHistoryPage() {
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
   const [page, setPage] = useState(1);
   const [bulkError, setBulkError] = useState('');
+  const [editing, setEditing] = useState(null);
   const confirm = useConfirm();
 
   usePageHeader({ title: 'History PM Part' });
@@ -69,7 +72,10 @@ function PmPartHistoryPage() {
   const pageIds = data?.items?.map((h) => h.id) ?? [];
   const selection = useRowSelection(pageIds);
   // Hapus massal = Recycle Bin engine, Admin-only di backend.
-  const { isAdmin: canBulkDelete } = useAuth();
+  const { isAdmin: canBulkDelete, hasPermission } = useAuth();
+  // Edit Remark/PIC/Alasan Telat: permission sama dengan input penggantian (pm_part.submit).
+  const canEdit = hasPermission('pm_part.submit');
+  const updateMutation = useUpdatePmPartHistory();
   // 'pm-part-history' - entity ini yang PALING KRITIS di antara 3 tabel
   // history: counter wear part dihitung LIVE dari MAX(tgl_ganti) tabel ini
   // (COUNTER_CTE di pmPartQueries.js, filter deleted_at IS NULL sudah
@@ -221,7 +227,7 @@ function PmPartHistoryPage() {
                           />
                         </th>
                       )}
-                      {['Tanggal', 'Line / Part', 'Shift', 'Counter', 'Jenis', 'PIC', 'Ketepatan', 'Alasan Telat', 'Remark', 'Oleh'].map(
+                      {['Tanggal', 'Line / Part', 'Shift', 'Counter', 'Jenis', 'PIC', 'Ketepatan', 'Alasan Telat', 'Remark', 'Oleh', ...(canEdit ? ['Aksi'] : [])].map(
                         (h) => (
                           <th
                             key={h}
@@ -265,8 +271,24 @@ function PmPartHistoryPage() {
                           <OnTimeBadge onTime={item.on_time} />
                         </td>
                         <td className="max-w-[200px] px-2.5 py-2.5 text-xs text-[var(--text-dim)]">{item.alasan_telat || '-'}</td>
-                        <td className="max-w-[200px] px-2.5 py-2.5 text-xs text-[var(--text-dim)]">{item.remark || '-'}</td>
+                        <td className="max-w-[200px] px-2.5 py-2.5 text-xs text-[var(--text-dim)]">
+                          {item.remark || <span className="font-semibold text-warn">Belum diisi</span>}
+                        </td>
                         <td className="px-2.5 py-2.5 text-xs text-[var(--text-dim)]">{item.user_full_name}</td>
+                        {canEdit && (
+                          <td className="px-2.5 py-2.5">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditing(item)}
+                              aria-label={`Edit riwayat ${item.line_name} - ${item.part_name}`}
+                            >
+                              <Pencil size={13} />
+                              Edit
+                            </Button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -278,6 +300,18 @@ function PmPartHistoryPage() {
           </>
         )}
       </div>
+
+      {editing && (
+        <HistoryEditModal
+          title="Edit Riwayat Penggantian Part"
+          subtitle={`${formatDate(editing.tgl_ganti)} · ${editing.line_name} · ${editing.part_name} (${editing.drawing_no})`}
+          remarkField="remark"
+          remarkLabel="Remark"
+          item={editing}
+          mutation={updateMutation}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
   );
 }

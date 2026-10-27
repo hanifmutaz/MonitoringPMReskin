@@ -6,6 +6,7 @@ import {
   fetchPartSummary,
   fetchLineSummary,
   fetchKetepatanAttention,
+  fetchKetepatanBelowTarget,
   fetchLateLines,
   fetchLateLineEvidence,
   fetchIdleLines,
@@ -33,6 +34,14 @@ export function useDashboardLineSummary() {
 
 export function useDashboardKetepatanAttention() {
   return useQuery({ queryKey: ['dashboard', 'ketepatan-attention'], queryFn: fetchKetepatanAttention, ...DASHBOARD_REFRESH });
+}
+
+export function useDashboardKetepatanBelowTarget(period = 'month') {
+  return useQuery({
+    queryKey: ['dashboard', 'ketepatan-below-target', period],
+    queryFn: () => fetchKetepatanBelowTarget(period),
+    ...DASHBOARD_REFRESH,
+  });
 }
 
 export function useDashboardLateLines() {

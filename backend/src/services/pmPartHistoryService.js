@@ -16,7 +16,7 @@ const settingsService = require('./settingsService');
 const { clampFrom } = require('../utils/ketepatanStart');
 const AppError = require('../utils/AppError');
 const jenisQueries = require('../sql/jenisPenggantianQueries');
-const { resolveAlasanTelat } = require('../utils/alasanTelat');
+const { resolveAlasanTelat, resolveAlasanTelatOnEdit } = require('../utils/alasanTelat');
 
 async function listHistory({ lineId, partId, jenis, dateFrom, dateTo, page, limit }) {
   const pageNum = Number(page) > 0 ? Number(page) : 1;
@@ -119,6 +119,49 @@ async function createHistory(data, userId) {
   }
 }
 
+/**
+ * Edit history PM Part: hanya Remark, PIC, dan Alasan Telat. Counter/tanggal/jenis/ketepatan
+ * tidak disentuh (menentukan counter wear & KPI). Perubahan dicatat di audit log.
+ */
+async function updateHistory(id, data, userId) {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const before = await pmPartHistoryQueries.findById(id, client);
+    if (!before) throw AppError.notFound('Riwayat penggantian tidak ditemukan');
+
+    const next = {
+      remark: data.remark.trim(),
+      pic_name: data.pic_name !== undefined ? data.pic_name.trim() : before.pic_name,
+      alasan_telat: resolveAlasanTelatOnEdit(before.on_time, before.alasan_telat, data.alasan_telat),
+    };
+    await pmPartHistoryQueries.updateEditable(id, next, client);
+    const after = await pmPartHistoryQueries.findById(id, client);
+
+    await recordAudit(
+      {
+        tableName: 'pm_part_history',
+        recordId: id,
+        action: 'UPDATE',
+        oldValue: { remark: before.remark, pic_name: before.pic_name, alasan_telat: before.alasan_telat },
+        newValue: next,
+        userId,
+        actionDetail: 'Edit remark/PIC/alasan telat history PM Part',
+      },
+      client
+    );
+
+    await client.query('COMMIT');
+    return after;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 function toPercentage(total, onTimeCount) {
   if (!total) return null; // belum ada data yang bisa dihitung tahun ini
   return Math.round((onTimeCount / total) * 1000) / 10; // 1 desimal
@@ -139,8 +182,10 @@ async function getKetepatanSummary({ period = 'year' } = {}) {
   return { total, on_time_count: onTimeCount, percentage: toPercentage(total, onTimeCount) };
 }
 
-async function getKetepatanPerLine() {
-  const dateFrom = clampFrom(dateUtils.startOfYearString(), await settingsService.getSetting('ketepatan_start_date'));
+// period: 'year' (default, tahun berjalan) | 'month' (bulan kalender berjalan, WIB).
+async function getKetepatanPerLine({ period = 'year' } = {}) {
+  const periodFrom = period === 'month' ? dateUtils.startOfMonthString() : dateUtils.startOfYearString();
+  const dateFrom = clampFrom(periodFrom, await settingsService.getSetting('ketepatan_start_date'));
   const rows = await pmPartHistoryQueries.getKetepatanPerLine({ dateFrom });
   return rows.map((r) => {
     const total = Number(r.total);
@@ -176,6 +221,7 @@ module.exports = {
   getKetepatanMonthlyTrend,
   listHistory,
   createHistory,
+  updateHistory,
   determineOnTime,
   getKetepatanSummary,
   getKetepatanPerLine,

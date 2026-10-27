@@ -20,4 +20,8 @@ router.get('/export', requirePermission('pm_part.view'), pmPartHistoryController
 // biasanya butuh 'pm_part.view' + 'pm_part.submit'.
 router.post('/', requirePermission('pm_part.submit'), pmPartHistoryController.create);
 
+// Edit Remark / PIC / Alasan Telat history - permission sama dengan submit ('pm_part.submit').
+// Tanggal, counter, jenis dan ketepatan TIDAK bisa diubah lewat endpoint ini.
+router.patch('/:id', requirePermission('pm_part.submit'), pmPartHistoryController.update);
+
 module.exports = router;

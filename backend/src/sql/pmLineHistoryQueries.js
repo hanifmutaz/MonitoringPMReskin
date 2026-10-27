@@ -81,6 +81,24 @@ async function create(data, runner = db) {
   return result.rows[0];
 }
 
+// 1 baris history (bentuk sama dengan list) - belum dihapus. null kalau tidak ada.
+async function findById(id, runner = db) {
+  const result = await runner.query(`${LIST_SELECT} WHERE h.id = $1 AND h.deleted_at IS NULL`, [id]);
+  return result.rows[0] || null;
+}
+
+// Edit terbatas: hanya keterangan, pic_name, alasan_telat (kolom lain sengaja tidak tersentuh).
+async function updateEditable(id, { keterangan, pic_name, alasan_telat }, runner = db) {
+  const result = await runner.query(
+    `UPDATE pm_monthly_history
+     SET keterangan = $2, pic_name = $3, alasan_telat = $4
+     WHERE id = $1 AND deleted_at IS NULL
+     RETURNING id`,
+    [id, keterangan, pic_name, alasan_telat]
+  );
+  return result.rowCount > 0;
+}
+
 // --- Ketepatan PM Monthly/Weekly (lihat pmLineHistoryService.js buat definisi on_time) ---
 
 // dateTo OPSIONAL (inklusif). Tanpa dateTo = dari dateFrom sampai sekarang
@@ -153,6 +171,8 @@ async function findLateEvents({ lineId, dateFrom }, runner = db) {
 }
 
 module.exports = {
+  findById,
+  updateEditable,
   findLateEvents,
   findAllForExport,
   findAll,

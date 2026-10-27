@@ -8,7 +8,7 @@ import { useDashboardSummary } from '../hooks/useDashboardSummary';
 import {
   useDashboardAttention,
   useDashboardUpcoming,
-  useDashboardKetepatanAttention,
+  useDashboardKetepatanBelowTarget,
   useDashboardLateLines,
   useDashboardIdleLines,
   useDashboardMultiSite,
@@ -24,6 +24,7 @@ import { Card, CardHeader, CardTitle } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
 import { EmptyState } from '../components/ui/empty-state';
 import { Button } from '../components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 
 function formatKetepatan(percentage) {
   return percentage === null || percentage === undefined ? '100%' : `${percentage}%`;
@@ -141,33 +142,52 @@ function KetepatanTrendPanel({ data }) {
 // Karena ditaro DI DALAM <Card> (yang udah ber-border + p-4.5), tanpa
 // override bakal jadi "kotak-dalam-kotak" + ketinggian (ngambang di tengah).
 // `border-0 py-8` + icon bikin dia nyatu jadi isi panel, bukan box terpisah.
-function KetepatanAttentionPanel({ data = [], isLoading }) {
+const KETEPATAN_PERIOD_LABEL = { month: 'Bulan Ini', year: 'Tahun Berjalan' };
+
+// Semua Line yang ketepatan PM-nya di bawah 100% (nilai terburuk dari Part/Monthly/Weekly), terburuk dulu.
+// `onPeriodChange` kosong = periode tetap (tampilan site lain, datanya tahun berjalan dari site itu).
+function KetepatanAttentionPanel({ data = [], isLoading, period = 'year', onPeriodChange }) {
   if (isLoading) return null;
+  const rows = data.filter((row) => row.worst_percentage !== null && row.worst_percentage !== undefined && row.worst_percentage < 100);
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex-wrap gap-2">
         <CardTitle className="flex items-center gap-1.5">
           <TrendingDown size={16} />
-          Line Perlu Perhatian (Ketepatan PM Terendah, Tahun Berjalan)
+          Line Ketepatan PM di Bawah 100% ({KETEPATAN_PERIOD_LABEL[period]})
+          {rows.length > 0 && (
+            <span className="ml-1 rounded-full bg-[var(--panel-3)] px-2 py-0.5 font-[var(--font-mono)] text-[11px] text-muted-foreground">
+              {rows.length}
+            </span>
+          )}
         </CardTitle>
+        {onPeriodChange && (
+          <Tabs value={period} onValueChange={onPeriodChange}>
+            <TabsList aria-label="Periode ketepatan">
+              <TabsTrigger value="month">Bulan Ini</TabsTrigger>
+              <TabsTrigger value="year">Tahun Berjalan</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
       </CardHeader>
-      {data.length === 0 ? (
+      {rows.length === 0 ? (
         <EmptyState
           icon={TrendingDown}
+          tone="ok"
           className="border-0 py-8"
-          title="Belum ada data ranking"
-          description="Ranking ketepatan PM akan muncul di sini setelah ada event PM tahun ini."
+          title="Semua Line ketepatan PM 100%"
+          description={`Tidak ada Line dengan ketepatan di bawah 100% (${KETEPATAN_PERIOD_LABEL[period].toLowerCase()}), atau belum ada event PM di periode ini.`}
         />
       ) : (
-        <div className="overflow-x-auto" tabIndex="0" role="region" aria-label="Tabel ranking ketepatan PM (scroll horizontal)">
+        <div className="max-h-[420px] overflow-auto" tabIndex="0" role="region" aria-label="Tabel Line ketepatan PM di bawah 100% (scroll)">
           <table className="w-full border-collapse">
             <thead><tr>
               {['Line', 'Ketepatan PM Part', 'Ketepatan Monthly', 'Ketepatan Weekly'].map((h) => (
-                <th key={h} scope="col" className="border-b border-border px-2.5 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">{h}</th>
+                <th key={h} scope="col" className="sticky top-0 z-10 border-b border-border bg-card px-2.5 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">{h}</th>
               ))}
             </tr></thead>
             <tbody>
-              {data.map((row) => (
+              {rows.map((row) => (
                 <tr key={row.line_id} className="hover:bg-[var(--panel-2)]">
                   <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5 font-[var(--font-mono)] text-[13px]">{row.line_name}</td>
                   <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5"><PercentBadge percentage={row.part_percentage} /></td>
@@ -196,14 +216,15 @@ function DashboardPage() {
   const localSummary = useDashboardSummary();
   const localAttention = useDashboardAttention();
   const localUpcoming = useDashboardUpcoming();
-  const localKetepatan = useDashboardKetepatanAttention();
+  const [ketepatanPeriod, setKetepatanPeriod] = useState('month');
+  const localKetepatan = useDashboardKetepatanBelowTarget(ketepatanPeriod);
   const localLate = useDashboardLateLines();
   const localIdle = useDashboardIdleLines();
 
   const summary = isRemoteView ? remoteSite.data?.summary : localSummary.data;
   const attention = isRemoteView ? remoteSite.data?.attention ?? [] : localAttention.data ?? [];
   const upcoming = isRemoteView ? remoteSite.data?.upcoming ?? [] : localUpcoming.data ?? [];
-  const ketepatanAttention = isRemoteView ? remoteSite.data?.ketepatan_attention ?? [] : localKetepatan.data ?? [];
+  const ketepatanAttention = isRemoteView ? remoteSite.data?.ketepatan_attention ?? [] : localKetepatan.data?.items ?? [];
   const loadingSummary = isRemoteView ? false : localSummary.isLoading;
   const errorSummary = isRemoteView ? false : localSummary.isError;
 
@@ -272,7 +293,12 @@ function DashboardPage() {
 
       {!loadingSummary && <KetepatanTrendPanel data={summary?.ketepatan_trend} />}
 
-      <KetepatanAttentionPanel data={ketepatanAttention} isLoading={isRemoteView ? false : localKetepatan.isLoading} />
+      <KetepatanAttentionPanel
+        data={ketepatanAttention}
+        isLoading={isRemoteView ? false : localKetepatan.isLoading && !localKetepatan.data}
+        period={isRemoteView ? 'year' : ketepatanPeriod}
+        onPeriodChange={isRemoteView ? undefined : setKetepatanPeriod}
+      />
 
       <Card>
         <CardHeader><CardTitle>Ringkasan Status Line</CardTitle></CardHeader>

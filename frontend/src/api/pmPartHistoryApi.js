@@ -10,3 +10,9 @@ export async function createPmPartHistory(payload) {
   const { data } = await apiClient.post('/pm-part-history', payload);
   return data.data;
 }
+
+// Edit terbatas (remark/keterangan, PIC, alasan telat). Tanggal/counter/jenis tidak bisa diubah.
+export async function updatePmPartHistory(id, payload) {
+  const { data } = await apiClient.patch(`/pm-part-history/${id}`, payload);
+  return data.data;
+}

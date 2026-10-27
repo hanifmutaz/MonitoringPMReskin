@@ -42,6 +42,16 @@ const ketepatanAttention = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Success', data });
 });
 
+// GET /api/dashboard/ketepatan-below-target?period=month|year - semua Line dengan ketepatan < 100%.
+const ketepatanBelowTarget = asyncHandler(async (req, res) => {
+  const { period } = req.query;
+  if (period !== undefined && period !== 'month' && period !== 'year') {
+    throw AppError.badRequest('Validasi gagal', { period: "period harus 'month' atau 'year'" });
+  }
+  const data = await dashboardService.getKetepatanBelowTarget({ period });
+  res.status(200).json({ success: true, message: 'Success', data });
+});
+
 // GET /api/dashboard/late-lines - Line dengan PM terlambat (ringkas).
 const lateLines = asyncHandler(async (req, res) => {
   const data = await lateLineService.getLateLines();
@@ -85,6 +95,7 @@ module.exports = {
   partSummary,
   lineSummary,
   ketepatanAttention,
+  ketepatanBelowTarget,
   lateLines,
   lateLineEvidence,
   idleLines,

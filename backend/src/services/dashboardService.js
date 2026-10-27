@@ -261,12 +261,9 @@ async function getSyncStatus() {
 // Monitoring terpisah dan bandingin manual satu-satu.
 const KETEPATAN_ATTENTION_LIMIT = 5;
 
-async function getKetepatanAttention() {
-  const [partPerLine, linePerLine] = await Promise.all([
-    pmPartHistoryService.getKetepatanPerLine(),
-    pmLineHistoryService.getKetepatanPerLine(),
-  ]);
-
+// Gabungkan ketepatan per Line dari PM Part + Monthly + Weekly jadi 1 baris per Line,
+// lengkap dengan nilai TERBURUK-nya (dan jenis PM mana yang terburuk).
+function mergeKetepatanPerLine(partPerLine, linePerLine) {
   const merged = new Map();
   const upsert = (lineId, lineName) => {
     if (!merged.has(lineId)) {
@@ -290,16 +287,48 @@ async function getKetepatanAttention() {
     row.weekly_percentage = l.weekly.percentage;
   }
 
-  return Array.from(merged.values())
-    .map((row) => {
-      const values = [row.part_percentage, row.monthly_percentage, row.weekly_percentage].filter(
-        (v) => v !== null && v !== undefined
-      );
-      return { ...row, worst_percentage: values.length ? Math.min(...values) : null };
-    })
+  return Array.from(merged.values()).map((row) => {
+    const candidates = [
+      { label: 'PM Part', value: row.part_percentage },
+      { label: 'PM Monthly', value: row.monthly_percentage },
+      { label: 'PM Weekly', value: row.weekly_percentage },
+    ].filter((c) => c.value !== null && c.value !== undefined);
+    if (candidates.length === 0) return { ...row, worst_percentage: null, worst_label: null };
+    const worst = candidates.reduce((a, b) => (b.value < a.value ? b : a));
+    return { ...row, worst_percentage: worst.value, worst_label: worst.label };
+  });
+}
+
+async function getKetepatanAttention() {
+  const [partPerLine, linePerLine] = await Promise.all([
+    pmPartHistoryService.getKetepatanPerLine(),
+    pmLineHistoryService.getKetepatanPerLine(),
+  ]);
+
+  return mergeKetepatanPerLine(partPerLine, linePerLine)
     .filter((row) => row.worst_percentage !== null)
     .sort((a, b) => a.worst_percentage - b.worst_percentage)
-    .slice(0, KETEPATAN_ATTENTION_LIMIT);
+    .slice(0, KETEPATAN_ATTENTION_LIMIT)
+    .map(({ worst_label, ...row }) => row); // bentuk respons lama tidak berubah
+}
+
+// SEMUA Line yang ketepatan PM-nya di bawah 100% (nilai terburuk dari Part/Monthly/Weekly),
+// terburuk dulu. Dipakai panel "Prioritas Hari Ini" (Mode TV) dan Dashboard.
+//   period 'month' = bulan kalender berjalan (default, selaras tile "Ketepatan PM Bulan Ini")
+//   period 'year'  = tahun berjalan
+// Line tanpa event PM di periode itu tidak muncul (belum ada yang bisa dinilai, bukan 0%).
+async function getKetepatanBelowTarget({ period = 'month' } = {}) {
+  const safePeriod = period === 'year' ? 'year' : 'month';
+  const [partPerLine, linePerLine] = await Promise.all([
+    pmPartHistoryService.getKetepatanPerLine({ period: safePeriod }),
+    pmLineHistoryService.getKetepatanPerLine({ period: safePeriod }),
+  ]);
+
+  const items = mergeKetepatanPerLine(partPerLine, linePerLine)
+    .filter((row) => row.worst_percentage !== null && row.worst_percentage < 100)
+    .sort((a, b) => a.worst_percentage - b.worst_percentage || a.line_name.localeCompare(b.line_name));
+
+  return { period: safePeriod, items };
 }
 
 // --- Dashboard khusus per domain (dipisah dari getSummary/getAttention yang
@@ -378,5 +407,6 @@ module.exports = {
   getPartSummary,
   getLineSummary,
   getKetepatanAttention,
+  getKetepatanBelowTarget,
   getKetepatanTrend,
 };

@@ -1,6 +1,6 @@
 // src/controllers/pmPartHistoryController.js
 const pmPartHistoryService = require('../services/pmPartHistoryService');
-const { validateCreateHistory } = require('../validators/pmPartHistoryValidator');
+const { validateCreateHistory, validateUpdateHistory } = require('../validators/pmPartHistoryValidator');
 const historyExportService = require('../services/historyExportService');
 const { sendXlsx } = require('../utils/xlsxExport');
 const { parseDateRange } = require('../utils/dateRange');
@@ -52,4 +52,17 @@ const create = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, message: 'Success', data });
 });
 
-module.exports = { list, create, exportXlsx };
+// PATCH /pm-part-history/:id - edit Remark / PIC / Alasan Telat saja.
+const update = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw AppError.badRequest('Validasi gagal', { id: 'id harus bilangan bulat positif' });
+  }
+  const { valid, errors } = validateUpdateHistory(req.body);
+  if (!valid) throw AppError.badRequest('Validasi gagal', errors);
+
+  const data = await pmPartHistoryService.updateHistory(id, req.body, req.user.id);
+  res.status(200).json({ success: true, message: 'Success', data });
+});
+
+module.exports = { list, create, update, exportXlsx };

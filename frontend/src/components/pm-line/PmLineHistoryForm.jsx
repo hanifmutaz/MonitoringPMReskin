@@ -112,7 +112,7 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm, sta
         // Hanya dikirim untuk PM pertama; selain itu backend pakai tanggal server.
         ...(isFirstPm ? { tgl_input: form.tgl_input } : {}),
         pic_name: form.pic_name,
-        keterangan: form.keterangan || undefined,
+        keterangan: form.keterangan.trim(),
         ...(showAlasanTelat ? { alasan_telat: form.alasan_telat } : {}),
       });
       setForm(buildInitialForm(presetLine, presetJenisPm));
@@ -210,8 +210,19 @@ function PmLineHistoryForm({ onSuccess, onCancel, presetLine, presetJenisPm, sta
         )}
 
         <div className="sm:col-span-2">
-          <Label className="mb-2.5">Keterangan (opsional)</Label>
-          <Textarea className="min-h-[60px]" value={form.keterangan} onChange={(e) => update('keterangan', e.target.value)} />
+          <Label className="mb-2.5">
+            Keterangan <span className="text-[var(--danger)]">*</span>
+          </Label>
+          <Textarea
+            className="min-h-[60px]"
+            value={form.keterangan}
+            onChange={(e) => update('keterangan', e.target.value)}
+            maxLength={500}
+            required
+            placeholder="Contoh: Cek oli, kencangkan baut, bersihkan filter"
+            aria-label="Keterangan PM"
+          />
+          {errors.keterangan && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.keterangan}</p>}
         </div>
       </div>
 

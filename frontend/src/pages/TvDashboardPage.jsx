@@ -14,11 +14,23 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import {
   useTvLineSummary, useTvPartSummary, useTvUpcoming, useTvSyncStatus, useTvSummary, useTvInventoryNeedOrder,
+  useTvIdleLines, useTvKetepatanBelowTarget,
 } from '../hooks/useTvDashboard';
+import { idleRow, ketepatanRow, pickPriorityRows } from '../utils/tvPriority';
 
 dayjs.locale('id');
 
 const num = (v) => (v === undefined || v === null ? '-' : Number(v).toLocaleString('id-ID'));
+// Jumlah baris di panel "Prioritas Hari Ini" (idle & ketepatan dijamin dapat jatah, lihat utils/tvPriority.js).
+const PRIORITY_SLOTS = 9;
+// Kelas baris per tone. Idle & ketepatan diberi garis kiri berwarna supaya beda dari baris PM.
+const PRIORITY_TONE = {
+  overdue: { row: 'bg-overdue-dim', text: 'text-overdue' },
+  danger: { row: 'bg-danger-dim', text: 'text-danger' },
+  warn: { row: 'bg-warn-dim', text: 'text-warn' },
+  muted: { row: 'bg-[var(--panel-2)]', text: 'text-muted-foreground' },
+};
+const PRIORITY_KIND_EDGE = { idle: 'border-l-4 border-[#64748b]', ketepatan: 'border-l-4 border-[#8b5cf6]' };
 const WORST = { OVERDUE: -1, DANGER: 0, WARNING: 1, OK: 2 };
 const TONE = { OK: 'text-ok', WARNING: 'text-warn', DANGER: 'text-danger', OVERDUE: 'text-overdue' };
 const PILL = { OK: 'bg-ok text-black', WARNING: 'bg-warn text-black', DANGER: 'bg-danger text-white', OVERDUE: 'bg-overdue text-white' };
@@ -234,6 +246,9 @@ function TvDashboardPage() {
   const syncQ = useTvSyncStatus();
   const summary = useTvSummary().data;
   const needOrder = useTvInventoryNeedOrder(canSeeInventory).data;
+  // Dua sumber tambahan Prioritas Hari Ini. Kalau gagal dimuat, panel tetap tampil tanpa itu (tidak ikut "Gagal memuat data").
+  const idleData = useTvIdleLines().data;
+  const belowTarget = useTvKetepatanBelowTarget().data;
 
   const sync = syncQ.data;
   const ld = line.data;
@@ -257,14 +272,21 @@ function TvDashboardPage() {
   ];
   const kBulanMonth = ld?.ketepatan?.month;
 
-  const priority = [
+  const coreRows = [
     ...nextActions.filter((r) => r.sisa <= 0 || r.hariIni).map((r) => ({
-      key: `l-${r.key}`, title: r.line, sub: `PM ${r.jenis}`, info: r.hariIni && r.sisa > 0 ? `PM hari ini (sisa ${r.sisa})` : sisaLabel(r.sisa), status: r.status,
+      key: `l-${r.key}`, kind: 'pm', title: r.line, sub: `PM ${r.jenis}`, info: r.hariIni && r.sisa > 0 ? `PM hari ini (sisa ${r.sisa})` : sisaLabel(r.sisa),
+      tone: r.status === 'OVERDUE' ? 'overdue' : r.status === 'DANGER' ? 'danger' : 'warn',
     })),
     ...(pd?.top_attention ?? []).filter((p) => p.status === 'DANGER').map((p) => ({
-      key: `p-${p.part_id}`, title: p.line_name, sub: [p.drawing_no, p.part_name].filter(Boolean).join(' • '), info: `Sisa ${num(p.remaining_shot)} shot`, status: 'DANGER',
+      key: `p-${p.part_id}`, kind: 'part', title: p.line_name, sub: [p.drawing_no, p.part_name].filter(Boolean).join(' • '), info: `Sisa ${num(p.remaining_shot)} shot`, tone: 'danger',
     })),
   ];
+  // Line tidak running (>= idle_min_days di Settings) dan Line dengan ketepatan PM < 100% bulan ini.
+  const idleRows = (idleData?.items ?? []).map(idleRow);
+  const ketepatanRows = (belowTarget?.items ?? []).map((i) => ketepatanRow(i, 'bulan ini'));
+  const { shown: priorityShown, hidden: priorityHidden } = pickPriorityRows({
+    core: coreRows, idle: idleRows, ketepatan: ketepatanRows, slots: PRIORITY_SLOTS,
+  });
 
   const dayCols = Array.from({ length: 8 }, (_, i) => {
     const d = dayjs().add(i, 'day');
@@ -358,20 +380,23 @@ function TvDashboardPage() {
 
           <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1.65fr)] gap-3">
             <Panel icon={<ClipboardList size={22} />} title="Prioritas Hari Ini" aside={dayjs().format('dddd, D MMMM YYYY')}>
-              {priority.length === 0 ? (
+              {priorityShown.length === 0 ? (
                 <AllGood title="Tidak ada PM hari ini" text="Semua mesin dalam kondisi aman. Tetap lakukan pengecekan rutin dan jaga kondisi mesin." />
               ) : (
                 <div className="flex flex-col gap-1.5">
-                  {priority.slice(0, 7).map((p) => (
-                    <div key={p.key} className={`flex items-center justify-between gap-2 rounded-lg px-3 py-1.5 ${p.status === 'OVERDUE' ? 'bg-overdue-dim' : p.status === 'DANGER' ? 'bg-danger-dim' : 'bg-warn-dim'}`}>
-                      <div className="min-w-0">
-                        <div className="font-[var(--font-mono)] font-semibold">{p.title}</div>
-                        <div className="truncate text-xs text-muted-foreground">{p.sub}</div>
+                  {priorityShown.map((p) => {
+                    const tone = PRIORITY_TONE[p.tone] ?? PRIORITY_TONE.warn;
+                    return (
+                      <div key={p.key} className={`flex items-center justify-between gap-2 rounded-lg px-3 py-1.5 ${tone.row} ${PRIORITY_KIND_EDGE[p.kind] ?? ''}`}>
+                        <div className="min-w-0">
+                          <div className="font-[var(--font-mono)] font-semibold">{p.title}</div>
+                          <div className="truncate text-xs text-muted-foreground">{p.sub}</div>
+                        </div>
+                        <div className={`shrink-0 text-right text-sm font-semibold ${tone.text}`}>{p.info}</div>
                       </div>
-                      <div className={`shrink-0 text-sm font-semibold ${TONE[p.status]}`}>{p.info}</div>
-                    </div>
-                  ))}
-                  {priority.length > 7 && <div className="pt-1 text-center text-xs text-[var(--text-faint)]">+{priority.length - 7} lainnya</div>}
+                    );
+                  })}
+                  {priorityHidden > 0 && <div className="pt-1 text-center text-xs text-[var(--text-faint)]">+{priorityHidden} lainnya</div>}
                 </div>
               )}
             </Panel>
