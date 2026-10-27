@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { cleaningInfo, idleRow, ketepatanRow, pickPriorityRows } from './tvPriority';
+import {
+  CLEANING_SOON_DAYS, cleaningInfo, cleaningUpcomingRow, idleRow, ketepatanRow, pickPriorityRows, splitIdleByCleaning,
+} from './tvPriority';
 
 const make = (kind, n) => Array.from({ length: n }, (_, i) => ({ key: `${kind}-${i}`, kind }));
 const kinds = (rows) => rows.map((r) => r.kind);
@@ -36,6 +38,44 @@ describe('pickPriorityRows', () => {
 
   test('semua kosong', () => {
     expect(pickPriorityRows({ slots: 9 })).toEqual({ shown: [], hidden: 0 });
+  });
+
+  test('reservePerKind=1: panel sempit (5 slot) tetap menyisakan 3 slot untuk PM/Part', () => {
+    const { shown } = pickPriorityRows({ core: make('pm', 10), idle: make('idle', 5), ketepatan: make('ketepatan', 5), slots: 5, reservePerKind: 1 });
+    expect(shown).toHaveLength(5);
+    expect(kinds(shown).filter((k) => k === 'pm')).toHaveLength(3);
+    expect(kinds(shown).filter((k) => k === 'idle')).toHaveLength(1);
+    expect(kinds(shown).filter((k) => k === 'ketepatan')).toHaveLength(1);
+  });
+});
+
+describe('splitIdleByCleaning', () => {
+  const it = (line_id, days, required, idle_days = 10) => ({ line_id, line_name: `L${line_id}`, days_to_cleaning: days, cleaning_required: required, idle_days });
+
+  test('cleaning jatuh tempo (hari ini/telat) -> priority; sisanya -> upcoming', () => {
+    const { priority, upcoming } = splitIdleByCleaning([it(1, 8, false), it(2, 0, true), it(3, -9, true), it(4, 14, false)]);
+    expect(priority.map((i) => i.line_id)).toEqual([2, 3]);
+    expect(upcoming.map((i) => i.line_id)).toEqual([1, 4]);
+  });
+
+  test('upcoming urut sisa hari terdekat; sisa sama -> yang lebih lama idle dulu; tanpa tanggal paling bawah', () => {
+    const { upcoming } = splitIdleByCleaning([it(1, 14, false), it(2, null, false), it(3, 5, false, 20), it(4, 5, false, 30)]);
+    expect(upcoming.map((i) => i.line_id)).toEqual([4, 3, 1, 2]);
+  });
+
+  test('input kosong / undefined aman', () => {
+    expect(splitIdleByCleaning()).toEqual({ priority: [], upcoming: [] });
+  });
+});
+
+describe('cleaningUpcomingRow', () => {
+  test('sisa hari dan tone: <= CLEANING_SOON_DAYS warn, selain itu muted', () => {
+    expect(cleaningUpcomingRow({ line_id: 1, line_name: '41HR65', idle_days: 53, days_to_cleaning: 8 })).toMatchObject({ key: 'c-1', line: '41HR65', idle: '53 hari', sisa: '8 hari', tone: 'muted' });
+    expect(cleaningUpcomingRow({ line_id: 2, line_name: 'x', idle_days: 5, days_to_cleaning: CLEANING_SOON_DAYS }).tone).toBe('warn');
+  });
+
+  test('belum pernah running & tanpa tanggal cleaning', () => {
+    expect(cleaningUpcomingRow({ line_id: 3, line_name: 'y', idle_days: 9, never_ran: true, days_to_cleaning: null })).toMatchObject({ idle: 'Belum pernah (9 hr)', sisa: '-', tone: 'muted' });
   });
 });
 

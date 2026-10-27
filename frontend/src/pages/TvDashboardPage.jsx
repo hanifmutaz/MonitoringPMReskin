@@ -9,20 +9,26 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/id';
 import {
   Wrench, Package, ShieldAlert, AlertTriangle, CheckCircle2, CalendarClock, Boxes, Target,
-  ClipboardList, Clock, Settings, CalendarDays, Info, WifiOff, Maximize, Minimize, ArrowLeft,
+  ClipboardList, Clock, Settings, CalendarDays, Info, WifiOff, Maximize, Minimize, ArrowLeft, SprayCan,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   useTvLineSummary, useTvPartSummary, useTvUpcoming, useTvSyncStatus, useTvSummary, useTvInventoryNeedOrder,
   useTvIdleLines, useTvKetepatanBelowTarget,
 } from '../hooks/useTvDashboard';
-import { idleRow, ketepatanRow, pickPriorityRows } from '../utils/tvPriority';
+import {
+  cleaningUpcomingRow, idleRow, ketepatanRow, pickPriorityRows, splitIdleByCleaning,
+} from '../utils/tvPriority';
 
 dayjs.locale('id');
 
 const num = (v) => (v === undefined || v === null ? '-' : Number(v).toLocaleString('id-ID'));
-// Jumlah baris di panel "Prioritas Hari Ini" (idle & ketepatan dijamin dapat jatah, lihat utils/tvPriority.js).
-const PRIORITY_SLOTS = 9;
+// Kolom kiri dibagi dua: "Prioritas Hari Ini" (atas) + "Cleaning Line Tidak Running Terdekat" (bawah).
+// Jumlah baris di panel Prioritas (idle & ketepatan dijamin dapat 1 jatah, lihat utils/tvPriority.js).
+const PRIORITY_SLOTS = 5;
+const PRIORITY_RESERVE = 1;
+// Jumlah baris panel "Cleaning Line Tidak Running Terdekat" (sisanya "+N lagi").
+const CLEANING_SLOTS = 4;
 // Kelas baris per tone. Idle & ketepatan diberi garis kiri berwarna supaya beda dari baris PM.
 const PRIORITY_TONE = {
   overdue: { row: 'bg-overdue-dim', text: 'text-overdue' },
@@ -281,11 +287,16 @@ function TvDashboardPage() {
       key: `p-${p.part_id}`, kind: 'part', title: p.line_name, sub: [p.drawing_no, p.part_name].filter(Boolean).join(' • '), info: `Sisa ${num(p.remaining_shot)} shot`, tone: 'danger',
     })),
   ];
-  // Line tidak running (>= idle_min_days di Settings) dan Line dengan ketepatan PM < 100% bulan ini.
-  const idleRows = (idleData?.items ?? []).map(idleRow);
+  // Line tidak running (>= idle_min_days di Settings): hanya yang cleaning-nya SUDAH jatuh tempo (hari ini/telat)
+  // masuk Prioritas. Yang belum jatuh tempo tampil di panel "Cleaning Line Tidak Running Terdekat".
+  // Line dengan ketepatan PM < 100% bulan ini tetap masuk Prioritas.
+  const { priority: idlePriority, upcoming: idleUpcoming } = splitIdleByCleaning(idleData?.items ?? []);
+  const idleRows = idlePriority.map(idleRow);
+  const cleaningRows = idleUpcoming.map(cleaningUpcomingRow);
+  const cleaningShown = cleaningRows.slice(0, CLEANING_SLOTS);
   const ketepatanRows = (belowTarget?.items ?? []).map((i) => ketepatanRow(i, 'bulan ini'));
   const { shown: priorityShown, hidden: priorityHidden } = pickPriorityRows({
-    core: coreRows, idle: idleRows, ketepatan: ketepatanRows, slots: PRIORITY_SLOTS,
+    core: coreRows, idle: idleRows, ketepatan: ketepatanRows, slots: PRIORITY_SLOTS, reservePerKind: PRIORITY_RESERVE,
   });
 
   const dayCols = Array.from({ length: 8 }, (_, i) => {
@@ -379,6 +390,7 @@ function TvDashboardPage() {
           </div>
 
           <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1.65fr)] gap-3">
+            <div className="grid min-h-0 grid-rows-[minmax(0,1.45fr)_minmax(0,1fr)] gap-3">
             <Panel icon={<ClipboardList size={22} />} title="Prioritas Hari Ini" aside={dayjs().format('dddd, D MMMM YYYY')}>
               {priorityShown.length === 0 ? (
                 <AllGood title="Tidak ada PM hari ini" text="Semua mesin dalam kondisi aman. Tetap lakukan pengecekan rutin dan jaga kondisi mesin." />
@@ -400,6 +412,29 @@ function TvDashboardPage() {
                 </div>
               )}
             </Panel>
+
+            <Panel icon={<SprayCan size={22} />} title="Cleaning Line Tidak Running" aside="Terdekat">
+              {cleaningShown.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">Tidak ada Line tidak running yang menunggu cleaning</div>
+              ) : (
+                <>
+                  <table className="w-full whitespace-nowrap border-collapse text-sm">
+                    <thead><tr><Th>Line</Th><Th>Tidak Running</Th><Th right>Cleaning</Th></tr></thead>
+                    <tbody>
+                      {cleaningShown.map((r) => (
+                        <tr key={r.key} className="border-b border-[var(--border-soft)]">
+                          <td className="px-2 py-1 font-[var(--font-mono)]">{r.line}</td>
+                          <td className="px-2 py-1 text-muted-foreground">{r.idle}</td>
+                          <td className={`px-2 py-1 text-right font-semibold ${PRIORITY_TONE[r.tone].text}`}>{r.sisa}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {cleaningRows.length > CLEANING_SLOTS && <div className="pt-1 text-center text-xs text-[var(--text-faint)]">+{cleaningRows.length - CLEANING_SLOTS} lagi</div>}
+                </>
+              )}
+            </Panel>
+            </div>
 
             <Panel icon={<Clock size={22} />} title="PM Terdekat (Next Action)">
               {nextRows.length === 0 ? (
@@ -432,14 +467,13 @@ function TvDashboardPage() {
                 <div className="flex h-full items-center justify-center text-muted-foreground">Belum ada data part</div>
               ) : (
                 <table className="w-full border-collapse text-sm [&_td]:whitespace-nowrap">
-                  <thead><tr><Th>No</Th><Th>Line</Th><Th>IPDP</Th><Th>Part Name</Th><Th right>Sisa Shot</Th><Th center>Status</Th></tr></thead>
+                  <thead><tr><Th>No</Th><Th>Line</Th><Th>IPDP</Th><Th right>Sisa Shot</Th><Th center>Status</Th></tr></thead>
                   <tbody>
                     {topParts.map((p, i) => (
                       <tr key={p.part_id} className="border-b border-[var(--border-soft)]">
                         <td className="px-2 py-1 text-muted-foreground">{i + 1}</td>
                         <td className="px-2 py-1 font-[var(--font-mono)]">{p.line_name}</td>
                         <td className="px-2 py-1 font-[var(--font-mono)]">{p.drawing_no || '-'}</td>
-                        <td className="px-2 py-1">{p.part_name || '-'}</td>
                         <td className={`px-2 py-1 text-right font-[var(--font-mono)] font-semibold ${TONE[p.status]}`}>{num(p.remaining_shot)}</td>
                         <td className="px-2 py-1 text-center"><Pill status={p.status} label={STATUS_LABEL[p.status]} /></td>
                       </tr>

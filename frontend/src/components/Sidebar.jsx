@@ -111,6 +111,7 @@ const NAV_GROUPS = [
       // modal form yang sama, tanpa preset - user pilih Line & jenis PM di
       // situ). Route /pm-line/form TETAP HIDUP, cuma gak lagi muncul di menu.
       { to: '/pm-line', label: 'Monitoring PM Monthly and Weekly', badgeKey: 'lines_critical', permission: 'pm_line.view' },
+      { to: '/pm-line/cleaning', label: 'Cleaning Line Tidak Running', permission: 'pm_line.view' },
       { to: '/pm-line/history', label: 'History PM Monthly and Weekly', permission: 'pm_line.view' },
     ],
   },

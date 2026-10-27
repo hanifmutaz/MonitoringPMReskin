@@ -27,6 +27,7 @@ const PmPartHistoryPage = lazy(() => import('./pages/PmPartHistoryPage'));
 const PmLineStatusPage = lazy(() => import('./pages/PmLineStatusPage'));
 const PmLineFormPage = lazy(() => import('./pages/PmLineFormPage'));
 const PmLineHistoryPage = lazy(() => import('./pages/PmLineHistoryPage'));
+const PmLineCleaningPage = lazy(() => import('./pages/PmLineCleaningPage'));
 const MasterDataPage = lazy(() => import('./pages/MasterDataPage'));
 const InventoryPage = lazy(() => import('./pages/InventoryPage'));
 const InventoryHistoryPage = lazy(() => import('./pages/InventoryHistoryPage'));
@@ -71,6 +72,7 @@ function App() {
             <Route element={<ProtectedRoute requiredPermission="pm_line.view" />}>
               <Route path="/pm-line" element={<PmLineStatusPage />} />
               <Route path="/pm-line/history" element={<PmLineHistoryPage />} />
+              <Route path="/pm-line/cleaning" element={<PmLineCleaningPage />} />
             </Route>
             <Route element={<ProtectedRoute requiredPermission="pm_line.submit" />}>
               <Route path="/pm-line/form" element={<PmLineFormPage />} />
