@@ -23,9 +23,11 @@ function validateCreateLineCleaning(body) {
     errors.pic_name = 'PIC maksimal 150 karakter';
   }
 
-  if (body && body.keterangan !== undefined && body.keterangan !== null) {
-    if (typeof body.keterangan !== 'string') errors.keterangan = 'Keterangan harus berupa teks';
-    else if (body.keterangan.length > 500) errors.keterangan = 'Keterangan maksimal 500 karakter';
+  // Keterangan WAJIB (apa yang dibersihkan / kondisi Line saat cleaning), supaya riwayat cleaning bisa diaudit.
+  if (!body || typeof body.keterangan !== 'string' || body.keterangan.trim() === '') {
+    errors.keterangan = 'Keterangan wajib diisi';
+  } else if (body.keterangan.trim().length > 500) {
+    errors.keterangan = 'Keterangan maksimal 500 karakter';
   }
 
   return { valid: Object.keys(errors).length === 0, errors };

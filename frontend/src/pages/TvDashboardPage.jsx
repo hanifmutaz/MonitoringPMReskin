@@ -1,6 +1,7 @@
 // src/pages/TvDashboardPage.jsx
 // Mode TV "PM Monitoring" (1 layar, tanpa sidebar): KPI part/line/inventory,
-// prioritas hari ini, PM terdekat, top part perlu perhatian, jadwal PM 8 hari.
+// prioritas hari ini, PM terdekat, top part perlu perhatian, cleaning Line tidak running terdekat,
+// ketepatan PM < 100% (baris bisa diklik -> detail telat + alasan), jadwal PM 8 hari.
 // Auto-refresh 60 detik, tanpa endpoint baru. Dibuka lewat tombol "Mode TV" di
 // Topbar (route /tv). Ukuran & jumlah baris dibatasi supaya tidak kepotong.
 import { Fragment, useEffect, useState } from 'react';
@@ -16,19 +17,21 @@ import {
   useTvLineSummary, useTvPartSummary, useTvUpcoming, useTvSyncStatus, useTvSummary, useTvInventoryNeedOrder,
   useTvIdleLines, useTvKetepatanBelowTarget,
 } from '../hooks/useTvDashboard';
-import {
-  cleaningUpcomingRow, idleRow, ketepatanRow, pickPriorityRows, splitIdleByCleaning,
-} from '../utils/tvPriority';
+import { cleaningUpcomingRow, idleRow, pickPriorityRows, splitIdleByCleaning } from '../utils/tvPriority';
+import { belowTargetTone, pctLabel } from '../utils/ketepatanLate';
+import KetepatanLateDetailModal from '../components/KetepatanLateDetailModal';
 
 dayjs.locale('id');
 
 const num = (v) => (v === undefined || v === null ? '-' : Number(v).toLocaleString('id-ID'));
-// Kolom kiri dibagi dua: "Prioritas Hari Ini" (atas) + "Cleaning Line Tidak Running Terdekat" (bawah).
-// Jumlah baris di panel Prioritas (idle & ketepatan dijamin dapat 1 jatah, lihat utils/tvPriority.js).
-const PRIORITY_SLOTS = 5;
-const PRIORITY_RESERVE = 1;
-// Jumlah baris panel "Cleaning Line Tidak Running Terdekat" (sisanya "+N lagi").
+// Jumlah baris di panel "Prioritas Hari Ini" (Line tidak running yang cleaning-nya jatuh tempo dijamin dapat jatah,
+// lihat utils/tvPriority.js).
+const PRIORITY_SLOTS = 9;
+// Jumlah baris panel "Cleaning Line Tidak Running" (sisanya "+N lagi").
 const CLEANING_SLOTS = 4;
+// Lebar 4 kolom baris tengah: Prioritas | PM Terdekat | Top Part | (Cleaning + Ketepatan PM). Atur di sini kalau
+// TV tertentu terasa sempit/longgar.
+const MIDDLE_COLS = 'grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.05fr)_minmax(0,1fr)]';
 // Kelas baris per tone. Idle & ketepatan diberi garis kiri berwarna supaya beda dari baris PM.
 const PRIORITY_TONE = {
   overdue: { row: 'bg-overdue-dim', text: 'text-overdue' },
@@ -36,7 +39,7 @@ const PRIORITY_TONE = {
   warn: { row: 'bg-warn-dim', text: 'text-warn' },
   muted: { row: 'bg-[var(--panel-2)]', text: 'text-muted-foreground' },
 };
-const PRIORITY_KIND_EDGE = { idle: 'border-l-4 border-[#64748b]', ketepatan: 'border-l-4 border-[#8b5cf6]' };
+const PRIORITY_KIND_EDGE = { idle: 'border-l-4 border-[#64748b]' };
 const WORST = { OVERDUE: -1, DANGER: 0, WARNING: 1, OK: 2 };
 const TONE = { OK: 'text-ok', WARNING: 'text-warn', DANGER: 'text-danger', OVERDUE: 'text-overdue' };
 const PILL = { OK: 'bg-ok text-black', WARNING: 'bg-warn text-black', DANGER: 'bg-danger text-white', OVERDUE: 'bg-overdue text-white' };
@@ -255,6 +258,8 @@ function TvDashboardPage() {
   // Dua sumber tambahan Prioritas Hari Ini. Kalau gagal dimuat, panel tetap tampil tanpa itu (tidak ikut "Gagal memuat data").
   const idleData = useTvIdleLines().data;
   const belowTarget = useTvKetepatanBelowTarget().data;
+  // Line yang baris ketepatannya sedang dibuka (modal detail telat + alasan).
+  const [ketepatanDetail, setKetepatanDetail] = useState(null);
 
   const sync = syncQ.data;
   const ld = line.data;
@@ -288,15 +293,15 @@ function TvDashboardPage() {
     })),
   ];
   // Line tidak running (>= idle_min_days di Settings): hanya yang cleaning-nya SUDAH jatuh tempo (hari ini/telat)
-  // masuk Prioritas. Yang belum jatuh tempo tampil di panel "Cleaning Line Tidak Running Terdekat".
-  // Line dengan ketepatan PM < 100% bulan ini tetap masuk Prioritas.
+  // masuk Prioritas. Yang belum jatuh tempo tampil di panel "Cleaning Line Tidak Running".
+  // Line dengan ketepatan PM < 100% bulan ini TIDAK masuk Prioritas: punya panel sendiri (bisa diklik).
   const { priority: idlePriority, upcoming: idleUpcoming } = splitIdleByCleaning(idleData?.items ?? []);
   const idleRows = idlePriority.map(idleRow);
   const cleaningRows = idleUpcoming.map(cleaningUpcomingRow);
   const cleaningShown = cleaningRows.slice(0, CLEANING_SLOTS);
-  const ketepatanRows = (belowTarget?.items ?? []).map((i) => ketepatanRow(i, 'bulan ini'));
+  const ketepatanItems = belowTarget?.items ?? [];
   const { shown: priorityShown, hidden: priorityHidden } = pickPriorityRows({
-    core: coreRows, idle: idleRows, ketepatan: ketepatanRows, slots: PRIORITY_SLOTS, reservePerKind: PRIORITY_RESERVE,
+    core: coreRows, idle: idleRows, slots: PRIORITY_SLOTS,
   });
 
   const dayCols = Array.from({ length: 8 }, (_, i) => {
@@ -389,8 +394,7 @@ function TvDashboardPage() {
             ) : <Kpi key={key} {...k} />))}
           </div>
 
-          <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1.65fr)] gap-3">
-            <div className="grid min-h-0 grid-rows-[minmax(0,1.45fr)_minmax(0,1fr)] gap-3">
+          <div className={`grid min-h-0 gap-3 ${MIDDLE_COLS}`}>
             <Panel icon={<ClipboardList size={22} />} title="Prioritas Hari Ini" aside={dayjs().format('dddd, D MMMM YYYY')}>
               {priorityShown.length === 0 ? (
                 <AllGood title="Tidak ada PM hari ini" text="Semua mesin dalam kondisi aman. Tetap lakukan pengecekan rutin dan jaga kondisi mesin." />
@@ -412,29 +416,6 @@ function TvDashboardPage() {
                 </div>
               )}
             </Panel>
-
-            <Panel icon={<SprayCan size={22} />} title="Cleaning Line Tidak Running" aside="Terdekat">
-              {cleaningShown.length === 0 ? (
-                <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">Tidak ada Line tidak running yang menunggu cleaning</div>
-              ) : (
-                <>
-                  <table className="w-full whitespace-nowrap border-collapse text-sm">
-                    <thead><tr><Th>Line</Th><Th>Tidak Running</Th><Th right>Cleaning</Th></tr></thead>
-                    <tbody>
-                      {cleaningShown.map((r) => (
-                        <tr key={r.key} className="border-b border-[var(--border-soft)]">
-                          <td className="px-2 py-1 font-[var(--font-mono)]">{r.line}</td>
-                          <td className="px-2 py-1 text-muted-foreground">{r.idle}</td>
-                          <td className={`px-2 py-1 text-right font-semibold ${PRIORITY_TONE[r.tone].text}`}>{r.sisa}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {cleaningRows.length > CLEANING_SLOTS && <div className="pt-1 text-center text-xs text-[var(--text-faint)]">+{cleaningRows.length - CLEANING_SLOTS} lagi</div>}
-                </>
-              )}
-            </Panel>
-            </div>
 
             <Panel icon={<Clock size={22} />} title="PM Terdekat (Next Action)">
               {nextRows.length === 0 ? (
@@ -482,6 +463,58 @@ function TvDashboardPage() {
                 </table>
               )}
             </Panel>
+
+            <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3">
+              <Panel icon={<SprayCan size={22} />} title="Cleaning Line Tidak Running" aside="Terdekat">
+                {cleaningShown.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">Tidak ada Line tidak running yang menunggu cleaning</div>
+                ) : (
+                  <>
+                    <table className="w-full whitespace-nowrap border-collapse text-sm">
+                      <thead><tr><Th>Line</Th><Th>Tidak Running</Th><Th right>Cleaning</Th></tr></thead>
+                      <tbody>
+                        {cleaningShown.map((r) => (
+                          <tr key={r.key} className="border-b border-[var(--border-soft)]">
+                            <td className="px-2 py-1 font-[var(--font-mono)]">{r.line}</td>
+                            <td className="px-2 py-1 text-muted-foreground">{r.idle}</td>
+                            <td className={`px-2 py-1 text-right font-semibold ${PRIORITY_TONE[r.tone].text}`}>{r.sisa}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {cleaningRows.length > CLEANING_SLOTS && <div className="pt-1 text-center text-xs text-[var(--text-faint)]">+{cleaningRows.length - CLEANING_SLOTS} lagi</div>}
+                  </>
+                )}
+              </Panel>
+
+              <Panel
+                icon={<Target size={22} />}
+                title="Ketepatan PM < 100%"
+                aside={ketepatanItems.length > 0 ? `Bulan ini · ${ketepatanItems.length} line` : 'Bulan ini'}
+              >
+                {ketepatanItems.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">Semua PM bulan ini tepat waktu</div>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    {ketepatanItems.map((k) => (
+                      <button
+                        key={k.line_id}
+                        type="button"
+                        onClick={() => setKetepatanDetail(k)}
+                        className="flex w-full items-center justify-between gap-2 rounded-lg bg-[var(--panel-2)] px-3 py-1.5 text-left transition-colors hover:bg-[var(--accent-dim)]"
+                        title="Klik untuk lihat PM yang telat, lama telat, dan alasannya"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-[var(--font-mono)] font-semibold">{k.line_name}</div>
+                          <div className="truncate text-xs text-muted-foreground">{k.worst_label}</div>
+                        </div>
+                        <div className={`shrink-0 text-sm font-semibold tabular-nums ${PRIORITY_TONE[belowTargetTone(k.worst_percentage)].text}`}>{pctLabel(k.worst_percentage)}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </Panel>
+            </div>
           </div>
 
           <div className="grid grid-cols-[minmax(0,1fr)_15rem] gap-3">
@@ -536,6 +569,10 @@ function TvDashboardPage() {
             </Panel>
           </div>
         </>
+      )}
+
+      {ketepatanDetail && (
+        <KetepatanLateDetailModal item={ketepatanDetail} period="month" onClose={() => setKetepatanDetail(null)} />
       )}
 
       <footer className="flex items-center justify-between text-sm text-[var(--text-faint)]">

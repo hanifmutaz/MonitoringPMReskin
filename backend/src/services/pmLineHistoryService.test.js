@@ -1,7 +1,7 @@
 // src/services/pmLineHistoryService.test.js
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { determineHelperUpdate, determineOnTime, resolveTglInput } = require('./pmLineHistoryService');
+const { computeLateDays, determineHelperUpdate, determineOnTime, resolveTglInput } = require('./pmLineHistoryService');
 
 describe('determineHelperUpdate - Reset Rule MASTER DOCUMENT Bagian 2.D', () => {
   test('WEEKLY: update tgl_pm_weekly_terakhir + reset akumulasi_poin_weekly, tidak menyentuh Monthly', () => {
@@ -228,5 +228,32 @@ describe('determineHelperUpdate - shiftCut (poin sadar-shift di tanggal PM)', ()
   test('shiftCut null (jam tidak diketahui) dikosongkan eksplisit', () => {
     const r = determineHelperUpdate('WEEKLY', '2026-10-01', null, true, false, null);
     assert.equal(r.pm_weekly_baseline_shift_cut, null);
+  });
+});
+
+describe('computeLateDays - lama telat = poin mentah - cap', () => {
+  const T = { monthlyCap: 7, weeklyTotalDays: 7 };
+  const helper = { akumulasi_poin_monthly_raw: 9.5, akumulasi_poin_weekly_raw: 8 };
+
+  test('PM tepat waktu -> null', () => {
+    assert.equal(computeLateDays('MONTHLY', true, helper, T), null);
+  });
+
+  test('Monthly telat: raw - cap, 1 desimal', () => {
+    assert.equal(computeLateDays('MONTHLY', false, helper, T), 2.5);
+    assert.equal(computeLateDays('MONTHLY', false, { akumulasi_poin_monthly_raw: 7.26 }, T), 0.3);
+  });
+
+  test('Weekly pakai poin & cap Weekly', () => {
+    assert.equal(computeLateDays('WEEKLY', false, helper, { monthlyCap: 30, weeklyTotalDays: 7 }), 1);
+  });
+
+  test('poin mentah tidak tersedia / helper kosong -> null (tidak menebak)', () => {
+    assert.equal(computeLateDays('MONTHLY', false, { akumulasi_poin_monthly_raw: null }, T), null);
+    assert.equal(computeLateDays('MONTHLY', false, null, T), null);
+  });
+
+  test('tidak pernah negatif (mis. telat karena fallback poin ter-cap)', () => {
+    assert.equal(computeLateDays('MONTHLY', false, { akumulasi_poin_monthly_raw: 7 }, T), 0);
   });
 });

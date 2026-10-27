@@ -68,6 +68,21 @@ const lateLineEvidence = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Success', data });
 });
 
+// GET /api/dashboard/ketepatan-below-target/:lineId/events?period=month|year - PM telat 1 Line di periode itu
+// (jenis PM, telat berapa lama, PIC, alasan). Dibuka dari daftar "Ketepatan PM < 100%".
+const ketepatanLateEvents = asyncHandler(async (req, res) => {
+  const lineId = Number(req.params.lineId);
+  if (!Number.isInteger(lineId) || lineId <= 0) {
+    throw AppError.badRequest('Validasi gagal', { lineId: 'lineId harus bilangan bulat positif' });
+  }
+  const { period } = req.query;
+  if (period !== undefined && period !== 'month' && period !== 'year') {
+    throw AppError.badRequest('Validasi gagal', { period: "period harus 'month' atau 'year'" });
+  }
+  const data = await lateLineService.getKetepatanLateDetail(lineId, period);
+  res.status(200).json({ success: true, message: 'Success', data });
+});
+
 // GET /api/dashboard/idle-lines - Line tidak running + status cleaning.
 const idleLines = asyncHandler(async (req, res) => {
   const data = await lineIdleService.getIdleLines();
@@ -96,6 +111,7 @@ module.exports = {
   lineSummary,
   ketepatanAttention,
   ketepatanBelowTarget,
+  ketepatanLateEvents,
   lateLines,
   lateLineEvidence,
   idleLines,

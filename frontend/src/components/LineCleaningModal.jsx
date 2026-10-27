@@ -19,12 +19,17 @@ function LineCleaningModal({ line, onClose }) {
   async function handleSubmit(e) {
     e.preventDefault();
     setErrors({});
+    // Spasi saja tidak dianggap terisi (required HTML hanya cek kosong); server memvalidasi ulang.
+    if (!form.keterangan.trim()) {
+      setErrors({ keterangan: 'Keterangan wajib diisi' });
+      return;
+    }
     try {
       await mutation.mutateAsync({
         line_id: line.line_id,
         tgl_cleaning: form.tgl_cleaning || undefined,
         pic_name: form.pic_name,
-        keterangan: form.keterangan || undefined,
+        keterangan: form.keterangan.trim(),
       });
       onClose();
     } catch (err) {
@@ -50,8 +55,15 @@ function LineCleaningModal({ line, onClose }) {
             {errors.pic_name && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.pic_name}</p>}
           </div>
           <div>
-            <Label className="mb-2.5">Keterangan (opsional)</Label>
-            <Textarea className="min-h-[60px]" maxLength={500} value={form.keterangan} onChange={(e) => update('keterangan', e.target.value)} />
+            <Label className="mb-2.5">Keterangan</Label>
+            <Textarea
+              className="min-h-[60px]"
+              maxLength={500}
+              required
+              placeholder="Apa yang dibersihkan / kondisi Line saat cleaning"
+              value={form.keterangan}
+              onChange={(e) => update('keterangan', e.target.value)}
+            />
             {errors.keterangan && <p className="mt-1 text-[11px] text-[var(--danger)]">{errors.keterangan}</p>}
           </div>
         </div>

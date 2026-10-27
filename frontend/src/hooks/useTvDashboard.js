@@ -5,6 +5,7 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   fetchSummary, fetchLineSummary, fetchPartSummary, fetchUpcoming, fetchSyncStatus, fetchIdleLines, fetchKetepatanBelowTarget,
+  fetchKetepatanLateEvents,
 } from '../api/dashboardApi';
 import { fetchInventoryRopStatus } from '../api/inventoryApi';
 
@@ -32,19 +33,30 @@ export function useTvSyncStatus() {
   return useQuery({ queryKey: ['dashboard', 'sync-status'], queryFn: fetchSyncStatus, ...tvOptions });
 }
 
-// Line tidak running (>= idle_min_days) + status cleaning, buat "Prioritas Hari Ini".
+// Line tidak running (>= idle_min_days) + status cleaning, buat "Prioritas Hari Ini" (cleaning jatuh tempo)
+// dan panel "Cleaning Line Tidak Running" (cleaning terdekat).
 // Gagal/belum ada endpoint (backend lama) tidak boleh merusak layar TV: retry:false, error diabaikan di page.
 export function useTvIdleLines() {
   return useQuery({ queryKey: ['dashboard', 'idle-lines'], queryFn: fetchIdleLines, ...tvOptions, retry: 1 });
 }
 
-// Line dengan ketepatan PM < 100% bulan ini, buat "Prioritas Hari Ini".
+// Line dengan ketepatan PM < 100% bulan ini, buat panel "Ketepatan PM < 100%" (bisa diklik untuk detail).
 export function useTvKetepatanBelowTarget() {
   return useQuery({
     queryKey: ['dashboard', 'ketepatan-below-target', 'month'],
     queryFn: () => fetchKetepatanBelowTarget('month'),
     ...tvOptions,
     retry: 1,
+  });
+}
+
+// Detail telat 1 Line (dibuka saat baris di panel "Ketepatan PM < 100%" diklik). Hanya diambil saat modal
+// terbuka (lineId terisi), tanpa auto-refresh: ini bukti per kejadian, bukan angka live.
+export function useTvKetepatanLateEvents(lineId, period = 'month') {
+  return useQuery({
+    queryKey: ['dashboard', 'ketepatan-late-events', lineId, period],
+    queryFn: () => fetchKetepatanLateEvents(lineId, period),
+    enabled: Boolean(lineId),
   });
 }
 

@@ -19,7 +19,9 @@ const lineIdleQueries = require('../sql/lineIdleQueries');
 const pmLineHistoryQueries = require('../sql/pmLineHistoryQueries');
 const pmPartHistoryQueries = require('../sql/pmPartHistoryQueries');
 const { computeIdleStatus } = require('../utils/lineIdle');
+const settingsService = require('./settingsService');
 const dateUtils = require('../utils/dateUtils');
+const { clampFrom } = require('../utils/ketepatanStart');
 const AppError = require('../utils/AppError');
 
 const OUTPUT_DAYS = 14;
@@ -190,8 +192,71 @@ async function getLateLineEvidence(lineId) {
   };
 }
 
+/**
+ * Gabungkan PM telat Monthly/Weekly + Part jadi 1 daftar seragam (terbaru dulu). Fungsi murni.
+ *  - Monthly/Weekly: lama telat = telat_hari yang dicatat saat submit (null untuk data lama).
+ *  - Part: lama telat = counter_saat_diganti - target_shot (shot) + persen di atas target.
+ */
+function buildKetepatanLateEvents(lineEvents = [], partEvents = []) {
+  const fromLine = lineEvents.map((e) => ({
+    source: e.jenis_pm === 'WEEKLY' ? 'PM_LINE_WEEKLY' : 'PM_LINE_MONTHLY',
+    label: e.jenis_pm === 'WEEKLY' ? 'PM Weekly' : 'PM Monthly',
+    tanggal: e.tgl_input,
+    late: e.telat_hari === null || e.telat_hari === undefined ? null : { unit: 'hari', value: Number(e.telat_hari) },
+    pic_name: e.pic_name,
+    alasan_telat: e.alasan_telat,
+    catatan: e.keterangan,
+  }));
+  const fromPart = partEvents.map((e) => {
+    const target = Number(e.target_shot);
+    const over = Math.max(0, Number(e.counter_saat_diganti) - target);
+    return {
+      source: 'PM_PART',
+      label: `${e.part_name} (${e.drawing_no})`,
+      tanggal: e.tgl_ganti,
+      late: { unit: 'shot', value: over, percent: target > 0 ? round1((over / target) * 100) : null },
+      pic_name: e.pic_name,
+      alasan_telat: e.alasan_telat,
+      catatan: e.remark,
+      counter: Number(e.counter_saat_diganti),
+      target_shot: target,
+    };
+  });
+  return [...fromLine, ...fromPart].sort((a, b) => (a.tanggal < b.tanggal ? 1 : a.tanggal > b.tanggal ? -1 : 0));
+}
+
+/**
+ * Detail "Ketepatan PM < 100%" 1 Line: PM mana yang dinilai telat di periode itu, telat berapa lama,
+ * siapa PIC-nya, dan alasannya. Periode & batas awal SAMA dengan perhitungan persentase ketepatan
+ * (bulan/tahun berjalan, dipotong ketepatan_start_date) supaya angkanya cocok dengan daftarnya.
+ */
+async function getKetepatanLateDetail(lineId, period = 'month') {
+  const safePeriod = period === 'year' ? 'year' : 'month';
+  const lineRows = await lineIdleQueries.findLineActivity();
+  const line = lineRows.find((r) => r.line_id === lineId);
+  if (!line) throw AppError.notFound('Line tidak ditemukan');
+
+  const periodFrom = safePeriod === 'month' ? dateUtils.startOfMonthString() : dateUtils.startOfYearString();
+  const dateFrom = clampFrom(periodFrom, await settingsService.getSetting('ketepatan_start_date'));
+
+  const [lineEvents, partEvents] = await Promise.all([
+    pmLineHistoryQueries.findLateEvents({ lineId, dateFrom }),
+    pmPartHistoryQueries.findLateEventsByLine({ lineId, dateFrom }),
+  ]);
+
+  return {
+    line_id: lineId,
+    line_name: line.line_name,
+    period: safePeriod,
+    date_from: dateFrom,
+    events: buildKetepatanLateEvents(lineEvents, partEvents),
+  };
+}
+
 module.exports = {
   getLateLines,
+  getKetepatanLateDetail,
+  buildKetepatanLateEvents,
   getLateLineEvidence,
   lateItemsFromLineStatus,
   lateItemFromPartMetric,

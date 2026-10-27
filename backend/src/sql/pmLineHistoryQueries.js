@@ -64,9 +64,9 @@ async function findAllForExport({ lineId, jenis, dateFrom, dateTo, maxRows } = {
 
 async function create(data, runner = db) {
   const result = await runner.query(
-    `INSERT INTO pm_monthly_history (line_id, tgl_input, jenis_pm, keterangan, pic_name, user_id, on_time, alasan_telat)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-     RETURNING id, line_id, tgl_input, jenis_pm, keterangan, pic_name, user_id, on_time, alasan_telat, created_at`,
+    `INSERT INTO pm_monthly_history (line_id, tgl_input, jenis_pm, keterangan, pic_name, user_id, on_time, alasan_telat, telat_hari)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     RETURNING id, line_id, tgl_input, jenis_pm, keterangan, pic_name, user_id, on_time, alasan_telat, telat_hari, created_at`,
     [
       data.line_id,
       data.tgl_input,
@@ -76,6 +76,7 @@ async function create(data, runner = db) {
       data.user_id,
       data.on_time,
       data.alasan_telat ?? null,
+      data.telat_hari ?? null,
     ]
   );
   return result.rows[0];
@@ -161,7 +162,7 @@ async function getKetepatanPerLine({ dateFrom }, runner = db) {
 // PM Monthly/Weekly yang dinilai telat (on_time = FALSE) untuk 1 Line sejak dateFrom.
 async function findLateEvents({ lineId, dateFrom }, runner = db) {
   const result = await runner.query(
-    `SELECT h.id, h.tgl_input, h.jenis_pm, h.pic_name, h.keterangan, h.alasan_telat, h.created_at
+    `SELECT h.id, h.tgl_input, h.jenis_pm, h.pic_name, h.keterangan, h.alasan_telat, h.telat_hari, h.created_at
      FROM pm_monthly_history h
      WHERE h.line_id = $1 AND h.on_time = FALSE AND h.deleted_at IS NULL AND h.tgl_input >= $2
      ORDER BY h.tgl_input DESC, h.id DESC`,

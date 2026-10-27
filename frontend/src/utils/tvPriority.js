@@ -2,18 +2,16 @@
 //
 // Susunan panel "Prioritas Hari Ini" di Mode TV. Murni (tanpa React/DOM) supaya bisa di-unit-test.
 //
-// Empat sumber, urut kepentingan:
+// Dua sumber, urut kepentingan:
 //   1. PM Line yang jatuh tempo hari ini / sudah lewat, dan Part berstatus Danger   (kind 'pm' / 'part')
-//   2. Line tidak running yang cleaning-nya SUDAH jatuh tempo (hari ini / telat)     (kind 'idle')
-//      Yang cleaning-nya belum jatuh tempo TIDAK masuk sini, tapi ke panel sendiri
-//      "Cleaning Line Tidak Running Terdekat" (lihat splitIdleByCleaning).
-//   3. Line dengan ketepatan PM di bawah 100%                                        (kind 'ketepatan')
+//   2. Line tidak running yang cleaning-nya SUDAH jatuh tempo (hari ini / telat)    (kind 'idle')
+// Yang BELUM jatuh tempo tidak masuk sini: cleaning terdekat tampil di panel sendiri
+// ("Cleaning Line Tidak Running", lihat splitIdleByCleaning) dan Line dengan ketepatan PM < 100%
+// tampil di panel "Ketepatan PM < 100%" (bisa diklik untuk detail telat + alasannya).
 // Slot di layar TV terbatas. Supaya daftar PM yang panjang tidak menghabiskan semua slot,
-// idle & ketepatan masing-masing dijamin dapat minimal RESERVE slot (kalau ada datanya).
+// idle dijamin dapat minimal RESERVE_IDLE slot (kalau ada datanya).
 
-export const RESERVE_PER_NEW_KIND = 2;
-
-const fmtPct = (v) => `${Number(v).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`;
+export const RESERVE_IDLE = 2;
 
 /** Teks status cleaning Line yang tidak running (sisa hari negatif/0 = wajib cleaning). */
 export function cleaningInfo(item) {
@@ -41,7 +39,7 @@ export function idleRow(item) {
 /**
  * Pisahkan Line tidak running jadi dua kelompok:
  *  - priority: cleaning sudah jatuh tempo (hari ini / telat) -> masuk "Prioritas Hari Ini"
- *  - upcoming: cleaning belum jatuh tempo -> panel "Cleaning Line Tidak Running Terdekat",
+ *  - upcoming: cleaning belum jatuh tempo -> panel "Cleaning Line Tidak Running",
  *    urut paling dekat dulu (days_to_cleaning kecil), tanpa tanggal ditaruh paling bawah.
  */
 export function splitIdleByCleaning(items = []) {
@@ -69,48 +67,18 @@ export function cleaningUpcomingRow(item) {
   };
 }
 
-/** Item "ketepatan < 100%" -> baris prioritas. periodLabel mis. 'bulan ini'. */
-export function ketepatanRow(item, periodLabel) {
-  const pct = Number(item.worst_percentage);
-  return {
-    key: `k-${item.line_id}`,
-    kind: 'ketepatan',
-    title: item.line_name,
-    sub: `Ketepatan ${item.worst_label || 'PM'} (${periodLabel})`,
-    info: fmtPct(pct),
-    tone: pct < 50 ? 'danger' : 'warn',
-  };
-}
-
 /**
  * @param {Array} core - baris PM Line / Part Danger (sudah berurutan, kind 'pm' | 'part')
  * @param {Array} idle - baris kind 'idle' (urut paling lama idle dulu)
- * @param {Array} ketepatan - baris kind 'ketepatan' (urut terburuk dulu)
  * @param {number} slots - jumlah baris maksimal di layar
- * @param {number} [reservePerKind] - slot minimal untuk idle & ketepatan (default RESERVE_PER_NEW_KIND)
+ * @param {number} [reserveIdle] - slot minimal untuk idle (default RESERVE_IDLE)
  * @returns {{shown: Array, hidden: number}}
  */
-export function pickPriorityRows({ core = [], idle = [], ketepatan = [], slots, reservePerKind = RESERVE_PER_NEW_KIND }) {
-  const reserveIdle = Math.min(idle.length, reservePerKind);
-  const reserveKet = Math.min(ketepatan.length, reservePerKind);
-  const coreTake = Math.min(core.length, Math.max(slots - reserveIdle - reserveKet, 0));
+export function pickPriorityRows({ core = [], idle = [], slots, reserveIdle = RESERVE_IDLE }) {
+  const reserved = Math.min(idle.length, reserveIdle);
+  const coreTake = Math.min(core.length, Math.max(slots - reserved, 0));
+  const idleTake = Math.min(idle.length, Math.max(slots - coreTake, 0));
 
-  // Slot sisa dibagi bergantian: idle, ketepatan, idle, ketepatan, ...
-  let free = Math.max(slots - coreTake, 0);
-  let idleTake = 0;
-  let ketTake = 0;
-  while (free > 0 && (idleTake < idle.length || ketTake < ketepatan.length)) {
-    if (idleTake < idle.length) {
-      idleTake += 1;
-      free -= 1;
-    }
-    if (free > 0 && ketTake < ketepatan.length) {
-      ketTake += 1;
-      free -= 1;
-    }
-  }
-
-  const shown = [...core.slice(0, coreTake), ...idle.slice(0, idleTake), ...ketepatan.slice(0, ketTake)];
-  const total = core.length + idle.length + ketepatan.length;
-  return { shown, hidden: total - shown.length };
+  const shown = [...core.slice(0, coreTake), ...idle.slice(0, idleTake)];
+  return { shown, hidden: core.length + idle.length - shown.length };
 }

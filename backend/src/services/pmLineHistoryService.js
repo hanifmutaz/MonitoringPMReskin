@@ -144,6 +144,28 @@ function determineOnTime(jenisPm, tglInput, helperBefore, thresholds, nowHHMM = 
 }
 
 /**
+ * Lama telat (hari) PM yang dinilai telat = poin mentah - cap (satuan sama dengan "Sisa Hari" negatif).
+ * Dicatat ke history supaya detail ketepatan bisa menjawab "telat berapa lama".
+ * null kalau PM tepat waktu atau poin mentah tidak tersedia (baris lama belum di-recompute).
+ *
+ * @param {'MONTHLY'|'WEEKLY'} jenisPm
+ * @param {boolean} onTime
+ * @param {{akumulasi_poin_monthly_raw?: number|null, akumulasi_poin_weekly_raw?: number|null}|null} helperBefore
+ * @param {{monthlyCap: number, weeklyTotalDays: number}} thresholds
+ * @returns {number|null}
+ */
+function computeLateDays(jenisPm, onTime, helperBefore, thresholds) {
+  if (onTime) return null;
+  const isWeekly = jenisPm === 'WEEKLY';
+  const raw = isWeekly ? helperBefore?.akumulasi_poin_weekly_raw : helperBefore?.akumulasi_poin_monthly_raw;
+  if (raw === null || raw === undefined) return null;
+  const cap = isWeekly ? thresholds.weeklyTotalDays : thresholds.monthlyCap;
+  const late = Number(raw) - Number(cap);
+  if (!Number.isFinite(late)) return null;
+  return Math.max(0, Math.round(late * 10) / 10);
+}
+
+/**
  * Tentukan tanggal PM yang dicatat. KPI ketepatan harus real, jadi tanggal
  * ditentukan SISTEM (hari ini WIB), bukan input operator - supaya tidak bisa
  * di-backdate. Satu-satunya pengecualian: PM PERTAMA untuk jenis itu (Tgl PM
@@ -225,7 +247,14 @@ async function submitPmLineHistory(data, userId) {
     // -> transaksi di-rollback, helper tidak ke-reset.
     const alasanTelat = resolveAlasanTelat(onTime, data.alasan_telat);
     const createdHistory = await pmLineHistoryQueries.create(
-      { ...data, tgl_input: tglInput, user_id: userId, on_time: onTime, alasan_telat: alasanTelat },
+      {
+        ...data,
+        tgl_input: tglInput,
+        user_id: userId,
+        on_time: onTime,
+        alasan_telat: alasanTelat,
+        telat_hari: computeLateDays(data.jenis_pm, onTime, helperBefore, onTimeThresholds),
+      },
       client
     );
 
@@ -385,6 +414,7 @@ module.exports = {
   updatePmLineHistory,
   determineHelperUpdate,
   determineOnTime,
+  computeLateDays,
   resolveTglInput,
   getKetepatanSummary,
   getKetepatanMonthlyTrend,

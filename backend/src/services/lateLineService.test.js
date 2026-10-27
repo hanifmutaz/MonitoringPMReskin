@@ -1,6 +1,6 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { lateItemsFromLineStatus, lateItemFromPartMetric, fillDailyOutput } = require('./lateLineService');
+const { lateItemsFromLineStatus, lateItemFromPartMetric, fillDailyOutput, buildKetepatanLateEvents } = require('./lateLineService');
 
 const THRESHOLDS = { monthlyCap: 7, weeklyTotalDays: 7 };
 
@@ -67,5 +67,39 @@ describe('fillDailyOutput', () => {
       { tanggal: '2026-10-23', output: 500 },
       { tanggal: '2026-10-24', output: 0 },
     ]);
+  });
+});
+
+describe('buildKetepatanLateEvents', () => {
+  const lineEv = (over = {}) => ({ jenis_pm: 'WEEKLY', tgl_input: '2026-10-12', pic_name: 'Budi', keterangan: 'catatan', alasan_telat: 'Line running terus', telat_hari: '2.5', ...over });
+  const partEv = (over = {}) => ({ tgl_ganti: '2026-10-20', counter_saat_diganti: 105000, target_shot: 100000, pic_name: 'Sari', remark: null, alasan_telat: 'Part datang telat', part_name: 'Punch A', drawing_no: 'DWG-1', ...over });
+
+  test('Monthly/Weekly: lama telat dari telat_hari (angka), label per jenis', () => {
+    const [e] = buildKetepatanLateEvents([lineEv()], []);
+    assert.equal(e.source, 'PM_LINE_WEEKLY');
+    assert.equal(e.label, 'PM Weekly');
+    assert.deepEqual(e.late, { unit: 'hari', value: 2.5 });
+    assert.equal(e.alasan_telat, 'Line running terus');
+    assert.equal(buildKetepatanLateEvents([lineEv({ jenis_pm: 'MONTHLY' })], [])[0].label, 'PM Monthly');
+  });
+
+  test('data lama tanpa telat_hari -> late null (UI tulis "tidak tercatat", bukan 0)', () => {
+    assert.equal(buildKetepatanLateEvents([lineEv({ telat_hari: null })], [])[0].late, null);
+  });
+
+  test('Part: lama telat = counter - target (shot) + persen di atas target', () => {
+    const [e] = buildKetepatanLateEvents([], [partEv()]);
+    assert.equal(e.source, 'PM_PART');
+    assert.equal(e.label, 'Punch A (DWG-1)');
+    assert.deepEqual(e.late, { unit: 'shot', value: 5000, percent: 5 });
+  });
+
+  test('gabungan diurutkan tanggal terbaru dulu', () => {
+    const rows = buildKetepatanLateEvents([lineEv({ tgl_input: '2026-10-05' })], [partEv({ tgl_ganti: '2026-10-20' }), partEv({ tgl_ganti: '2026-10-10' })]);
+    assert.deepEqual(rows.map((r) => r.tanggal), ['2026-10-20', '2026-10-10', '2026-10-05']);
+  });
+
+  test('kosong aman', () => {
+    assert.deepEqual(buildKetepatanLateEvents(), []);
   });
 });
