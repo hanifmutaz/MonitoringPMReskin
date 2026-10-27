@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
-  CLEANING_SOON_DAYS, cleaningInfo, cleaningUpcomingRow, idleRow, pickPriorityRows, splitIdleByCleaning,
+  CLEANING_DANGER_DAYS, CLEANING_WARN_DAYS, cleaningInfo, cleaningUpcomingRow, idleRow, pickPriorityRows,
+  resolveCleaningThresholds, splitIdleByCleaning,
 } from './tvPriority';
 
 const make = (kind, n) => Array.from({ length: n }, (_, i) => ({ key: `${kind}-${i}`, kind }));
@@ -79,12 +80,35 @@ describe('splitIdleByCleaning', () => {
 });
 
 describe('cleaningUpcomingRow', () => {
-  test('sisa hari dan tone: <= CLEANING_SOON_DAYS warn, selain itu muted', () => {
-    expect(cleaningUpcomingRow({ line_id: 1, line_name: '41HR65', idle_days: 53, days_to_cleaning: 8 })).toMatchObject({ key: 'c-1', line: '41HR65', idle: '53 hari', sisa: '8 hari', tone: 'muted' });
-    expect(cleaningUpcomingRow({ line_id: 2, line_name: 'x', idle_days: 5, days_to_cleaning: CLEANING_SOON_DAYS }).tone).toBe('warn');
+  test('sisa hari dan tone mengikuti batas default (<= 7 danger, <= 14 warn, selebihnya muted)', () => {
+    expect(cleaningUpcomingRow({ line_id: 1, line_name: '41HR65', idle_days: 53, days_to_cleaning: 17 })).toMatchObject({ key: 'c-1', line: '41HR65', idle: '53 hari', sisa: '17 hari', tone: 'muted' });
+    expect(cleaningUpcomingRow({ line_id: 2, line_name: 'x', idle_days: 5, days_to_cleaning: CLEANING_WARN_DAYS }).tone).toBe('warn');
+    expect(cleaningUpcomingRow({ line_id: 2, line_name: 'x', idle_days: 5, days_to_cleaning: CLEANING_DANGER_DAYS }).tone).toBe('danger');
+  });
+
+  test('batas dari Settings dipakai kalau dikirim', () => {
+    const cfg = { warnDays: 30, dangerDays: 10 };
+    expect(cleaningUpcomingRow({ line_id: 1, line_name: 'a', idle_days: 5, days_to_cleaning: 20 }, cfg).tone).toBe('warn');
+    expect(cleaningUpcomingRow({ line_id: 1, line_name: 'a', idle_days: 5, days_to_cleaning: 10 }, cfg).tone).toBe('danger');
+    expect(cleaningUpcomingRow({ line_id: 1, line_name: 'a', idle_days: 5, days_to_cleaning: 31 }, cfg).tone).toBe('muted');
   });
 
   test('belum pernah running & tanpa tanggal cleaning', () => {
     expect(cleaningUpcomingRow({ line_id: 3, line_name: 'y', idle_days: 9, never_ran: true, days_to_cleaning: null })).toMatchObject({ idle: 'Belum pernah (9 hr)', sisa: '-', tone: 'muted' });
+  });
+});
+
+describe('resolveCleaningThresholds', () => {
+  test('kosong/tidak valid -> default', () => {
+    expect(resolveCleaningThresholds()).toEqual({ dangerDays: CLEANING_DANGER_DAYS, warnDays: CLEANING_WARN_DAYS });
+    expect(resolveCleaningThresholds({ warnDays: 'abc', dangerDays: null })).toEqual({ dangerDays: CLEANING_DANGER_DAYS, warnDays: CLEANING_WARN_DAYS });
+  });
+
+  test('terbalik (danger > warn) ditukar', () => {
+    expect(resolveCleaningThresholds({ warnDays: 5, dangerDays: 20 })).toEqual({ dangerDays: 5, warnDays: 20 });
+  });
+
+  test('nilai 0 sah (hanya yang sudah jatuh tempo hari ini yang merah)', () => {
+    expect(resolveCleaningThresholds({ warnDays: 7, dangerDays: 0 })).toEqual({ dangerDays: 0, warnDays: 7 });
   });
 });

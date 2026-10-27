@@ -16,6 +16,8 @@ const KEY_RULES = {
   },
   idle_min_days: (v) => (Number.isInteger(v) && v >= 1 && v <= 365 ? null : 'Harus bilangan bulat 1 - 365 hari'),
   idle_cleaning_interval_days: (v) => (Number.isInteger(v) && v >= 1 && v <= 730 ? null : 'Harus bilangan bulat 1 - 730 hari'),
+  idle_cleaning_warn_days: (v) => (Number.isInteger(v) && v >= 0 && v <= 730 ? null : 'Harus bilangan bulat 0 - 730 hari'),
+  idle_cleaning_danger_days: (v) => (Number.isInteger(v) && v >= 0 && v <= 730 ? null : 'Harus bilangan bulat 0 - 730 hari'),
   backup_auto_time: (v) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? null : 'Format jam harus HH:MM (00:00 - 23:59)'),
   backup_auto_format: (v) => (BACKUP_FORMATS.includes(v) ? null : `Pilih salah satu: ${BACKUP_FORMATS.join(', ')}`),
   backup_auto_interval_days: (v) =>

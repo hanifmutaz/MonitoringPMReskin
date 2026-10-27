@@ -15,19 +15,24 @@ const { recordAudit } = require('../utils/auditLog');
 const dateUtils = require('../utils/dateUtils');
 const AppError = require('../utils/AppError');
 
-const DEFAULTS = { enabled: true, minDays: 7, intervalDays: 60 };
+// warnDays/dangerDays = batas warna kuning/merah panel Cleaning (sisa hari cleaning), murni tampilan.
+const DEFAULTS = { enabled: true, minDays: 7, intervalDays: 60, warnDays: 14, dangerDays: 7 };
 
 async function getIdleConfig() {
   const s = await settingsService.getSettings([
     'idle_monitoring_enabled',
     'idle_min_days',
     'idle_cleaning_interval_days',
+    'idle_cleaning_warn_days',
+    'idle_cleaning_danger_days',
   ]);
   // Migration belum jalan / key belum ada -> pakai default (jangan crash dashboard).
   return {
     enabled: s.idle_monitoring_enabled === undefined ? DEFAULTS.enabled : s.idle_monitoring_enabled,
     minDays: s.idle_min_days > 0 ? s.idle_min_days : DEFAULTS.minDays,
     intervalDays: s.idle_cleaning_interval_days > 0 ? s.idle_cleaning_interval_days : DEFAULTS.intervalDays,
+    warnDays: s.idle_cleaning_warn_days >= 0 ? s.idle_cleaning_warn_days : DEFAULTS.warnDays,
+    dangerDays: s.idle_cleaning_danger_days >= 0 ? s.idle_cleaning_danger_days : DEFAULTS.dangerDays,
   };
 }
 

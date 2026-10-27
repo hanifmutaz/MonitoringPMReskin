@@ -198,7 +198,10 @@ async function getLateLineEvidence(lineId) {
  *  - Part: lama telat = counter_saat_diganti - target_shot (shot) + persen di atas target.
  */
 function buildKetepatanLateEvents(lineEvents = [], partEvents = []) {
+  // id = id baris history (pm_monthly_history / pm_part_history), dipakai UI untuk melengkapi alasan telat
+  // lewat endpoint edit history yang sudah ada (PATCH /pm-line-history/:id, /pm-part-history/:id).
   const fromLine = lineEvents.map((e) => ({
+    id: e.id,
     source: e.jenis_pm === 'WEEKLY' ? 'PM_LINE_WEEKLY' : 'PM_LINE_MONTHLY',
     label: e.jenis_pm === 'WEEKLY' ? 'PM Weekly' : 'PM Monthly',
     tanggal: e.tgl_input,
@@ -211,6 +214,7 @@ function buildKetepatanLateEvents(lineEvents = [], partEvents = []) {
     const target = Number(e.target_shot);
     const over = Math.max(0, Number(e.counter_saat_diganti) - target);
     return {
+      id: e.id,
       source: 'PM_PART',
       label: `${e.part_name} (${e.drawing_no})`,
       tanggal: e.tgl_ganti,

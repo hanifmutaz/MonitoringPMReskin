@@ -51,11 +51,33 @@ export function splitIdleByCleaning(items = []) {
   return { priority, upcoming };
 }
 
-/** Ambang (hari) cleaning dianggap "mendekati" -> tone warn di panel TV. */
-export const CLEANING_SOON_DAYS = 3;
+/** Default batas warna panel Cleaning (hari); nilai aslinya dari Settings, dikirim backend di config idle-lines. */
+export const CLEANING_WARN_DAYS = 14;
+export const CLEANING_DANGER_DAYS = 7;
 
-/** Item cleaning terdekat -> baris tabel panel TV. */
-export function cleaningUpcomingRow(item) {
+/**
+ * Batas warna dari config backend ({warnDays, dangerDays}). Kosong/tidak valid -> default.
+ * Kalau terbalik (danger > warn) ditukar, supaya merah selalu lebih dekat dari kuning.
+ */
+export function resolveCleaningThresholds(config) {
+  const num = (v, fallback) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? fallback : Number(v));
+  const a = num(config?.dangerDays, CLEANING_DANGER_DAYS);
+  const b = num(config?.warnDays, CLEANING_WARN_DAYS);
+  return { dangerDays: Math.min(a, b), warnDays: Math.max(a, b) };
+}
+
+/** Tone sisa hari cleaning: <= danger merah, <= warn kuning, selain itu muted. Tanpa tanggal -> muted. */
+export function cleaningTone(days, thresholds) {
+  if (days === null || days === undefined) return 'muted';
+  const { dangerDays, warnDays } = resolveCleaningThresholds(thresholds);
+  const n = Number(days);
+  if (n <= dangerDays) return 'danger';
+  if (n <= warnDays) return 'warn';
+  return 'muted';
+}
+
+/** Item cleaning terdekat -> baris tabel panel TV. thresholds = {warnDays, dangerDays} dari Settings. */
+export function cleaningUpcomingRow(item, thresholds) {
   const days = item.days_to_cleaning;
   const hasDays = days !== null && days !== undefined;
   return {
@@ -63,7 +85,7 @@ export function cleaningUpcomingRow(item) {
     line: item.line_name,
     idle: item.never_ran ? `Belum pernah (${item.idle_days} hr)` : `${item.idle_days} hari`,
     sisa: hasDays ? (Number(days) === 0 ? 'Hari ini' : `${days} hari`) : '-',
-    tone: hasDays && Number(days) <= CLEANING_SOON_DAYS ? 'warn' : 'muted',
+    tone: cleaningTone(days, thresholds),
   };
 }
 

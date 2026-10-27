@@ -20,6 +20,8 @@ import {
 import { cleaningUpcomingRow, idleRow, pickPriorityRows, splitIdleByCleaning } from '../utils/tvPriority';
 import { belowTargetTone, pctLabel } from '../utils/ketepatanLate';
 import KetepatanLateDetailModal from '../components/KetepatanLateDetailModal';
+import KetepatanLateHoverCard from '../components/KetepatanLateHoverCard';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 
 dayjs.locale('id');
 
@@ -27,8 +29,6 @@ const num = (v) => (v === undefined || v === null ? '-' : Number(v).toLocaleStri
 // Jumlah baris di panel "Prioritas Hari Ini" (Line tidak running yang cleaning-nya jatuh tempo dijamin dapat jatah,
 // lihat utils/tvPriority.js).
 const PRIORITY_SLOTS = 9;
-// Jumlah baris panel "Cleaning Line Tidak Running" (sisanya "+N lagi").
-const CLEANING_SLOTS = 4;
 // Lebar 4 kolom baris tengah: Prioritas | PM Terdekat | Top Part | (Cleaning + Ketepatan PM). Atur di sini kalau
 // TV tertentu terasa sempit/longgar.
 const MIDDLE_COLS = 'grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.05fr)_minmax(0,1fr)]';
@@ -57,9 +57,9 @@ const JENIS_CHIP = {
 const ROW_OPTIONS = [10, 15, 20, 30];
 const DEFAULT_ROWS = 15;
 const ROWS_KEY = 'tv.rows';
-// Jadwal 7 hari: tiap hari menampilkan SEMUA Line dalam 2 kolom (maks 8 baris = 16 entri).
-// Lebih dari itu baru dipotong dan sisanya ditulis "+N lagi" (jarang terjadi).
-const DAY_MAX_ENTRIES = 16;
+// Jadwal 7 hari: tiap hari menampilkan SEMUA Line, 1 per baris (tulisan besar). Batas tinggi daftar per hari;
+// lebih panjang dari itu bisa di-scroll. Literal class (bukan template string) supaya ikut ter-generate Tailwind.
+const DAY_LIST_MAX_H = 'max-h-[12.5rem]';
 const clampRows = (n) => (Number.isFinite(n) ? Math.min(50, Math.max(5, Math.round(n))) : DEFAULT_ROWS);
 function readStoredRows() {
   try { return clampRows(Number(localStorage.getItem(ROWS_KEY)) || DEFAULT_ROWS); } catch { return DEFAULT_ROWS; }
@@ -297,8 +297,9 @@ function TvDashboardPage() {
   // Line dengan ketepatan PM < 100% bulan ini TIDAK masuk Prioritas: punya panel sendiri (bisa diklik).
   const { priority: idlePriority, upcoming: idleUpcoming } = splitIdleByCleaning(idleData?.items ?? []);
   const idleRows = idlePriority.map(idleRow);
-  const cleaningRows = idleUpcoming.map(cleaningUpcomingRow);
-  const cleaningShown = cleaningRows.slice(0, CLEANING_SLOTS);
+  // Semua Line ditampilkan (panel bisa di-scroll); warna kuning/merah ikut batas di Settings
+  // (idle_cleaning_warn_days / idle_cleaning_danger_days, dikirim lewat config idle-lines).
+  const cleaningRows = idleUpcoming.map((item) => cleaningUpcomingRow(item, idleData?.config));
   const ketepatanItems = belowTarget?.items ?? [];
   const { shown: priorityShown, hidden: priorityHidden } = pickPriorityRows({
     core: coreRows, idle: idleRows, slots: PRIORITY_SLOTS,
@@ -466,24 +467,21 @@ function TvDashboardPage() {
 
             <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3">
               <Panel icon={<SprayCan size={22} />} title="Cleaning Line Tidak Running" aside="Terdekat">
-                {cleaningShown.length === 0 ? (
+                {cleaningRows.length === 0 ? (
                   <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">Tidak ada Line tidak running yang menunggu cleaning</div>
                 ) : (
-                  <>
-                    <table className="w-full whitespace-nowrap border-collapse text-sm">
-                      <thead><tr><Th>Line</Th><Th>Tidak Running</Th><Th right>Cleaning</Th></tr></thead>
-                      <tbody>
-                        {cleaningShown.map((r) => (
-                          <tr key={r.key} className="border-b border-[var(--border-soft)]">
-                            <td className="px-2 py-1 font-[var(--font-mono)]">{r.line}</td>
-                            <td className="px-2 py-1 text-muted-foreground">{r.idle}</td>
-                            <td className={`px-2 py-1 text-right font-semibold ${PRIORITY_TONE[r.tone].text}`}>{r.sisa}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {cleaningRows.length > CLEANING_SLOTS && <div className="pt-1 text-center text-xs text-[var(--text-faint)]">+{cleaningRows.length - CLEANING_SLOTS} lagi</div>}
-                  </>
+                  <table className="w-full whitespace-nowrap border-collapse text-sm">
+                    <thead><tr><Th>Line</Th><Th>Tidak Running</Th><Th right>Cleaning</Th></tr></thead>
+                    <tbody>
+                      {cleaningRows.map((r) => (
+                        <tr key={r.key} className={`border-b border-[var(--border-soft)] ${r.tone === 'muted' ? '' : PRIORITY_TONE[r.tone].row}`}>
+                          <td className="px-2 py-1 font-[var(--font-mono)]">{r.line}</td>
+                          <td className="px-2 py-1 text-muted-foreground">{r.idle}</td>
+                          <td className={`px-2 py-1 text-right font-semibold ${PRIORITY_TONE[r.tone].text}`}>{r.sisa}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
               </Panel>
 
@@ -495,23 +493,30 @@ function TvDashboardPage() {
                 {ketepatanItems.length === 0 ? (
                   <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">Semua PM bulan ini tepat waktu</div>
                 ) : (
-                  <div className="flex flex-col gap-1">
-                    {ketepatanItems.map((k) => (
-                      <button
-                        key={k.line_id}
-                        type="button"
-                        onClick={() => setKetepatanDetail(k)}
-                        className="flex w-full items-center justify-between gap-2 rounded-lg bg-[var(--panel-2)] px-3 py-1.5 text-left transition-colors hover:bg-[var(--accent-dim)]"
-                        title="Klik untuk lihat PM yang telat, lama telat, dan alasannya"
-                      >
-                        <div className="min-w-0">
-                          <div className="font-[var(--font-mono)] font-semibold">{k.line_name}</div>
-                          <div className="truncate text-xs text-muted-foreground">{k.worst_label}</div>
-                        </div>
-                        <div className={`shrink-0 text-sm font-semibold tabular-nums ${PRIORITY_TONE[belowTargetTone(k.worst_percentage)].text}`}>{pctLabel(k.worst_percentage)}</div>
-                      </button>
-                    ))}
-                  </div>
+                  <TooltipProvider delayDuration={150}>
+                    <div className="flex flex-col gap-1">
+                      {ketepatanItems.map((k) => (
+                        <Tooltip key={k.line_id}>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => setKetepatanDetail(k)}
+                              className="flex w-full items-center justify-between gap-2 rounded-lg bg-[var(--panel-2)] px-3 py-1.5 text-left transition-colors hover:bg-[var(--accent-dim)]"
+                            >
+                              <div className="min-w-0">
+                                <div className="font-[var(--font-mono)] font-semibold">{k.line_name}</div>
+                                <div className="truncate text-xs text-muted-foreground">{k.worst_label}</div>
+                              </div>
+                              <div className={`shrink-0 text-sm font-semibold tabular-nums ${PRIORITY_TONE[belowTargetTone(k.worst_percentage)].text}`}>{pctLabel(k.worst_percentage)}</div>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" align="start" className="px-3 py-2 text-sm">
+                            <KetepatanLateHoverCard lineId={k.line_id} lineName={k.line_name} />
+                          </TooltipContent>
+                        </Tooltip>
+                      ))}
+                    </div>
+                  </TooltipProvider>
                 )}
               </Panel>
             </div>
@@ -522,32 +527,27 @@ function TvDashboardPage() {
               <div className="grid grid-cols-8 gap-2">
                 {dayCols.map((c) => (
                   <div key={c.key} className="flex min-h-[8.25rem] min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-[var(--panel-2)]">
-                    <div className={`py-1 text-center ${c.sunday ? 'bg-danger-dim text-danger' : 'bg-[var(--accent-dim)] text-[var(--accent)]'}`}>
-                      <div className="text-sm font-semibold leading-tight">{c.d.format('dddd')}</div>
+                    <div className={`py-1.5 text-center ${c.sunday ? 'bg-danger-dim text-danger' : 'bg-[var(--accent-dim)] text-[var(--accent)]'}`}>
+                      <div className="text-base font-semibold leading-tight">{c.d.format('dddd')}</div>
                       <div className="text-xs leading-tight opacity-80">
                         {c.d.format('D MMM YYYY')}
                         {c.lineCount > 0 && <span className="font-semibold"> · {c.lineCount} line</span>}
                       </div>
                     </div>
                     {c.entries.length === 0 ? (
-                      <div className="flex flex-1 flex-col items-center justify-center text-xs text-[var(--text-faint)]">
-                        <div className="text-base">-</div>Tidak ada jadwal
+                      <div className="flex flex-1 flex-col items-center justify-center text-sm text-[var(--text-faint)]">
+                        <div className="text-lg">-</div>Tidak ada jadwal
                       </div>
                     ) : (
-                      <div className="flex min-h-0 flex-1 flex-col gap-0.5 px-2 py-1">
-                        {/* 2 kolom, urut turun per kolom (A-Z): semua Line terlihat tanpa harus "+N lagi". */}
-                        <div
-                          className="grid grid-flow-col grid-cols-2 gap-x-2 text-xs font-semibold leading-[0.875rem]"
-                          style={{ gridTemplateRows: `repeat(${Math.ceil(Math.min(c.entries.length, DAY_MAX_ENTRIES) / 2)}, auto)` }}
-                        >
-                          {c.entries.slice(0, DAY_MAX_ENTRIES).map((e) => (
-                            <div key={e.key} className="flex min-w-0 items-center justify-between gap-1">
-                              <span className="truncate font-[var(--font-mono)]">{e.line}</span>
-                              <span className={`shrink-0 ${TAG_TONE[e.tag]}`}>({e.tag})</span>
-                            </div>
-                          ))}
-                        </div>
-                        {c.entries.length > DAY_MAX_ENTRIES && <div className="text-xs font-normal text-[var(--text-faint)]">+{c.entries.length - DAY_MAX_ENTRIES} lagi</div>}
+                      // 1 kolom, 1 Line per baris (A-Z) dengan tulisan besar. Kalau Line dalam sehari banyak,
+                      // daftar bisa di-scroll (tinggi dibatasi DAY_LIST_MAX_H supaya baris tengah TV tidak terdesak).
+                      <div className={`flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-2.5 py-1.5 [scrollbar-width:thin] ${DAY_LIST_MAX_H}`}>
+                        {c.entries.map((e) => (
+                          <div key={e.key} className="flex min-w-0 items-center justify-between gap-2 text-base font-semibold leading-snug">
+                            <span className="truncate font-[var(--font-mono)]">{e.line}</span>
+                            <span className={`shrink-0 ${TAG_TONE[e.tag]}`}>({e.tag})</span>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>

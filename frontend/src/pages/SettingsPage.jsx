@@ -61,6 +61,8 @@ const SETTING_LABELS = {
   idle_monitoring_enabled: 'Aktifkan Deteksi Line Tidak Running',
   idle_min_days: 'Dianggap Tidak Running Setelah (hari tanpa output)',
   idle_cleaning_interval_days: 'Wajib Cleaning Setiap (hari)',
+  idle_cleaning_warn_days: 'Batas Kuning Cleaning (sisa hari)',
+  idle_cleaning_danger_days: 'Batas Merah Cleaning (sisa hari)',
   // Backup Otomatis
   backup_auto_enabled: 'Aktifkan Backup Otomatis',
   backup_auto_time: 'Jam Backup (WIB)',

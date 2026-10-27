@@ -99,6 +99,11 @@ describe('buildKetepatanLateEvents', () => {
     assert.deepEqual(rows.map((r) => r.tanggal), ['2026-10-20', '2026-10-10', '2026-10-05']);
   });
 
+  test('id baris history ikut dikirim (buat melengkapi alasan telat dari UI)', () => {
+    const rows = buildKetepatanLateEvents([lineEv({ id: 11 })], [partEv({ id: 22 })]);
+    assert.deepEqual(rows.map((r) => [r.source, r.id]).sort(), [['PM_LINE_WEEKLY', 11], ['PM_PART', 22]]);
+  });
+
   test('kosong aman', () => {
     assert.deepEqual(buildKetepatanLateEvents(), []);
   });
