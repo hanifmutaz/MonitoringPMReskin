@@ -15,9 +15,9 @@ import { useId, useMemo, useState } from 'react';
 import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 import { CHART_SERIES, buildChartSeries, niceDomain, linePath, spreadLabels, formatPct, monthLabel } from '../utils/ketepatanDashboard';
 
-const W = 780;
-const H = 300;
-const M = { top: 16, right: 112, bottom: 32, left: 46 };
+const W = 600;
+const H = 240;
+const M = { top: 14, right: 104, bottom: 30, left: 44 };
 const PLOT_W = W - M.left - M.right;
 const PLOT_H = H - M.top - M.bottom;
 const SERIES_COLOR = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)'];
@@ -172,7 +172,7 @@ function KetepatanYearChart({ byMonth, selectedMonth }) {
 
             {/* Label sumbu X */}
             {byMonth.map((row, i) => (
-              <text key={row.month} x={xOf(i)} y={H - 10} textAnchor="middle" fontSize="11" fill="currentColor" opacity={row.future ? 0.45 : 1} fontWeight={row.month === selectedMonth ? 700 : 400}>
+              <text key={row.month} x={xOf(i)} y={H - 9} textAnchor="middle" fontSize="11" fill="currentColor" opacity={row.future ? 0.45 : 1} fontWeight={row.month === selectedMonth ? 700 : 400}>
                 {monthLabel(row.month, 'name')}
               </text>
             ))}

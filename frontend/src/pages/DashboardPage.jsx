@@ -39,7 +39,7 @@ const HEALTH_STAT_CLASS = {
 function HealthStat({ value, label, tone }) {
   const cfg = HEALTH_STAT_CLASS[tone];
   return (
-    <div className={`flex min-h-[92px] flex-1 flex-col items-center justify-center rounded-xl border p-4 text-center ${cfg.bg} ${cfg.border}`}>
+    <div className={`flex min-h-[80px] flex-1 flex-col items-center justify-center rounded-xl border p-4 text-center ${cfg.bg} ${cfg.border}`}>
       <div className={`font-[var(--font-display)] text-[30px] font-semibold leading-none tracking-tight ${cfg.text}`}>{value}</div>
       <div className="mt-2 text-xs font-medium text-muted-foreground">{label}</div>
     </div>
@@ -242,50 +242,51 @@ function DashboardPage() {
         </Card>
       )}
 
-      {view?.byMonth && (
-        <Card className={dim}>
-          <CardHeader><CardTitle>Ketepatan PM per Bulan ({view.year})</CardTitle></CardHeader>
-          <KetepatanYearChart byMonth={view.byMonth} selectedMonth={view.month} />
-        </Card>
-      )}
-
+      {/* Chart per bulan + tren 6 bulan: berdampingan di layar lebar */}
       {view && (
-        <div className={dim}>
+        <div className={`grid grid-cols-1 gap-5 ${view.byMonth ? 'xl:grid-cols-2' : ''} ${dim}`}>
+          {view.byMonth && (
+            <Card className="h-full">
+              <CardHeader><CardTitle>Ketepatan PM per Bulan ({view.year})</CardTitle></CardHeader>
+              <KetepatanYearChart byMonth={view.byMonth} selectedMonth={view.month} />
+            </Card>
+          )}
           <KetepatanTrendPanel data={view.trend} currentMonth={view.currentMonth} selectedMonth={view.month} />
         </div>
       )}
 
-      {/* Ringkasan Status Line (snapshot) */}
-      <Card>
-        <CardHeader><CardTitle>Ringkasan Status Line</CardTitle></CardHeader>
-        {!loadingSummary && summary && (
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
-            <LineStatusDonut healthy={summary.lines_healthy} warning={summary.lines_warning} critical={summary.lines_critical} />
-            <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
-              <HealthStat value={summary.lines_healthy} label="Healthy" tone="ok" />
-              <HealthStat value={summary.lines_warning} label="Warning" tone="warn" />
-              <HealthStat value={summary.lines_critical} label="Critical" tone="danger" />
+      {/* Ringkasan Status Line + Critical Alerts (snapshot) */}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <Card className="h-full">
+          <CardHeader><CardTitle>Ringkasan Status Line</CardTitle></CardHeader>
+          {!loadingSummary && summary && (
+            <div className="flex flex-col gap-5">
+              <LineStatusDonut healthy={summary.lines_healthy} warning={summary.lines_warning} critical={summary.lines_critical} />
+              <div className="grid grid-cols-3 gap-3">
+                <HealthStat value={summary.lines_healthy} label="Healthy" tone="ok" />
+                <HealthStat value={summary.lines_warning} label="Warning" tone="warn" />
+                <HealthStat value={summary.lines_critical} label="Critical" tone="danger" />
+              </div>
             </div>
+          )}
+        </Card>
+        {!(isRemoteView ? false : localAttention.isLoading) && <CriticalAlertsPanel items={attention} />}
+      </div>
+
+      {/* Line < 100% + Line Tidak Running (Idle hanya data lokal) */}
+      <div className={`grid grid-cols-1 gap-5 ${isRemoteView ? '' : 'xl:grid-cols-2'}`}>
+        {view && (
+          <div className={`h-full ${dim}`}>
+            <KetepatanBelowTargetPanel
+              items={belowItems}
+              period={belowPeriodShown}
+              onPeriodChange={isRemoteView ? undefined : setBelowPeriod}
+              onSelect={isRemoteView ? undefined : setLateItem}
+              labels={{ month: titles.monthLabel, year: titles.yearLabel, monthTab: titles.monthTab, yearTab: titles.yearTab }}
+              isLoading={false}
+            />
           </div>
         )}
-      </Card>
-
-      {view && (
-        <div className={dim}>
-          <KetepatanBelowTargetPanel
-            items={belowItems}
-            period={belowPeriodShown}
-            onPeriodChange={isRemoteView ? undefined : setBelowPeriod}
-            onSelect={isRemoteView ? undefined : setLateItem}
-            labels={{ month: titles.monthLabel, year: titles.yearLabel, monthTab: titles.monthTab, yearTab: titles.yearTab }}
-            isLoading={false}
-          />
-        </div>
-      )}
-
-      {/* Snapshot: Critical Alerts (semua site) + Line Tidak Running (hanya data lokal) */}
-      <div className={`grid grid-cols-1 gap-5 ${isRemoteView ? '' : 'lg:grid-cols-2'}`}>
-        {!(isRemoteView ? false : localAttention.isLoading) && <CriticalAlertsPanel items={attention} />}
         {!isRemoteView && <IdleLinesPanel data={localIdle.data} isLoading={localIdle.isLoading} />}
       </div>
 

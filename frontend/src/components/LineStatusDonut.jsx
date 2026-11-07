@@ -30,7 +30,7 @@ function LineStatusDonut({
   )`;
 
   return (
-    <div className="flex items-center gap-8">
+    <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
       <div
         className="flex h-[200px] w-[200px] shrink-0 items-center justify-center rounded-full"
         style={{ background: total > 0 ? gradient : 'var(--panel-3)' }}

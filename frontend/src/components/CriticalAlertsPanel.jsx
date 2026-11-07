@@ -37,11 +37,16 @@ function AlertCard({ item }) {
 
 function CriticalAlertsPanel({ items = [] }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4.5">
+    <div className="h-full rounded-xl border border-border bg-card p-4.5">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="m-0 font-[var(--font-display)] text-[15px] font-semibold">
           <AlertTriangle size={16} style={{ verticalAlign: -3, marginRight: 6 }} />
           Critical Alerts
+          {items.length > 0 && (
+            <span className="ml-2 rounded-full bg-[var(--panel-3)] px-2 py-0.5 align-middle font-[var(--font-mono)] text-[11px] font-normal text-muted-foreground">
+              {items.length}
+            </span>
+          )}
         </h2>
       </div>
       {items.length === 0 ? (
@@ -53,7 +58,9 @@ function CriticalAlertsPanel({ items = [] }) {
           description="Semua part dalam kondisi aman. Alert muncul di sini saat ada part yang mendekati batas penggantian."
         />
       ) : (
-        items.map((item) => <AlertCard key={item.part_id} item={item} />)
+        <div className="max-h-[280px] overflow-y-auto pr-1" tabIndex="0" role="region" aria-label="Daftar critical alerts (scroll)">
+          {items.map((item) => <AlertCard key={item.part_id} item={item} />)}
+        </div>
       )}
     </div>
   );

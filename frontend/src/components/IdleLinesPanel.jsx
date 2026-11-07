@@ -46,7 +46,7 @@ function IdleLinesPanel({ data, isLoading }) {
   const { config, items } = data;
 
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-1.5">
           <PowerOff size={16} />
@@ -73,12 +73,12 @@ function IdleLinesPanel({ data, isLoading }) {
           description={`Tidak ada Line yang tanpa output selama ${config.minDays} hari atau lebih.`}
         />
       ) : (
-        <div className="overflow-x-auto" tabIndex="0" role="region" aria-label="Tabel Line tidak running (scroll horizontal)">
+        <div className="max-h-[280px] overflow-auto" tabIndex="0" role="region" aria-label="Tabel Line tidak running (scroll)">
           <table className="w-full border-collapse">
             <thead>
               <tr>
                 {['Line', 'Tidak Running', 'Cleaning Terakhir', 'Status Cleaning', ...(canSubmit ? [''] : [])].map((h, i) => (
-                  <th key={h || `aksi-${i}`} scope="col" className="border-b border-border px-2.5 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
+                  <th key={h || `aksi-${i}`} scope="col" className="sticky top-0 z-10 border-b border-border bg-card px-2.5 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">
                     {h || <span className="sr-only">Aksi</span>}
                   </th>
                 ))}
@@ -87,7 +87,7 @@ function IdleLinesPanel({ data, isLoading }) {
             <tbody>
               {items.map((item) => (
                 <tr key={item.line_id} className="hover:bg-[var(--panel-2)]">
-                  <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5 font-[var(--font-mono)] text-[13px]">{item.line_name}</td>
+                  <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5 whitespace-nowrap font-[var(--font-mono)] text-[13px]">{item.line_name}</td>
                   <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5">
                     <div className="font-[var(--font-mono)] text-[13px]">{item.idle_days} hari</div>
                     <div className="text-[11px] text-[var(--text-faint)]">

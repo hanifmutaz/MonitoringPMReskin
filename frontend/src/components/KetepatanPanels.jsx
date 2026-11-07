@@ -32,7 +32,7 @@ export function PercentBadge({ percentage }) {
 function TrendCell({ cell }) {
   if (!cell) return <span className="text-[var(--text-faint)]">—</span>;
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 whitespace-nowrap">
       <PercentBadge percentage={cell.percentage} />
       {cell.total > 0 && <span className="text-[11px] text-[var(--text-faint)]">{cell.total} event</span>}
     </div>
@@ -48,7 +48,7 @@ export function KetepatanTrendPanel({ data, currentMonth, selectedMonth }) {
   const hasPart = data.some((r) => r.part);
   const columns = [...(hasPart ? [{ key: 'part', label: 'PM Part' }] : []), { key: 'monthly', label: 'Monthly' }, { key: 'weekly', label: 'Weekly' }];
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader>
         <CardTitle>Tren Ketepatan PM per Bulan ({data.length} Bulan Terakhir)</CardTitle>
       </CardHeader>
@@ -86,7 +86,7 @@ export function KetepatanBelowTargetPanel({ items, period, onPeriodChange, onSel
   const rows = belowTargetRows(items);
   const periodLabel = labels[period];
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader className="flex-wrap gap-2">
         <CardTitle className="flex items-center gap-1.5">
           <TrendingDown size={16} />
@@ -113,7 +113,7 @@ export function KetepatanBelowTargetPanel({ items, period, onPeriodChange, onSel
           description={`Tidak ada Line dengan ketepatan di bawah 100% (${periodLabel.toLowerCase()}), atau belum ada event PM di periode ini.`}
         />
       ) : (
-        <div className="max-h-[420px] overflow-auto" tabIndex="0" role="region" aria-label="Tabel Line ketepatan PM di bawah 100% (scroll)">
+        <div className="max-h-[280px] overflow-auto" tabIndex="0" role="region" aria-label="Tabel Line ketepatan PM di bawah 100% (scroll)">
           <table className="w-full border-collapse">
             <thead>
               <tr>
@@ -130,7 +130,7 @@ export function KetepatanBelowTargetPanel({ items, period, onPeriodChange, onSel
                   className={`hover:bg-[var(--panel-2)] ${onSelect ? 'cursor-pointer' : ''}`}
                   onClick={onSelect ? () => onSelect(row) : undefined}
                 >
-                  <td className={`${TD} font-[var(--font-mono)] text-[13px]`}>
+                  <td className={`${TD} whitespace-nowrap font-[var(--font-mono)] text-[13px]`}>
                     {onSelect ? (
                       <button type="button" className="cursor-pointer text-left underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring" onClick={(e) => { e.stopPropagation(); onSelect(row); }}>
                         {row.line_name}
