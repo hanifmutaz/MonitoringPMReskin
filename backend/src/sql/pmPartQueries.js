@@ -113,7 +113,10 @@ const WEAR_DESC_ORDER = `
 const DEFAULT_ORDER = 'l.line_name ASC, fp.jig_name ASC, fp.drawing_no ASC';
 
 async function findAllWithCounter({ lineId, search, limit, offset, orderBy } = {}, runner = db) {
-  const conditions = ['p.is_active = TRUE'];
+  // deleted_at IS NULL WAJIB: soft delete (partQueries.remove) cuma mengisi deleted_at dan TIDAK
+  // mematikan is_active, jadi tanpa filter ini part di Recycle Bin ikut terhitung di monitoring
+  // (penyebab "Total Parts 545 tapi 563 OK" di Dashboard Management).
+  const conditions = ['p.is_active = TRUE', 'p.deleted_at IS NULL'];
   const params = [];
 
   if (lineId) {
@@ -159,7 +162,7 @@ async function findAllWithCounter({ lineId, search, limit, offset, orderBy } = {
  * sini). Dipakai untuk metadata pagination di jalur "tanpa filter status".
  */
 async function countAll({ lineId, search } = {}, runner = db) {
-  const conditions = ['p.is_active = TRUE'];
+  const conditions = ['p.is_active = TRUE', 'p.deleted_at IS NULL']; // sama dengan findAllWithCounter
   const params = [];
 
   if (lineId) {

@@ -16,6 +16,7 @@ router.get('/sync-status', dashboardController.syncStatus);
 router.get('/part-summary', dashboardController.partSummary);
 router.get('/line-summary', dashboardController.lineSummary);
 router.get('/ketepatan-attention', dashboardController.ketepatanAttention);
+router.get('/ketepatan', dashboardController.ketepatan);
 router.get('/ketepatan-below-target', dashboardController.ketepatanBelowTarget);
 router.get('/ketepatan-below-target/:lineId/events', dashboardController.ketepatanLateEvents);
 router.get('/late-lines', dashboardController.lateLines);

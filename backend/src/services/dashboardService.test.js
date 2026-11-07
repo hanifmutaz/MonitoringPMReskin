@@ -535,4 +535,143 @@ describe('dashboardService', () => {
       assert.deepEqual(trend[5].weekly, { percentage: null, total: 0 });
     });
   });
+
+  describe('getKetepatanBelowTarget - backdate (month)', () => {
+    test('month diteruskan sebagai range {from,to} dibatasi akhir periode, bukan sampai sekarang', async () => {
+      const part = mock.method(pmPartHistoryService, 'getKetepatanPerLine', async () => []);
+      const lineM = mock.method(pmLineHistoryService, 'getKetepatanPerLine', async () => []);
+
+      const resMonth = await dashboardService.getKetepatanBelowTarget({ period: 'month', month: '2026-02' });
+      assert.deepEqual(part.mock.calls[0].arguments[0], { period: 'month', range: { from: '2026-02-01', to: '2026-02-28' } });
+      assert.deepEqual(lineM.mock.calls[0].arguments[0], { period: 'month', range: { from: '2026-02-01', to: '2026-02-28' } });
+      assert.equal(resMonth.month, '2026-02');
+
+      await dashboardService.getKetepatanBelowTarget({ period: 'year', month: '2025-08' });
+      // tahun = year-to-date: berakhir di akhir bulan terpilih (Agt), bukan 31 Des
+      assert.deepEqual(part.mock.calls[1].arguments[0], { period: 'year', range: { from: '2025-01-01', to: '2025-08-31' } });
+    });
+  });
+
+  describe('getKetepatanDashboard (periode global, bisa backdate)', () => {
+    function stubPeriodData({ partMap = new Map(), lineMap = new Map(), startDate = '' } = {}) {
+      mock.timers.setTime(new Date('2026-11-07T01:00:00Z').getTime()); // 07 Nov 2026 08:00 WIB
+      const partRange = mock.method(pmPartHistoryService, 'getKetepatanByMonthRange', async () => partMap);
+      const lineRange = mock.method(pmLineHistoryService, 'getKetepatanByMonthRange', async () => lineMap);
+      const partPerLine = mock.method(pmPartHistoryService, 'getKetepatanPerLine', async () => []);
+      const linePerLine = mock.method(pmLineHistoryService, 'getKetepatanPerLine', async () => []);
+      mock.method(settingsService, 'getSetting', async () => startDate);
+      return { partRange, lineRange, partPerLine, linePerLine };
+    }
+
+    test('tanpa month = bulan berjalan: 12 bulan Jan-Des, hanya bulan depan yang future, tren berakhir bulan ini', async () => {
+      stubPeriodData();
+
+      const res = await dashboardService.getKetepatanDashboard();
+
+      assert.equal(res.month, '2026-11');
+      assert.equal(res.year, 2026);
+      assert.equal(res.is_current, true);
+      assert.equal(res.by_month.length, 12);
+      assert.equal(res.by_month[0].month, '2026-01');
+      assert.equal(res.by_month[11].month, '2026-12');
+      assert.deepEqual(res.by_month.filter((r) => r.future).map((r) => r.month), ['2026-12']);
+      assert.deepEqual(res.trend.map((r) => r.month), ['2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11']);
+    });
+
+    test('backdate: tren 6 bulan berakhir di bulan terpilih (lintas tahun) dan rentang query dibatasi periode', async () => {
+      const { partRange, lineRange, partPerLine } = stubPeriodData();
+
+      const res = await dashboardService.getKetepatanDashboard({ month: '2026-03' });
+
+      assert.equal(res.is_current, false);
+      assert.deepEqual(res.trend.map((r) => r.month), ['2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03']);
+      const ranges = partRange.mock.calls.map((c) => c.arguments[0]);
+      assert.deepEqual(ranges[0], { from: '2026-01-01', to: '2026-03-31' }); // chart/kartu tahun = Jan s/d akhir bulan terpilih
+      assert.deepEqual(ranges[1], { from: '2025-10-01', to: '2026-03-31' }); // tren
+      assert.deepEqual(lineRange.mock.calls.map((c) => c.arguments[0]), ranges);
+      assert.deepEqual(partPerLine.mock.calls[0].arguments[0], { period: 'month', range: { from: '2026-03-01', to: '2026-03-31' } });
+      assert.deepEqual(partPerLine.mock.calls[1].arguments[0], { period: 'year', range: { from: '2026-01-01', to: '2026-03-31' } });
+    });
+
+    test('kartu bulan = bulan terpilih; kartu tahun = year-to-date (Jan s/d bulan terpilih), event sesudahnya TIDAK ikut', async () => {
+      const partMap = new Map([
+        ['2026-01', { total: 4, on_time_count: 3, percentage: 75 }],
+        ['2026-03', { total: 6, on_time_count: 6, percentage: 100 }],
+      ]);
+      const lineMap = new Map([
+        ['2026-03', { monthly: { total: 2, on_time_count: 1, percentage: 50 }, weekly: { total: 10, on_time_count: 10, percentage: 100 } }],
+        // Mei ada di data tapi SETELAH bulan terpilih (Mar): tidak boleh masuk kartu tahun maupun chart
+        ['2026-05', { monthly: { total: 3, on_time_count: 3, percentage: 100 }, weekly: { total: 5, on_time_count: 4, percentage: 80 } }],
+      ]);
+      stubPeriodData({ partMap, lineMap });
+
+      const res = await dashboardService.getKetepatanDashboard({ month: '2026-03' });
+
+      assert.deepEqual(res.bulan.part, { total: 6, on_time_count: 6, percentage: 100 });
+      assert.deepEqual(res.bulan.monthly, { total: 2, on_time_count: 1, percentage: 50 });
+      assert.deepEqual(res.tahun.part, { total: 10, on_time_count: 9, percentage: 90 });
+      assert.deepEqual(res.tahun.monthly, { total: 2, on_time_count: 1, percentage: 50 });
+      assert.deepEqual(res.tahun.weekly, { total: 10, on_time_count: 10, percentage: 100 });
+    });
+
+    test('bulan sesudah bulan terpilih ditandai future dan dikosongkan di chart (Apr-Des untuk Mar), Jan-Mar tidak', async () => {
+      const lineMap = new Map([
+        ['2026-05', { monthly: { total: 3, on_time_count: 3, percentage: 100 }, weekly: { total: 5, on_time_count: 4, percentage: 80 } }],
+      ]);
+      stubPeriodData({ lineMap });
+
+      const res = await dashboardService.getKetepatanDashboard({ month: '2026-03' });
+
+      assert.deepEqual(res.by_month.filter((r) => !r.future).map((r) => r.month), ['2026-01', '2026-02', '2026-03']);
+      assert.equal(res.by_month[4].future, true);
+      assert.deepEqual(res.by_month[4].monthly, { total: 0, on_time_count: 0, percentage: null });
+    });
+
+    test('bulan tanpa event = percentage null dan total 0 (bukan 0%/100%)', async () => {
+      stubPeriodData();
+
+      const res = await dashboardService.getKetepatanDashboard({ month: '2026-02' });
+
+      assert.deepEqual(res.bulan.part, { total: 0, on_time_count: 0, percentage: null });
+      assert.deepEqual(res.tahun.weekly, { total: 0, on_time_count: 0, percentage: null });
+      assert.equal(res.by_month[1].monthly.percentage, null);
+    });
+
+    test('before_start: periode seluruhnya sebelum ketepatan_start_date; start_date tidak valid = null', async () => {
+      stubPeriodData({ startDate: '2026-06-15' });
+      const early = await dashboardService.getKetepatanDashboard({ month: '2026-03' });
+      assert.equal(early.start_date, '2026-06-15');
+      assert.equal(early.bulan.before_start, true);
+      assert.equal(early.tahun.before_start, true); // tahun = Jan-Mar 2026, seluruhnya sebelum 15 Jun
+
+      mock.restoreAll();
+      stubDefaults();
+      stubPeriodData({ startDate: '2026-06-15' });
+      const later = await dashboardService.getKetepatanDashboard({ month: '2026-08' });
+      assert.equal(later.bulan.before_start, false);
+      assert.equal(later.tahun.before_start, false); // Jan-Agt 2026 mencakup sesudah 15 Jun
+
+      mock.restoreAll();
+      stubDefaults();
+      stubPeriodData({ startDate: 'bukan-tanggal' });
+      const invalid = await dashboardService.getKetepatanDashboard({ month: '2026-03' });
+      assert.equal(invalid.start_date, null);
+      assert.equal(invalid.bulan.before_start, false);
+    });
+
+    test('daftar Line < 100% ikut dibawa untuk bulan DAN tahun', async () => {
+      const { partPerLine } = stubPeriodData();
+      partPerLine.mock.mockImplementation(async ({ period }) =>
+        period === 'month'
+          ? [{ line_id: 1, line_name: 'CL-01', percentage: 80 }]
+          : [{ line_id: 1, line_name: 'CL-01', percentage: 90 }, { line_id: 2, line_name: 'CL-02', percentage: 95 }]
+      );
+
+      const res = await dashboardService.getKetepatanDashboard({ month: '2026-10' });
+
+      assert.equal(res.below_target.bulan.length, 1);
+      assert.equal(res.below_target.bulan[0].worst_percentage, 80);
+      assert.equal(res.below_target.tahun.length, 2);
+    });
+  });
 });

@@ -99,7 +99,7 @@ async function findByStatus({ status, lineId, search, limit, offset }, runner = 
        (SELECT sup.supplier_name FROM part_suppliers ps JOIN suppliers sup ON sup.id = ps.supplier_id
         WHERE ps.part_id = p.id AND ps.is_primary = TRUE LIMIT 1) AS primary_supplier_name
      FROM pm_part_status_snapshot s
-     JOIN parts p ON p.id = s.part_id AND p.is_active = TRUE
+     JOIN parts p ON p.id = s.part_id AND p.is_active = TRUE AND p.deleted_at IS NULL
      JOIN lines l ON l.id = s.line_id
      ${where}
      ORDER BY s.wear_percentage DESC, l.line_name ASC, p.jig_name ASC, p.drawing_no ASC
@@ -127,7 +127,7 @@ async function countByStatus({ status, lineId, search }, runner = db) {
   const result = await runner.query(
     `SELECT COUNT(*)::int AS total
      FROM pm_part_status_snapshot s
-     JOIN parts p ON p.id = s.part_id AND p.is_active = TRUE
+     JOIN parts p ON p.id = s.part_id AND p.is_active = TRUE AND p.deleted_at IS NULL
      ${where}`,
     params
   );

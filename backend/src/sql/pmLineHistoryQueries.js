@@ -141,7 +141,15 @@ async function getKetepatanByMonth({ dateFrom, dateTo }, runner = db) {
   return result.rows;
 }
 
-async function getKetepatanPerLine({ dateFrom }, runner = db) {
+// dateTo OPSIONAL (inklusif) - wajib diisi buat periode lampau (backdate), kalau tidak
+// hasilnya ikut menyedot bulan-bulan sesudah periode itu. Tanpa dateTo = sampai sekarang.
+async function getKetepatanPerLine({ dateFrom, dateTo }, runner = db) {
+  const params = [dateFrom];
+  let dateToSql = '';
+  if (dateTo) {
+    params.push(dateTo);
+    dateToSql = ` AND h.tgl_input <= $${params.length}`;
+  }
   const result = await runner.query(
     `SELECT
        h.line_id,
@@ -151,22 +159,29 @@ async function getKetepatanPerLine({ dateFrom }, runner = db) {
        COUNT(*) FILTER (WHERE h.on_time = TRUE) AS on_time_count
      FROM pm_monthly_history h
      LEFT JOIN lines l ON l.id = h.line_id
-     WHERE h.tgl_input >= $1 AND h.deleted_at IS NULL
+     WHERE h.tgl_input >= $1${dateToSql} AND h.deleted_at IS NULL
      GROUP BY h.line_id, COALESCE(l.line_name, h.line_name_snapshot), h.jenis_pm
      ORDER BY COALESCE(l.line_name, h.line_name_snapshot) ASC`,
-    [dateFrom]
+    params
   );
   return result.rows;
 }
 
-// PM Monthly/Weekly yang dinilai telat (on_time = FALSE) untuk 1 Line sejak dateFrom.
-async function findLateEvents({ lineId, dateFrom }, runner = db) {
+// PM Monthly/Weekly yang dinilai telat (on_time = FALSE) untuk 1 Line sejak dateFrom
+// (sampai dateTo inklusif kalau diisi).
+async function findLateEvents({ lineId, dateFrom, dateTo }, runner = db) {
+  const params = [lineId, dateFrom];
+  let dateToSql = '';
+  if (dateTo) {
+    params.push(dateTo);
+    dateToSql = ` AND h.tgl_input <= $${params.length}`;
+  }
   const result = await runner.query(
     `SELECT h.id, h.tgl_input, h.jenis_pm, h.pic_name, h.keterangan, h.alasan_telat, h.telat_hari, h.created_at
      FROM pm_monthly_history h
-     WHERE h.line_id = $1 AND h.on_time = FALSE AND h.deleted_at IS NULL AND h.tgl_input >= $2
+     WHERE h.line_id = $1 AND h.on_time = FALSE AND h.deleted_at IS NULL AND h.tgl_input >= $2${dateToSql}
      ORDER BY h.tgl_input DESC, h.id DESC`,
-    [lineId, dateFrom]
+    params
   );
   return result.rows;
 }

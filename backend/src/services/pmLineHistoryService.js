@@ -365,13 +365,14 @@ async function getKetepatanSummary({ period = 'year' } = {}) {
   return result;
 }
 
-// Tren N bulan terakhir (termasuk bulan ini) -> Map 'YYYY-MM' -> {monthly, weekly}.
+// Ketepatan per bulan kalender untuk rentang tanggal APA PUN (inklusif) -> Map 'YYYY-MM' -> {monthly, weekly}.
+// Dasar fitur backdate Dashboard Management. Awal rentang dipotong ketepatan_start_date.
 // Bulan/jenis tanpa event tidak ada di Map (pemanggil yang mengisi kosongnya).
-async function getKetepatanMonthlyTrend(months = 6) {
+async function getKetepatanByMonthRange({ from, to }) {
   const startDate = await getKetepatanStartDate();
   const rows = await pmLineHistoryQueries.getKetepatanByMonth({
-    dateFrom: clampFrom(dateUtils.startOfMonthString(-(months - 1)), startDate),
-    dateTo: dateUtils.endOfMonthString(),
+    dateFrom: clampFrom(from, startDate),
+    dateTo: to,
   });
   const result = new Map();
   for (const r of rows) {
@@ -384,11 +385,20 @@ async function getKetepatanMonthlyTrend(months = 6) {
   return result;
 }
 
+// Tren N bulan terakhir (termasuk bulan ini) -> Map 'YYYY-MM' -> {monthly, weekly}.
+async function getKetepatanMonthlyTrend(months = 6) {
+  return getKetepatanByMonthRange({
+    from: dateUtils.startOfMonthString(-(months - 1)),
+    to: dateUtils.endOfMonthString(),
+  });
+}
+
 // period: 'year' (default, tahun berjalan) | 'month' (bulan kalender berjalan, WIB).
-async function getKetepatanPerLine({ period = 'year' } = {}) {
-  const periodFrom = period === 'month' ? dateUtils.startOfMonthString() : dateUtils.startOfYearString();
+// range {from, to} (opsional, inklusif) = periode lampau (backdate); kalau diisi, period diabaikan.
+async function getKetepatanPerLine({ period = 'year', range } = {}) {
+  const periodFrom = range ? range.from : period === 'month' ? dateUtils.startOfMonthString() : dateUtils.startOfYearString();
   const dateFrom = clampFrom(periodFrom, await getKetepatanStartDate());
-  const rows = await pmLineHistoryQueries.getKetepatanPerLine({ dateFrom });
+  const rows = await pmLineHistoryQueries.getKetepatanPerLine(range ? { dateFrom, dateTo: range.to } : { dateFrom });
 
   const perLine = new Map();
   for (const r of rows) {
@@ -417,6 +427,7 @@ module.exports = {
   computeLateDays,
   resolveTglInput,
   getKetepatanSummary,
+  getKetepatanByMonthRange,
   getKetepatanMonthlyTrend,
   getKetepatanPerLine,
 };

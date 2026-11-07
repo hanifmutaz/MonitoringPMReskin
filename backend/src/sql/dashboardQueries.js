@@ -1,8 +1,11 @@
 // src/sql/dashboardQueries.js
 const db = require('../config/db');
 
+// "Part" di dashboard = part yang DIMONITOR: aktif DAN belum dihapus (Recycle Bin). Definisi ini harus
+// sama persis dengan pmPartQueries.findAllWithCounter, kalau tidak Total Parts bisa lebih kecil dari
+// jumlah status OK/Warning/Danger (bug lama: 545 total vs 563 OK).
 async function countAllParts(runner = db) {
-  const result = await runner.query(`SELECT COUNT(*)::int AS count FROM parts WHERE deleted_at IS NULL`);
+  const result = await runner.query(`SELECT COUNT(*)::int AS count FROM parts WHERE is_active = TRUE AND deleted_at IS NULL`);
   return result.rows[0].count;
 }
 

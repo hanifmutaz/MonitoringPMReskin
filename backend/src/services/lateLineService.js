@@ -22,6 +22,7 @@ const { computeIdleStatus } = require('../utils/lineIdle');
 const settingsService = require('./settingsService');
 const dateUtils = require('../utils/dateUtils');
 const { clampFrom } = require('../utils/ketepatanStart');
+const { rangeOf } = require('../utils/ketepatanPeriod');
 const AppError = require('../utils/AppError');
 
 const OUTPUT_DAYS = 14;
@@ -232,20 +233,32 @@ function buildKetepatanLateEvents(lineEvents = [], partEvents = []) {
 /**
  * Detail "Ketepatan PM < 100%" 1 Line: PM mana yang dinilai telat di periode itu, telat berapa lama,
  * siapa PIC-nya, dan alasannya. Periode & batas awal SAMA dengan perhitungan persentase ketepatan
- * (bulan/tahun berjalan, dipotong ketepatan_start_date) supaya angkanya cocok dengan daftarnya.
+ * (bulan/tahun, dipotong ketepatan_start_date) supaya angkanya cocok dengan daftarnya.
+ *
+ * monthKey ('YYYY-MM', opsional) = backdate: 'month' -> bulan itu, 'year' -> tahun dari bulan itu,
+ * dibatasi sampai akhir periode. Tanpa monthKey = perilaku lama (bulan/tahun berjalan).
  */
-async function getKetepatanLateDetail(lineId, period = 'month') {
+async function getKetepatanLateDetail(lineId, period = 'month', monthKey) {
   const safePeriod = period === 'year' ? 'year' : 'month';
   const lineRows = await lineIdleQueries.findLineActivity();
   const line = lineRows.find((r) => r.line_id === lineId);
   if (!line) throw AppError.notFound('Line tidak ditemukan');
 
-  const periodFrom = safePeriod === 'month' ? dateUtils.startOfMonthString() : dateUtils.startOfYearString();
+  let periodFrom;
+  let dateTo;
+  if (monthKey) {
+    const range = rangeOf(safePeriod, monthKey);
+    periodFrom = range.from;
+    dateTo = range.to;
+  } else {
+    periodFrom = safePeriod === 'month' ? dateUtils.startOfMonthString() : dateUtils.startOfYearString();
+  }
   const dateFrom = clampFrom(periodFrom, await settingsService.getSetting('ketepatan_start_date'));
+  const query = dateTo ? { lineId, dateFrom, dateTo } : { lineId, dateFrom };
 
   const [lineEvents, partEvents] = await Promise.all([
-    pmLineHistoryQueries.findLateEvents({ lineId, dateFrom }),
-    pmPartHistoryQueries.findLateEventsByLine({ lineId, dateFrom }),
+    pmLineHistoryQueries.findLateEvents(query),
+    pmPartHistoryQueries.findLateEventsByLine(query),
   ]);
 
   return {
@@ -253,6 +266,7 @@ async function getKetepatanLateDetail(lineId, period = 'month') {
     line_name: line.line_name,
     period: safePeriod,
     date_from: dateFrom,
+    date_to: dateTo ?? null,
     events: buildKetepatanLateEvents(lineEvents, partEvents),
   };
 }

@@ -151,16 +151,23 @@ async function updateEditable(id, { remark, pic_name, alasan_telat }, runner = d
   return result.rowCount > 0;
 }
 
-// PM Part yang dinilai telat (on_time = FALSE) untuk semua Part di 1 Line sejak dateFrom.
-async function findLateEventsByLine({ lineId, dateFrom }, runner = db) {
+// PM Part yang dinilai telat (on_time = FALSE) untuk semua Part di 1 Line sejak dateFrom
+// (sampai dateTo inklusif kalau diisi).
+async function findLateEventsByLine({ lineId, dateFrom, dateTo }, runner = db) {
+  const params = [lineId, dateFrom];
+  let dateToSql = '';
+  if (dateTo) {
+    params.push(dateTo);
+    dateToSql = ` AND h.tgl_ganti <= $${params.length}`;
+  }
   const result = await runner.query(
     `SELECT h.id, h.tgl_ganti, h.counter_saat_diganti, h.pic_name, h.remark, h.alasan_telat,
             p.part_name, p.drawing_no, p.target_shot
      FROM pm_part_history h
      JOIN parts p ON p.id = h.part_id
-     WHERE p.line_id = $1 AND h.on_time = FALSE AND h.deleted_at IS NULL AND h.tgl_ganti >= $2
+     WHERE p.line_id = $1 AND h.on_time = FALSE AND h.deleted_at IS NULL AND h.tgl_ganti >= $2${dateToSql}
      ORDER BY h.tgl_ganti DESC, h.id DESC`,
-    [lineId, dateFrom]
+    params
   );
   return result.rows;
 }
@@ -202,7 +209,14 @@ async function getKetepatanByMonth({ dateFrom, dateTo }, runner = db) {
   return result.rows;
 }
 
-async function getKetepatanPerLine({ dateFrom }, runner = db) {
+// dateTo OPSIONAL (inklusif) - wajib diisi buat periode lampau (backdate).
+async function getKetepatanPerLine({ dateFrom, dateTo }, runner = db) {
+  const params = [dateFrom];
+  let dateToSql = '';
+  if (dateTo) {
+    params.push(dateTo);
+    dateToSql = ` AND h.tgl_ganti <= $${params.length}`;
+  }
   const result = await runner.query(
     `SELECT
        p.line_id,
@@ -212,10 +226,10 @@ async function getKetepatanPerLine({ dateFrom }, runner = db) {
      FROM pm_part_history h
      JOIN parts p ON p.id = h.part_id
      JOIN lines l ON l.id = p.line_id
-     WHERE h.tgl_ganti >= $1 AND h.deleted_at IS NULL
+     WHERE h.tgl_ganti >= $1${dateToSql} AND h.deleted_at IS NULL
      GROUP BY p.line_id, l.line_name
      ORDER BY l.line_name ASC`,
-    [dateFrom]
+    params
   );
   return result.rows;
 }

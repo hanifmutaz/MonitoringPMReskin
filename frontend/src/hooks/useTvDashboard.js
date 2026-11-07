@@ -52,10 +52,11 @@ export function useTvKetepatanBelowTarget() {
 
 // Detail telat 1 Line (dibuka saat baris di panel "Ketepatan PM < 100%" diklik). Hanya diambil saat modal
 // terbuka (lineId terisi), tanpa auto-refresh: ini bukti per kejadian, bukan angka live.
-export function useTvKetepatanLateEvents(lineId, period = 'month') {
+// month (opsional, 'YYYY-MM') = backdate (Dashboard Management); TV tidak mengisinya = bulan/tahun berjalan.
+export function useTvKetepatanLateEvents(lineId, period = 'month', month) {
   return useQuery({
-    queryKey: ['dashboard', 'ketepatan-late-events', lineId, period],
-    queryFn: () => fetchKetepatanLateEvents(lineId, period),
+    queryKey: ['dashboard', 'ketepatan-late-events', lineId, period, month ?? null],
+    queryFn: () => fetchKetepatanLateEvents(lineId, period, month),
     enabled: Boolean(lineId),
   });
 }

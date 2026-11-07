@@ -30,15 +30,15 @@ function nextDateStr(dateStr) {
  * @param {number|null|undefined} p.shiftCut  jumlah shift di tanggal PM yang sudah mulai saat PM
  *                                disubmit (null/undefined = seluruh tanggal PM dibuang)
  * @param {Map<string,{count:number,shifts:string[]}>} p.runCountsByDate  tanggal -> run ConMas
- * @param {number} p.jumlahShift  jumlah shift normal Line
- * @param {number} p.pointFullRun poin untuk 1 hari running penuh
+ * @param {number} p.pointFullRun poin untuk 1 hari penuh (>= 2 data di tanggal itu; 1 data = setengahnya,
+ *                                lihat pmPointFormula.js - tidak tergantung jumlah shift Line)
  * @returns {{total:number, totalPrev:number}}
  *   total     = poin mentah (tanpa cap) sampai HARI INI.
  *   totalPrev = poin mentah sampai KEMARIN (tanpa hari ini) - dipakai toleransi
  *               jam batas PM (migration 1700000033000): cap baru terlewati oleh
  *               poin hari berjalan, bukan sebelumnya.
  */
-function computeAccruedPoints({ baselineStr, todayStr, shiftCut, runCountsByDate, jumlahShift, pointFullRun }) {
+function computeAccruedPoints({ baselineStr, todayStr, shiftCut, runCountsByDate, pointFullRun }) {
   const hasShiftCut = shiftCut !== null && shiftCut !== undefined;
   // PM sadar-shift: kalau jam PM tersimpan, tanggal PM ikut dihitung untuk shift yang mulai SETELAH PM.
   let cursorStr = hasShiftCut ? baselineStr : nextDateStr(baselineStr);
@@ -54,7 +54,7 @@ function computeAccruedPoints({ baselineStr, todayStr, shiftCut, runCountsByDate
       runCount: dayEntry ? dayEntry.count : 0,
       shifts: dayEntry ? dayEntry.shifts : [],
     });
-    const points = computeDailyPoints(runCount, jumlahShift, pointFullRun);
+    const points = computeDailyPoints(runCount, pointFullRun);
     total += points;
     if (cursorStr < todayStr) totalPrev += points;
     cursorStr = nextDateStr(cursorStr);

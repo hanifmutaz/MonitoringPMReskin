@@ -183,10 +183,11 @@ async function getKetepatanSummary({ period = 'year' } = {}) {
 }
 
 // period: 'year' (default, tahun berjalan) | 'month' (bulan kalender berjalan, WIB).
-async function getKetepatanPerLine({ period = 'year' } = {}) {
-  const periodFrom = period === 'month' ? dateUtils.startOfMonthString() : dateUtils.startOfYearString();
+// range {from, to} (opsional, inklusif) = periode lampau (backdate); kalau diisi, period diabaikan.
+async function getKetepatanPerLine({ period = 'year', range } = {}) {
+  const periodFrom = range ? range.from : period === 'month' ? dateUtils.startOfMonthString() : dateUtils.startOfYearString();
   const dateFrom = clampFrom(periodFrom, await settingsService.getSetting('ketepatan_start_date'));
-  const rows = await pmPartHistoryQueries.getKetepatanPerLine({ dateFrom });
+  const rows = await pmPartHistoryQueries.getKetepatanPerLine(range ? { dateFrom, dateTo: range.to } : { dateFrom });
   return rows.map((r) => {
     const total = Number(r.total);
     const onTimeCount = Number(r.on_time_count);
@@ -200,13 +201,14 @@ async function getKetepatanPerLine({ period = 'year' } = {}) {
   });
 }
 
-// Tren N bulan terakhir (termasuk bulan ini) -> Map 'YYYY-MM' -> {total, on_time_count, percentage}.
+// Ketepatan per bulan kalender untuk rentang tanggal APA PUN (inklusif) -> Map 'YYYY-MM' -> {total, on_time_count, percentage}.
+// Dasar fitur backdate Dashboard Management. Awal rentang dipotong ketepatan_start_date.
 // Bulan tanpa event tidak ada di Map (pemanggil yang mengisi kosongnya).
-async function getKetepatanMonthlyTrend(months = 6) {
+async function getKetepatanByMonthRange({ from, to }) {
   const startDate = await settingsService.getSetting('ketepatan_start_date');
   const rows = await pmPartHistoryQueries.getKetepatanByMonth({
-    dateFrom: clampFrom(dateUtils.startOfMonthString(-(months - 1)), startDate),
-    dateTo: dateUtils.endOfMonthString(),
+    dateFrom: clampFrom(from, startDate),
+    dateTo: to,
   });
   const result = new Map();
   for (const r of rows) {
@@ -217,7 +219,16 @@ async function getKetepatanMonthlyTrend(months = 6) {
   return result;
 }
 
+// Tren N bulan terakhir (termasuk bulan ini) -> Map 'YYYY-MM' -> {total, on_time_count, percentage}.
+async function getKetepatanMonthlyTrend(months = 6) {
+  return getKetepatanByMonthRange({
+    from: dateUtils.startOfMonthString(-(months - 1)),
+    to: dateUtils.endOfMonthString(),
+  });
+}
+
 module.exports = {
+  getKetepatanByMonthRange,
   getKetepatanMonthlyTrend,
   listHistory,
   createHistory,

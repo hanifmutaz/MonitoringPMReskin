@@ -20,7 +20,15 @@ import { useUpdatePmPartHistory } from '../hooks/usePmPartHistory';
 import { formatDate } from '../utils/formatDate';
 import { alasanLabel, lateLabel, pctLabel, belowTargetTone } from '../utils/ketepatanLate';
 
+import { monthLabel } from '../utils/ketepatanDashboard';
+
 const PERIOD_LABEL = { month: 'Bulan Ini', year: 'Tahun Ini' };
+
+// Label periode di judul: backdate (month terisi) pakai nama bulan/tahun sebenarnya, bukan "Bulan Ini".
+function periodTitle(period, month) {
+  if (!month) return PERIOD_LABEL[period] ?? period;
+  return period === 'year' ? `Tahun ${month.slice(0, 4)}` : monthLabel(month);
+}
 const TONE_TEXT = { danger: 'text-danger', warn: 'text-warn' };
 
 // Ringkasan persentase per jenis PM (Part / Monthly / Weekly) dari baris daftar. null = belum ada PM dinilai.
@@ -93,8 +101,9 @@ function toEditTarget(e) {
   };
 }
 
-function KetepatanLateDetailModal({ item, period = 'month', onClose }) {
-  const { data, isLoading, isError, refetch } = useTvKetepatanLateEvents(item.line_id, period);
+// month (opsional 'YYYY-MM') = backdate dari Dashboard Management; TV tidak mengisinya.
+function KetepatanLateDetailModal({ item, period = 'month', month, onClose }) {
+  const { data, isLoading, isError, refetch } = useTvKetepatanLateEvents(item.line_id, period, month);
   const { hasPermission } = useAuth();
   const lineMutation = useUpdatePmLineHistory();
   const partMutation = useUpdatePmPartHistory();
@@ -105,7 +114,7 @@ function KetepatanLateDetailModal({ item, period = 'month', onClose }) {
 
   return (
     <>
-      <Modal title={`Ketepatan PM - ${item.line_name} (${PERIOD_LABEL[period] ?? period})`} onClose={onClose} width="56rem">
+      <Modal title={`Ketepatan PM - ${item.line_name} (${periodTitle(period, month)})`} onClose={onClose} width="56rem">
         <div className="flex max-h-[75vh] flex-col gap-5 overflow-y-auto pr-1">
           <Breakdown item={item} />
 

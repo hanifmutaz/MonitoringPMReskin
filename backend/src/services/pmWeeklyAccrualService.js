@@ -9,10 +9,11 @@
 // Jadi status PM Weekly nggak pernah ter-update otomatis dari pemakaian
 // harian. Service ini melengkapi bagian yang bolong itu.
 //
-// Pola & formula SAMA PERSIS dengan pmMonthlyAccrualService.js (termasuk
-// fix proporsional per jumlah_shift dari migration 1700000022000):
+// Pola & formula SAMA PERSIS dengan pmMonthlyAccrualService.js (aturan per
+// tanggal 7 Nov 2026, lihat pmPointFormula.js - tidak tergantung jumlah shift Line):
 //
-//   poin_hari_itu = MIN(running / line.jumlah_shift, 1) * pm_weekly_point_full_run
+//   0 data -> 0 poin, 1 data -> 0,5 * pm_weekly_point_full_run,
+//   >= 2 data -> 1 * pm_weekly_point_full_run (2 atau 3 data sama-sama 1 hari)
 //   akumulasi dihitung dari (Tgl PM Weekly Terakhir, hari ini], di-cap ke
 //   pm_weekly_total_days (dipakai ulang sebagai cap poin - lihat migration
 //   1700000019000, key-nya sengaja tidak diganti).
@@ -76,7 +77,6 @@ async function recomputeAllLines() {
     }
 
     const lineRunCounts = byLine.get(line.line_name) || new Map();
-    const jumlahShift = line.jumlah_shift || 2;
     const pointFullRun = settings.pm_weekly_point_full_run ?? 1;
 
     // Hari ini (WIB) IKUT dihitung (realtime). totalPointsPrev = poin mentah sampai
@@ -86,7 +86,6 @@ async function recomputeAllLines() {
       todayStr: dateUtils.todayString(),
       shiftCut: helper.pm_weekly_baseline_shift_cut,
       runCountsByDate: lineRunCounts,
-      jumlahShift,
       pointFullRun,
     });
 

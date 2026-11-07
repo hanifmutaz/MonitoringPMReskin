@@ -6,6 +6,17 @@ const lineIdleService = require('../services/lineIdleService');
 const env = require('../config/env');
 const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
+const dateUtils = require('../utils/dateUtils');
+const { resolveMonthParam } = require('../utils/ketepatanPeriod');
+
+// ?month=YYYY-MM (backdate). Kosong -> undefined (pemanggil pakai perilaku lama / bulan berjalan);
+// format salah atau bulan di masa depan -> 400.
+function parseOptionalMonth(query) {
+  if (query.month === undefined || query.month === '') return undefined;
+  const result = resolveMonthParam(query.month, dateUtils.monthKey(0));
+  if (!result.ok) throw AppError.badRequest('Validasi gagal', { month: result.message });
+  return result.month;
+}
 
 const summary = asyncHandler(async (req, res) => {
   const data = await dashboardService.getSummary();
@@ -42,13 +53,22 @@ const ketepatanAttention = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Success', data });
 });
 
-// GET /api/dashboard/ketepatan-below-target?period=month|year - semua Line dengan ketepatan < 100%.
+// GET /api/dashboard/ketepatan?month=YYYY-MM - semua blok Ketepatan PM Dashboard Management untuk 1 bulan
+// acuan (kartu bulan + tahun, chart 12 bulan, tren 6 bulan, Line < 100%). Tanpa month = bulan ini.
+const ketepatan = asyncHandler(async (req, res) => {
+  const month = parseOptionalMonth(req.query);
+  const data = await dashboardService.getKetepatanDashboard({ month });
+  res.status(200).json({ success: true, message: 'Success', data });
+});
+
+// GET /api/dashboard/ketepatan-below-target?period=month|year[&month=YYYY-MM] - semua Line dengan ketepatan < 100%.
 const ketepatanBelowTarget = asyncHandler(async (req, res) => {
   const { period } = req.query;
   if (period !== undefined && period !== 'month' && period !== 'year') {
     throw AppError.badRequest('Validasi gagal', { period: "period harus 'month' atau 'year'" });
   }
-  const data = await dashboardService.getKetepatanBelowTarget({ period });
+  const month = parseOptionalMonth(req.query);
+  const data = await dashboardService.getKetepatanBelowTarget({ period, month });
   res.status(200).json({ success: true, message: 'Success', data });
 });
 
@@ -79,7 +99,8 @@ const ketepatanLateEvents = asyncHandler(async (req, res) => {
   if (period !== undefined && period !== 'month' && period !== 'year') {
     throw AppError.badRequest('Validasi gagal', { period: "period harus 'month' atau 'year'" });
   }
-  const data = await lateLineService.getKetepatanLateDetail(lineId, period);
+  const month = parseOptionalMonth(req.query);
+  const data = await lateLineService.getKetepatanLateDetail(lineId, period, month);
   res.status(200).json({ success: true, message: 'Success', data });
 });
 
@@ -110,6 +131,7 @@ module.exports = {
   partSummary,
   lineSummary,
   ketepatanAttention,
+  ketepatan,
   ketepatanBelowTarget,
   ketepatanLateEvents,
   lateLines,

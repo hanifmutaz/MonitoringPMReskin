@@ -5,6 +5,7 @@ const pmPartHistoryService = require('./pmPartHistoryService');
 const pmLineHistoryService = require('./pmLineHistoryService');
 const settingsService = require('./settingsService');
 const dateUtils = require('../utils/dateUtils');
+const ketepatanPeriod = require('../utils/ketepatanPeriod');
 const lineIdleService = require('./lineIdleService');
 
 const DASHBOARD_CACHE_TTL_MS = 5000;
@@ -317,18 +318,117 @@ async function getKetepatanAttention() {
 //   period 'month' = bulan kalender berjalan (default, selaras tile "Ketepatan PM Bulan Ini")
 //   period 'year'  = tahun berjalan
 // Line tanpa event PM di periode itu tidak muncul (belum ada yang bisa dinilai, bukan 0%).
-async function getKetepatanBelowTarget({ period = 'month' } = {}) {
+//
+// month ('YYYY-MM', opsional) = BACKDATE: 'month' -> bulan itu, 'year' -> tahun dari bulan itu, dibatasi
+// sampai akhir periodenya (bukan sampai sekarang). Tanpa month = perilaku lama (bulan/tahun berjalan).
+async function getKetepatanBelowTarget({ period = 'month', month } = {}) {
   const safePeriod = period === 'year' ? 'year' : 'month';
+  const query = month ? { period: safePeriod, range: ketepatanPeriod.rangeOf(safePeriod, month) } : { period: safePeriod };
   const [partPerLine, linePerLine] = await Promise.all([
-    pmPartHistoryService.getKetepatanPerLine({ period: safePeriod }),
-    pmLineHistoryService.getKetepatanPerLine({ period: safePeriod }),
+    pmPartHistoryService.getKetepatanPerLine(query),
+    pmLineHistoryService.getKetepatanPerLine(query),
   ]);
 
   const items = mergeKetepatanPerLine(partPerLine, linePerLine)
     .filter((row) => row.worst_percentage !== null && row.worst_percentage < 100)
     .sort((a, b) => a.worst_percentage - b.worst_percentage || a.line_name.localeCompare(b.line_name));
 
-  return { period: safePeriod, items };
+  return month ? { period: safePeriod, month, items } : { period: safePeriod, items };
+}
+
+// --- Ketepatan PM berbasis periode (Dashboard Management, bisa BACKDATE) ---
+
+const EMPTY_CELL = { total: 0, on_time_count: 0, percentage: null };
+
+function ketepatanCell(c) {
+  return c ? { total: c.total ?? 0, on_time_count: c.on_time_count ?? 0, percentage: c.percentage ?? null } : { ...EMPTY_CELL };
+}
+
+function percentageOf(total, onTimeCount) {
+  if (!total) return null; // tanpa event = belum bisa dinilai (bukan 0%)
+  return Math.round((onTimeCount / total) * 1000) / 10;
+}
+
+// Jumlahkan sel ketepatan beberapa bulan jadi 1 sel (dipakai untuk total tahun, supaya
+// angka kartu tahun SELALU sama dengan jumlah bar di chart per bulan).
+function sumKetepatanCells(cells) {
+  const total = cells.reduce((acc, c) => acc + c.total, 0);
+  const onTime = cells.reduce((acc, c) => acc + c.on_time_count, 0);
+  return { total, on_time_count: onTime, percentage: percentageOf(total, onTime) };
+}
+
+function rowForMonth(month, partMap, lineMap) {
+  const line = lineMap.get(month);
+  return {
+    month,
+    part: ketepatanCell(partMap.get(month)),
+    monthly: ketepatanCell(line?.monthly),
+    weekly: ketepatanCell(line?.weekly),
+  };
+}
+
+/**
+ * Semua data blok Ketepatan PM untuk 1 bulan acuan (default bulan ini; boleh bulan lampau):
+ * kartu bulan, kartu tahun, chart 12 bulan, tren 6 bulan (berakhir di bulan acuan), dan daftar
+ * Line < 100% (bulan + tahun). Angka kartu bulan/tahun diturunkan dari data per-bulan yang sama
+ * dengan chart, jadi tidak mungkin berbeda dengan yang tampil di grafik.
+ *
+ * Seluruh halaman "per kondisi bulan terpilih": tahun = year-to-date (1 Jan s/d akhir bulan terpilih), dan
+ * bulan SESUDAH bulan terpilih ditandai `future` (bolong di chart) walau datanya sudah ada, supaya melihat
+ * Maret 2026 menampilkan Jan-Mar 2026 persis seperti saat itu.
+ *
+ * @param {{month?: string}} p  month 'YYYY-MM' (sudah divalidasi pemanggil, tidak di masa depan)
+ */
+async function getKetepatanDashboard({ month } = {}) {
+  const currentMonth = dateUtils.monthKey(0);
+  const selected = month || currentMonth;
+  const year = ketepatanPeriod.yearOf(selected);
+  const yearMonths = ketepatanPeriod.monthsOfYear(year);
+  const trendKeys = ketepatanPeriod.trendMonths(selected, KETEPATAN_TREND_MONTHS);
+  const yearRange = ketepatanPeriod.rangeOf('year', selected);
+  const trendRange = { from: ketepatanPeriod.monthStart(trendKeys[0]), to: ketepatanPeriod.monthEnd(selected) };
+
+  const [partYear, lineYear, partTrend, lineTrend, belowMonth, belowYear, startDateRaw] = await Promise.all([
+    pmPartHistoryService.getKetepatanByMonthRange(yearRange),
+    pmLineHistoryService.getKetepatanByMonthRange(yearRange),
+    pmPartHistoryService.getKetepatanByMonthRange(trendRange),
+    pmLineHistoryService.getKetepatanByMonthRange(trendRange),
+    getKetepatanBelowTarget({ period: 'month', month: selected }),
+    getKetepatanBelowTarget({ period: 'year', month: selected }),
+    settingsService.getSetting('ketepatan_start_date'),
+  ]);
+
+  const startDate = typeof startDateRaw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(startDateRaw) ? startDateRaw : null;
+
+  // future = di luar periode terpilih (setelah bulan acuan). Datanya tidak dipakai sama sekali.
+  const byMonth = yearMonths.map((m) => (m > selected
+    ? { month: m, part: ketepatanCell(null), monthly: ketepatanCell(null), weekly: ketepatanCell(null), future: true }
+    : { ...rowForMonth(m, partYear, lineYear), future: false }));
+  const selectedRow = byMonth.find((r) => r.month === selected);
+  const ytd = byMonth.filter((r) => !r.future);
+
+  return {
+    month: selected,
+    year,
+    current_month: currentMonth,
+    is_current: selected === currentMonth,
+    start_date: startDate,
+    bulan: {
+      before_start: ketepatanPeriod.isBeforeStartDate(ketepatanPeriod.monthEnd(selected), startDate),
+      part: selectedRow.part,
+      monthly: selectedRow.monthly,
+      weekly: selectedRow.weekly,
+    },
+    tahun: {
+      before_start: ketepatanPeriod.isBeforeStartDate(yearRange.to, startDate),
+      part: sumKetepatanCells(ytd.map((r) => r.part)),
+      monthly: sumKetepatanCells(ytd.map((r) => r.monthly)),
+      weekly: sumKetepatanCells(ytd.map((r) => r.weekly)),
+    },
+    by_month: byMonth,
+    trend: trendKeys.map((m) => rowForMonth(m, partTrend, lineTrend)),
+    below_target: { bulan: belowMonth.items, tahun: belowYear.items },
+  };
 }
 
 // --- Dashboard khusus per domain (dipisah dari getSummary/getAttention yang
@@ -408,5 +508,6 @@ module.exports = {
   getLineSummary,
   getKetepatanAttention,
   getKetepatanBelowTarget,
+  getKetepatanDashboard,
   getKetepatanTrend,
 };

@@ -7,14 +7,15 @@
 // view_report_25415 per Line+tanggal yang punya output > 0 di slot
 // manapun (lihat conmasQueries.fetchDailyRunCounts).
 //
-// Formula DIUBAH (24 Sep 2026) - lihat migration 1700000022000. Versi lama
-// pakai threshold binary full/half GLOBAL (pm_monthly_min_run_count_full),
-// jadi Line 3-shift yang jalan penuh (running=3) dapet poin sama persis
-// dengan Line 2-shift yang jalan penuh (running=2) - keausan Line 3-shift
-// under-counted. Formula baru PROPORSIONAL ke jumlah_shift Line itu sendiri:
+// Formula DIUBAH LAGI (7 Nov 2026) - lihat pmPointFormula.js. Versi 24 Sep 2026
+// membagi dengan lines.jumlah_shift Line SAAT INI, padahal recompute di bawah
+// menyapu ulang semua hari sejak PM terakhir: kalau Line pindah 2 -> 3 shift,
+// hari-hari lama yang cuma jalan 2 shift ikut dinilai ulang jadi 2/3 hari.
+// Sekarang hanya data yang masuk per TANGGAL yang dilihat (tidak peduli Line
+// 2 atau 3 shift):
 //
-//   poin_hari_itu = MIN(running / line.jumlah_shift, 1) * pm_monthly_point_full_run
-//   (running == 0 -> 0 poin, tidak ada baris di ConMas hari itu)
+//   0 data -> 0 poin, 1 data -> 0,5 * pm_monthly_point_full_run,
+//   >= 2 data -> 1 * pm_monthly_point_full_run (2 atau 3 data sama-sama 1 hari)
 //
 //   akumulasi dihitung dari (Tgl PM Monthly Terakhir, hari ini], di-cap
 //
@@ -87,11 +88,9 @@ async function recomputeAllLines() {
     }
 
     const lineRunCounts = byLine.get(line.line_name) || new Map();
-    const jumlahShift = line.jumlah_shift || 2;
     const pointFullRun = settings.pm_monthly_point_full_run ?? 1;
 
-    // Proporsional: running penuh sesuai jumlah_shift Line -> full point;
-    // running sebagian -> pecahan sebanding (lihat pmPointFormula.js).
+    // Per tanggal: 1 data = 0,5 poin, >= 2 data = 1 poin penuh (lihat pmPointFormula.js).
     // Hari ini (WIB) IKUT dihitung (realtime). totalPointsPrev = poin mentah sampai
     // KEMARIN - dipakai untuk toleransi jam batas PM (migration 1700000033000).
     const { total: totalPoints, totalPrev: totalPointsPrev } = computeAccruedPoints({
@@ -99,7 +98,6 @@ async function recomputeAllLines() {
       todayStr: dateUtils.todayString(),
       shiftCut: helper.pm_monthly_baseline_shift_cut,
       runCountsByDate: lineRunCounts,
-      jumlahShift,
       pointFullRun,
     });
 

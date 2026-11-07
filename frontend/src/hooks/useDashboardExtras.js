@@ -1,5 +1,5 @@
 // src/hooks/useDashboardExtras.js
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
   fetchAttention,
   fetchUpcoming,
@@ -7,6 +7,7 @@ import {
   fetchLineSummary,
   fetchKetepatanAttention,
   fetchKetepatanBelowTarget,
+  fetchKetepatanDashboard,
   fetchLateLines,
   fetchLateLineEvidence,
   fetchIdleLines,
@@ -41,6 +42,18 @@ export function useDashboardKetepatanBelowTarget(period = 'month') {
     queryKey: ['dashboard', 'ketepatan-below-target', period],
     queryFn: () => fetchKetepatanBelowTarget(period),
     ...DASHBOARD_REFRESH,
+  });
+}
+
+// Semua blok Ketepatan PM untuk 1 bulan acuan. month undefined = bulan ini (auto-refresh 60 detik seperti
+// dashboard lain). Bulan lampau = data tetap, jadi TIDAK di-refetch otomatis. keepPreviousData: saat pindah
+// bulan, angka lama tetap tampil (redup) sampai data baru datang, tidak berkedip jadi skeleton.
+export function useDashboardKetepatan(month) {
+  return useQuery({
+    queryKey: ['dashboard', 'ketepatan', month ?? 'current'],
+    queryFn: () => fetchKetepatanDashboard(month),
+    placeholderData: keepPreviousData,
+    ...(month ? {} : DASHBOARD_REFRESH),
   });
 }
 

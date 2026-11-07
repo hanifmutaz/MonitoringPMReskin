@@ -11,7 +11,9 @@ function runs(entries) {
   return new Map(Object.entries(entries).map(([date, shifts]) => [date, { count: shifts.length, shifts }]));
 }
 
-const base = { jumlahShift: 2, pointFullRun: 1, shiftCut: null };
+const S3 = 'Shift 3 (3 Shift)';
+
+const base = { pointFullRun: 1, shiftCut: null };
 
 describe('computeAccruedPoints - hari berjalan ikut dihitung (realtime)', () => {
   // Baseline 5 Okt, 6-10 Okt full (5 poin), 11 Okt cuma 1 shift (0.5), + hari ini.
@@ -101,6 +103,55 @@ describe('computeAccruedPoints - tanggal PM (baseline) sadar-shift', () => {
       ...base, baselineStr: '2026-10-05', todayStr: '2026-10-12', runCountsByDate: new Map(),
     });
     assert.deepEqual(r, { total: 0, totalPrev: 0 });
+  });
+});
+
+describe('computeAccruedPoints - Line pindah 2 shift -> 3 shift (aturan per tanggal)', () => {
+  // Baseline 1 Nov. 2-5 Nov masih 2 shift (2 data/hari), 6-9 Nov sudah 3 shift (3 data/hari).
+  const history = {
+    '2026-11-02': [S1, S2],
+    '2026-11-03': [S1, S2],
+    '2026-11-04': [S1, S2],
+    '2026-11-05': [S1, S2],
+    '2026-11-06': [S1, S2, S3],
+    '2026-11-07': [S1, S2, S3],
+    '2026-11-08': [S1, S2, S3],
+    '2026-11-09': [S1, S2, S3],
+  };
+
+  test('hari 2 data dan hari 3 data sama-sama dihitung 1 hari -> 8 hari = 8 poin', () => {
+    const r = computeAccruedPoints({
+      ...base, baselineStr: '2026-11-01', todayStr: '2026-11-09', runCountsByDate: runs(history),
+    });
+    assert.equal(r.total, 8);
+    assert.equal(r.totalPrev, 7);
+  });
+
+  test('REGRESI: hasil TIDAK berubah walau jumlahShift Line diubah 2 -> 3 di master (parameter diabaikan)', () => {
+    const input = { ...base, baselineStr: '2026-11-01', todayStr: '2026-11-09', runCountsByDate: runs(history) };
+    assert.equal(computeAccruedPoints({ ...input, jumlahShift: 2 }).total, computeAccruedPoints({ ...input, jumlahShift: 3 }).total);
+  });
+
+  test('hari yang cuma 1 data tetap 0,5 hari (Line 3 shift yang sedang jalan sebagian)', () => {
+    const r = computeAccruedPoints({
+      ...base,
+      baselineStr: '2026-11-01',
+      todayStr: '2026-11-04',
+      runCountsByDate: runs({ '2026-11-02': [S1, S2, S3], '2026-11-03': [S1], '2026-11-04': [S1, S2] }),
+    });
+    assert.equal(r.total, 2.5); // 1 + 0,5 + 1
+  });
+
+  test('tanggal PM (baseline) di Line 3 shift: 2 shift tersisa setelah PM = 1 hari, 1 shift tersisa = 0,5 hari', () => {
+    const day = { '2026-11-07': [S1, S2, S3] };
+    const cut1 = computeAccruedPoints({
+      ...base, baselineStr: '2026-11-07', todayStr: '2026-11-07', shiftCut: 1, runCountsByDate: runs(day),
+    });
+    const cut2 = computeAccruedPoints({
+      ...base, baselineStr: '2026-11-07', todayStr: '2026-11-07', shiftCut: 2, runCountsByDate: runs(day),
+    });
+    assert.equal(cut1.total, 1); // shift 2 & 3 masih jalan setelah PM
+    assert.equal(cut2.total, 0.5); // tinggal shift 3
   });
 });
 

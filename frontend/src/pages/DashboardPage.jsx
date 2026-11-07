@@ -1,70 +1,34 @@
+// src/pages/DashboardPage.jsx
+//
+// Dashboard Management (redesign 7 Nov 2026). Isinya sengaja dibatasi untuk kebutuhan management:
+//   KPI (snapshot): Total Parts, Active Lines, Part Butuh Perhatian, Line Kritis
+//   Ketepatan PM (ikut PERIODE GLOBAL, bisa backdate): kartu bulan, kartu tahun, chart per bulan,
+//     tren 6 bulan, dan daftar Line < 100% (bulan & tahun)
+//   Snapshot: Ringkasan Status Line, Critical Alerts, Line Tidak Running
+// Jadwal PM 7 hari ke depan & Line Terlambat sengaja tidak di sini (ada di Mode TV).
+//
+// Tampilan site lain (multi-site) hanya punya snapshot: pemilih periode, chart 12 bulan, dan detail telat
+// tidak tersedia di sana (lihat viewFromRemote).
 import { useState } from 'react';
-import dayjs from 'dayjs';
-import 'dayjs/locale/id';
-import { Package, Factory, AlertTriangle, ShieldAlert, Target, TrendingDown } from 'lucide-react';
+import { Package, Factory, AlertTriangle, ShieldAlert, Target, Info } from 'lucide-react';
 import { usePageHeader } from '../contexts/PageHeaderContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboardSummary } from '../hooks/useDashboardSummary';
-import {
-  useDashboardAttention,
-  useDashboardUpcoming,
-  useDashboardKetepatanBelowTarget,
-  useDashboardLateLines,
-  useDashboardIdleLines,
-  useDashboardMultiSite,
-} from '../hooks/useDashboardExtras';
+import { useDashboardAttention, useDashboardIdleLines, useDashboardKetepatan, useDashboardMultiSite } from '../hooks/useDashboardExtras';
 import KpiCard from '../components/KpiCard';
 import LineStatusDonut from '../components/LineStatusDonut';
 import CriticalAlertsPanel from '../components/CriticalAlertsPanel';
-import GanttUpcomingPanel from '../components/GanttUpcomingPanel';
-import LateLinesPanel from '../components/LateLinesPanel';
 import IdleLinesPanel from '../components/IdleLinesPanel';
 import SiteSwitcher from '../components/SiteSwitcher';
+import KetepatanPeriodPicker from '../components/KetepatanPeriodPicker';
+import KetepatanYearChart from '../components/KetepatanYearChart';
+import KetepatanLateDetailModal from '../components/KetepatanLateDetailModal';
+import { KetepatanTrendPanel, KetepatanBelowTargetPanel } from '../components/KetepatanPanels';
 import { Card, CardHeader, CardTitle } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
 import { EmptyState } from '../components/ui/empty-state';
 import { Button } from '../components/ui/button';
-import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
-
-function formatKetepatan(percentage) {
-  return percentage === null || percentage === undefined ? '100%' : `${percentage}%`;
-}
-
-function ketepatanStatus(percentage) {
-  if (percentage === null || percentage === undefined) return 'accent';
-  if (percentage >= 90) return 'accent';
-  if (percentage >= 50) return 'warn';
-  return 'danger';
-}
-
-function ketepatanCaption(percentage, total, defaultCaption, periodLabel = 'tahun ini') {
-  if (percentage === null || percentage === undefined) return `Belum ada event ${periodLabel} - default 100%`;
-  return `${defaultCaption}, dari ${total} event`;
-}
-
-// 'YYYY-MM' -> 'Okt 2026' / 'Oktober 2026'. Key bulan dari backend (WIB), jadi
-// diparse sebagai tanggal 1 bulan itu supaya gak geser bulan karena timezone.
-function formatMonthKey(monthKey, format = 'MMMM YYYY') {
-  const d = dayjs(`${monthKey}-01`);
-  return d.isValid() ? d.locale('id').format(format) : monthKey;
-}
-
-const PERCENT_BADGE_CLASS = {
-  accent: { bg: 'bg-ok-dim', text: 'text-ok', dot: 'bg-ok' },
-  warn: { bg: 'bg-warn-dim', text: 'text-warn', dot: 'bg-warn' },
-  danger: { bg: 'bg-danger-dim', text: 'text-danger', dot: 'bg-danger' },
-  muted: { bg: 'bg-[var(--panel-3)]', text: 'text-[var(--text-faint)]', dot: 'bg-[var(--text-faint)]' },
-};
-
-function PercentBadge({ percentage }) {
-  const cfg = PERCENT_BADGE_CLASS[ketepatanStatus(percentage)];
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-[10px] py-[3px] font-[var(--font-mono)] text-xs ${cfg.bg} ${cfg.text}`}>
-      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cfg.dot}`} />
-      {formatKetepatan(percentage)}
-    </span>
-  );
-}
+import { formatPct, pctTone, pctCaption, monthLabel, viewFromLocal, viewFromRemote } from '../utils/ketepatanDashboard';
 
 const HEALTH_STAT_CLASS = {
   ok: { bg: 'bg-ok-dim', text: 'text-ok', border: 'border-ok/20' },
@@ -76,7 +40,6 @@ function HealthStat({ value, label, tone }) {
   const cfg = HEALTH_STAT_CLASS[tone];
   return (
     <div className={`flex min-h-[92px] flex-1 flex-col items-center justify-center rounded-xl border p-4 text-center ${cfg.bg} ${cfg.border}`}>
-      {/* polish: A7 typography scale — samain ke display-tier standar (30px, sama kayak KpiCard), sebelumnya text-[28px] beda 2px tanpa alasan jelas */}
       <div className={`font-[var(--font-display)] text-[30px] font-semibold leading-none tracking-tight ${cfg.text}`}>{value}</div>
       <div className="mt-2 text-xs font-medium text-muted-foreground">{label}</div>
     </div>
@@ -94,113 +57,47 @@ function KpiCardSkeleton() {
   );
 }
 
-// Tren ketepatan per bulan PM Monthly & Weekly (6 bulan terakhir, lama -> baru). Bulan tanpa event
-// tampil "-" (abu-abu), bukan 0%, supaya gak dikira performa jelek.
-// Kolom bulan terakhir = bulan berjalan (belum final sampai akhir bulan).
-function KetepatanTrendPanel({ data }) {
-  if (!data || data.length === 0) return null;
-  const lastIndex = data.length - 1;
+// Kartu ketepatan 1 jenis PM. cell = { percentage, total }; beforeStart = periode di luar batas awal hitung.
+function KetepatanKpi({ label, cell, caption, beforeStart }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Tren Ketepatan PM per Bulan ({data.length} Bulan Terakhir)</CardTitle>
-      </CardHeader>
-      <div className="overflow-x-auto" tabIndex="0" role="region" aria-label="Tabel tren ketepatan PM per bulan (scroll horizontal)">
-        <table className="w-full border-collapse">
-          <thead><tr>
-            {['Bulan', 'Monthly', 'Weekly'].map((h) => (
-              <th key={h} scope="col" className="border-b border-border px-2.5 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">{h}</th>
-            ))}
-          </tr></thead>
-          <tbody>
-            {data.map((row, i) => (
-              <tr key={row.month} className="hover:bg-[var(--panel-2)]">
-                <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5 font-[var(--font-mono)] text-[13px]">
-                  {formatMonthKey(row.month, 'MMM YYYY')}
-                  {i === lastIndex && <span className="ml-1.5 text-[11px] text-[var(--text-faint)]">(berjalan)</span>}
-                </td>
-                {['monthly', 'weekly'].map((k) => (
-                  <td key={k} className="border-b border-[var(--border-soft)] px-2.5 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <PercentBadge percentage={row[k].percentage} />
-                      {row[k].total > 0 && <span className="text-[11px] text-[var(--text-faint)]">{row[k].total} event</span>}
-                    </div>
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+    <KpiCard
+      icon={<Target size={18} />}
+      label={label}
+      value={beforeStart ? '—' : formatPct(cell.percentage)}
+      caption={pctCaption(cell, caption, { beforeStart })}
+      status={beforeStart ? 'muted' : pctTone(cell.percentage)}
+    />
   );
 }
 
+const CAPTION = {
+  part: 'Diganti sebelum/tepat target shot',
+  monthly: 'Input sebelum poin lewat cap',
+  weekly: 'Input dalam siklus hari weekly',
+};
 
-// data-lewat-props supaya bisa dipakai buat data lokal MAUPUN site lain.
-// Empty state: EmptyState default-nya udah punya border-dashed + py-12.
-// Karena ditaro DI DALAM <Card> (yang udah ber-border + p-4.5), tanpa
-// override bakal jadi "kotak-dalam-kotak" + ketinggian (ngambang di tengah).
-// `border-0 py-8` + icon bikin dia nyatu jadi isi panel, bukan box terpisah.
-const KETEPATAN_PERIOD_LABEL = { month: 'Bulan Ini', year: 'Tahun Berjalan' };
-
-// Semua Line yang ketepatan PM-nya di bawah 100% (nilai terburuk dari Part/Monthly/Weekly), terburuk dulu.
-// `onPeriodChange` kosong = periode tetap (tampilan site lain, datanya tahun berjalan dari site itu).
-function KetepatanAttentionPanel({ data = [], isLoading, period = 'year', onPeriodChange }) {
-  if (isLoading) return null;
-  const rows = data.filter((row) => row.worst_percentage !== null && row.worst_percentage !== undefined && row.worst_percentage < 100);
-  return (
-    <Card>
-      <CardHeader className="flex-wrap gap-2">
-        <CardTitle className="flex items-center gap-1.5">
-          <TrendingDown size={16} />
-          Line Ketepatan PM di Bawah 100% ({KETEPATAN_PERIOD_LABEL[period]})
-          {rows.length > 0 && (
-            <span className="ml-1 rounded-full bg-[var(--panel-3)] px-2 py-0.5 font-[var(--font-mono)] text-[11px] text-muted-foreground">
-              {rows.length}
-            </span>
-          )}
-        </CardTitle>
-        {onPeriodChange && (
-          <Tabs value={period} onValueChange={onPeriodChange}>
-            <TabsList aria-label="Periode ketepatan">
-              <TabsTrigger value="month">Bulan Ini</TabsTrigger>
-              <TabsTrigger value="year">Tahun Berjalan</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        )}
-      </CardHeader>
-      {rows.length === 0 ? (
-        <EmptyState
-          icon={TrendingDown}
-          tone="ok"
-          className="border-0 py-8"
-          title="Semua Line ketepatan PM 100%"
-          description={`Tidak ada Line dengan ketepatan di bawah 100% (${KETEPATAN_PERIOD_LABEL[period].toLowerCase()}), atau belum ada event PM di periode ini.`}
-        />
-      ) : (
-        <div className="max-h-[420px] overflow-auto" tabIndex="0" role="region" aria-label="Tabel Line ketepatan PM di bawah 100% (scroll)">
-          <table className="w-full border-collapse">
-            <thead><tr>
-              {['Line', 'Ketepatan PM Part', 'Ketepatan Monthly', 'Ketepatan Weekly'].map((h) => (
-                <th key={h} scope="col" className="sticky top-0 z-10 border-b border-border bg-card px-2.5 py-2 text-left font-[var(--font-mono)] text-[11px] uppercase tracking-[0.5px] text-[var(--text-faint)]">{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.line_id} className="hover:bg-[var(--panel-2)]">
-                  <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5 font-[var(--font-mono)] text-[13px]">{row.line_name}</td>
-                  <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5"><PercentBadge percentage={row.part_percentage} /></td>
-                  <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5"><PercentBadge percentage={row.monthly_percentage} /></td>
-                  <td className="border-b border-[var(--border-soft)] px-2.5 py-2.5"><PercentBadge percentage={row.weekly_percentage} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
-  );
+// Judul periode. Periode berjalan memakai istilah "Bulan Ini"/"Tahun Berjalan"; backdate memakai nama bulan/tahun asli.
+function periodTitles(view) {
+  const current = view.source === 'remote' || view.isCurrent;
+  if (current) {
+    return {
+      bulanCard: `Bulan Ini - ${monthLabel(view.month)}`,
+      tahunCard: 'Tahun Berjalan',
+      monthTab: 'Bulan Ini',
+      yearTab: 'Tahun Berjalan',
+      monthLabel: 'Bulan Ini',
+      yearLabel: 'Tahun Berjalan',
+    };
+  }
+  const yearText = `Tahun ${view.year}, Jan – ${monthLabel(view.month, 'name')}`;
+  return {
+    bulanCard: monthLabel(view.month),
+    tahunCard: yearText,
+    monthTab: monthLabel(view.month, 'short'),
+    yearTab: `Jan – ${monthLabel(view.month, 'name')} ${view.year}`,
+    monthLabel: monthLabel(view.month),
+    yearLabel: yearText,
+  };
 }
 
 function DashboardPage() {
@@ -213,20 +110,24 @@ function DashboardPage() {
   const remoteSite = selectedSiteId ? sites.find((s) => s.site_id === selectedSiteId) : null;
   const isRemoteView = !!remoteSite;
 
+  // null = bulan berjalan (auto-refresh); 'YYYY-MM' = backdate (data tetap).
+  const [month, setMonth] = useState(null);
+  const [belowPeriod, setBelowPeriod] = useState('month');
+  const [lateItem, setLateItem] = useState(null);
+
   const localSummary = useDashboardSummary();
   const localAttention = useDashboardAttention();
-  const localUpcoming = useDashboardUpcoming();
-  const [ketepatanPeriod, setKetepatanPeriod] = useState('month');
-  const localKetepatan = useDashboardKetepatanBelowTarget(ketepatanPeriod);
-  const localLate = useDashboardLateLines();
   const localIdle = useDashboardIdleLines();
+  const localKetepatan = useDashboardKetepatan(month ?? undefined);
 
   const summary = isRemoteView ? remoteSite.data?.summary : localSummary.data;
   const attention = isRemoteView ? remoteSite.data?.attention ?? [] : localAttention.data ?? [];
-  const upcoming = isRemoteView ? remoteSite.data?.upcoming ?? [] : localUpcoming.data ?? [];
-  const ketepatanAttention = isRemoteView ? remoteSite.data?.ketepatan_attention ?? [] : localKetepatan.data?.items ?? [];
   const loadingSummary = isRemoteView ? false : localSummary.isLoading;
   const errorSummary = isRemoteView ? false : localSummary.isError;
+
+  let view = null;
+  if (isRemoteView) view = viewFromRemote(remoteSite.data?.summary, remoteSite.data?.ketepatan_attention ?? []);
+  else if (localKetepatan.data) view = viewFromLocal(localKetepatan.data);
 
   if (errorSummary) {
     return (
@@ -249,10 +150,25 @@ function DashboardPage() {
     );
   }
 
+  const titles = view ? periodTitles(view) : null;
+  const isLocalBackdate = !isRemoteView && view && !view.isCurrent;
+  const ketepatanLoading = !isRemoteView && localKetepatan.isLoading;
+  const ketepatanError = !isRemoteView && localKetepatan.isError && !localKetepatan.data;
+  // Saat pindah bulan, angka lama tetap tampil (redup) sampai data baru datang.
+  const dim = !isRemoteView && localKetepatan.isPlaceholderData ? 'opacity-60 transition-opacity' : 'transition-opacity';
+
+  const handlePeriodChange = (next) => {
+    setMonth(next === view?.currentMonth ? null : next);
+  };
+
+  const belowItems = view ? (isRemoteView || belowPeriod === 'year' ? view.belowTarget.tahun : view.belowTarget.bulan) : [];
+  const belowPeriodShown = isRemoteView ? 'year' : belowPeriod;
+
   return (
     <div className="flex flex-col gap-5">
       <SiteSwitcher sites={sites} selectedSiteId={selectedSiteId} onChange={setSelectedSiteId} />
 
+      {/* KPI snapshot (kondisi saat ini) */}
       {loadingSummary ? (
         <div className="grid grid-cols-1 gap-4 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => <KpiCardSkeleton key={i} />)}
@@ -266,43 +182,83 @@ function DashboardPage() {
         </div>
       )}
 
-      {summary?.ketepatan_bulan_ini && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Ketepatan PM (Bulan Ini - {formatMonthKey(summary.ketepatan_bulan_ini.month)})</CardTitle>
-          </CardHeader>
-          {!loadingSummary && (
-            <div className="grid grid-cols-1 gap-4 gap-y-6 sm:grid-cols-2">
-              <KpiCard icon={<Target size={18} />} label="Ketepatan PM Monthly" value={formatKetepatan(summary.ketepatan_bulan_ini.monthly.percentage)} caption={ketepatanCaption(summary.ketepatan_bulan_ini.monthly.percentage, summary.ketepatan_bulan_ini.monthly.total, 'Input sebelum poin lewat cap', 'bulan ini')} status={ketepatanStatus(summary.ketepatan_bulan_ini.monthly.percentage)} />
-              <KpiCard icon={<Target size={18} />} label="Ketepatan PM Weekly" value={formatKetepatan(summary.ketepatan_bulan_ini.weekly.percentage)} caption={ketepatanCaption(summary.ketepatan_bulan_ini.weekly.percentage, summary.ketepatan_bulan_ini.weekly.total, 'Input dalam siklus hari weekly', 'bulan ini')} status={ketepatanStatus(summary.ketepatan_bulan_ini.weekly.percentage)} />
-            </div>
-          )}
+      {/* Pemilih periode global: menggerakkan semua blok Ketepatan PM di bawah */}
+      {!isRemoteView && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-[var(--font-display)] text-base font-semibold">Ketepatan PM</h2>
+          <KetepatanPeriodPicker
+            month={view?.month}
+            currentMonth={view?.currentMonth}
+            onChange={handlePeriodChange}
+            busy={localKetepatan.isFetching && localKetepatan.isPlaceholderData}
+          />
+        </div>
+      )}
+
+      {isLocalBackdate && (
+        <div className="flex items-start gap-2 rounded-lg border border-border bg-[var(--panel-2)] px-3.5 py-2.5 text-xs text-muted-foreground" role="note">
+          <Info size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+          <span>
+            Menampilkan Ketepatan PM per kondisi <strong className="font-semibold text-foreground">{monthLabel(view.month)}</strong>.
+            KPI di atas, Ringkasan Status Line, Critical Alerts, dan Line Tidak Running selalu menampilkan kondisi saat ini.
+          </span>
+        </div>
+      )}
+
+      {ketepatanError && (
+        <EmptyState
+          icon={AlertTriangle}
+          tone="danger"
+          title="Gagal memuat Ketepatan PM"
+          description="Terjadi kesalahan saat memuat data ketepatan untuk periode ini."
+          action={<Button type="button" size="sm" variant="outline" onClick={() => localKetepatan.refetch()}>Coba Lagi</Button>}
+        />
+      )}
+
+      {ketepatanLoading && !view && (
+        <div className="grid grid-cols-1 gap-4 gap-y-6 sm:grid-cols-2">
+          {[1, 2].map((i) => <KpiCardSkeleton key={i} />)}
+        </div>
+      )}
+
+      {view?.bulan && (
+        <Card className={dim}>
+          <CardHeader><CardTitle>Ketepatan PM ({titles.bulanCard})</CardTitle></CardHeader>
+          <div className="grid grid-cols-1 gap-4 gap-y-6 sm:grid-cols-2">
+            <KetepatanKpi label="Ketepatan PM Monthly" cell={view.bulan.monthly} caption={CAPTION.monthly} beforeStart={view.bulan.beforeStart} />
+            <KetepatanKpi label="Ketepatan PM Weekly" cell={view.bulan.weekly} caption={CAPTION.weekly} beforeStart={view.bulan.beforeStart} />
+          </div>
         </Card>
       )}
 
-      <Card>
-        <CardHeader><CardTitle>Ketepatan PM (Tahun Berjalan)</CardTitle></CardHeader>
-        {!loadingSummary && (
+      {view && (
+        <Card className={dim}>
+          <CardHeader><CardTitle>Ketepatan PM ({titles.tahunCard})</CardTitle></CardHeader>
           <div className="grid grid-cols-1 gap-4 gap-y-6 sm:grid-cols-3">
-            <KpiCard icon={<Target size={18} />} label="Ketepatan PM Part" value={formatKetepatan(summary.ketepatan_pm_part_percentage)} caption={ketepatanCaption(summary.ketepatan_pm_part_percentage, summary.ketepatan_pm_part_total, 'Diganti sebelum/tepat target shot')} status={ketepatanStatus(summary.ketepatan_pm_part_percentage)} />
-            <KpiCard icon={<Target size={18} />} label="Ketepatan PM Monthly" value={formatKetepatan(summary.ketepatan_pm_monthly_percentage)} caption={ketepatanCaption(summary.ketepatan_pm_monthly_percentage, summary.ketepatan_pm_monthly_total, 'Input sebelum poin lewat cap')} status={ketepatanStatus(summary.ketepatan_pm_monthly_percentage)} />
-            <KpiCard icon={<Target size={18} />} label="Ketepatan PM Weekly" value={formatKetepatan(summary.ketepatan_pm_weekly_percentage)} caption={ketepatanCaption(summary.ketepatan_pm_weekly_percentage, summary.ketepatan_pm_weekly_total, 'Input dalam siklus hari weekly')} status={ketepatanStatus(summary.ketepatan_pm_weekly_percentage)} />
+            <KetepatanKpi label="Ketepatan PM Part" cell={view.tahun.part} caption={CAPTION.part} beforeStart={view.tahun.beforeStart} />
+            <KetepatanKpi label="Ketepatan PM Monthly" cell={view.tahun.monthly} caption={CAPTION.monthly} beforeStart={view.tahun.beforeStart} />
+            <KetepatanKpi label="Ketepatan PM Weekly" cell={view.tahun.weekly} caption={CAPTION.weekly} beforeStart={view.tahun.beforeStart} />
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
 
-      {!loadingSummary && <KetepatanTrendPanel data={summary?.ketepatan_trend} />}
+      {view?.byMonth && (
+        <Card className={dim}>
+          <CardHeader><CardTitle>Ketepatan PM per Bulan ({view.year})</CardTitle></CardHeader>
+          <KetepatanYearChart byMonth={view.byMonth} selectedMonth={view.month} />
+        </Card>
+      )}
 
-      <KetepatanAttentionPanel
-        data={ketepatanAttention}
-        isLoading={isRemoteView ? false : localKetepatan.isLoading && !localKetepatan.data}
-        period={isRemoteView ? 'year' : ketepatanPeriod}
-        onPeriodChange={isRemoteView ? undefined : setKetepatanPeriod}
-      />
+      {view && (
+        <div className={dim}>
+          <KetepatanTrendPanel data={view.trend} currentMonth={view.currentMonth} selectedMonth={view.month} />
+        </div>
+      )}
 
+      {/* Ringkasan Status Line (snapshot) */}
       <Card>
         <CardHeader><CardTitle>Ringkasan Status Line</CardTitle></CardHeader>
-        {!loadingSummary && (
+        {!loadingSummary && summary && (
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
             <LineStatusDonut healthy={summary.lines_healthy} warning={summary.lines_warning} critical={summary.lines_critical} />
             <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
@@ -314,17 +270,27 @@ function DashboardPage() {
         )}
       </Card>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      {view && (
+        <div className={dim}>
+          <KetepatanBelowTargetPanel
+            items={belowItems}
+            period={belowPeriodShown}
+            onPeriodChange={isRemoteView ? undefined : setBelowPeriod}
+            onSelect={isRemoteView ? undefined : setLateItem}
+            labels={{ month: titles.monthLabel, year: titles.yearLabel, monthTab: titles.monthTab, yearTab: titles.yearTab }}
+            isLoading={false}
+          />
+        </div>
+      )}
+
+      {/* Snapshot: Critical Alerts (semua site) + Line Tidak Running (hanya data lokal) */}
+      <div className={`grid grid-cols-1 gap-5 ${isRemoteView ? '' : 'lg:grid-cols-2'}`}>
         {!(isRemoteView ? false : localAttention.isLoading) && <CriticalAlertsPanel items={attention} />}
-        {!(isRemoteView ? false : localUpcoming.isLoading) && <GanttUpcomingPanel items={upcoming} />}
+        {!isRemoteView && <IdleLinesPanel data={localIdle.data} isLoading={localIdle.isLoading} />}
       </div>
 
-      {/* Evidence & status idle dihitung dari data lokal; tidak tersedia untuk tampilan site lain. */}
-      {!isRemoteView && (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-          <LateLinesPanel data={localLate.data ?? []} isLoading={localLate.isLoading} />
-          <IdleLinesPanel data={localIdle.data} isLoading={localIdle.isLoading} />
-        </div>
+      {lateItem && view && (
+        <KetepatanLateDetailModal item={lateItem} period={belowPeriod} month={view.month} onClose={() => setLateItem(null)} />
       )}
     </div>
   );

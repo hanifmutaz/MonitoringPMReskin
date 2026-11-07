@@ -87,6 +87,13 @@
      (bukan warna status) biar gak nyuri fokus dari OK/Warn/Danger. */
   --neutral: #8d97a6;
   --neutral-dim: rgba(141, 151, 166, 0.16);
+
+  /* Warna seri chart (kategorikal, urutan TETAP: Part, Monthly, Weekly). Sengaja BUKAN
+     --ok/--warn/--danger (itu warna status, dicadangkan untuk makna status). Set 3-warna ini
+     divalidasi (CVD + normal-vision, semua pasangan) terhadap --panel #151b23. */
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
 }
 
 /* ==============================================================
@@ -123,4 +130,10 @@
 
   --neutral: #64748b;
   --neutral-dim: rgba(100, 116, 139, 0.12);
+
+  /* Seri chart tema terang, divalidasi terhadap --panel #ffffff. --chart-3 (aqua) kontrasnya 2,82:1
+     (< 3:1), jadi chart WAJIB punya legend + label langsung + tampilan tabel + bentuk marker beda. */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
 }
